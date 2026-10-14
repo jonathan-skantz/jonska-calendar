@@ -225,17 +225,6 @@ function App() {
     }
   }
 
-  const renameTag = async (tag: Tag) => {
-    const name = window.prompt('Rename tag', tag.name)?.trim()
-    if (!name || name === tag.name) return
-    try {
-      await api(`/api/tags/${tag.id}`, { method: 'PATCH', body: JSON.stringify({ name, color: tag.color }) })
-      await queryClient.invalidateQueries({ queryKey: ['workspace'] })
-    } catch (requestError) {
-      setActionError(requestError instanceof Error ? requestError.message : 'Unable to update tag')
-    }
-  }
-
   const deleteTag = async (tag: Tag) => {
     if (!window.confirm(`Delete tag “${tag.name}”?`)) return
     try {
