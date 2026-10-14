@@ -583,6 +583,7 @@ textarea:focus {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    background: var(--tag-color, #e5eee2);
 }
 
 .tag-control {
@@ -629,23 +630,6 @@ textarea:focus {
 
 .eye-icon.closed::after {
     display: none;
-}
-
-.tag-actions {
-    display: none;
-}
-
-.tag-actions button {
-    border: 0;
-    padding: 2px 4px;
-    background: transparent;
-    color: var(--muted);
-    font: 9px 'DM Mono', monospace;
-}
-
-.tag-actions button:hover {
-    color: var(--moss-dark);
-    text-decoration: underline;
 }
 
 .tag-help {
@@ -705,9 +689,15 @@ textarea:focus {
 
 .tag-picker label {
     display: flex;
-    grid-template-columns: none;
     align-items: center;
     gap: 7px;
+}
+
+.tag-option {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    align-items: center;
+    gap: 8px;
 }
 
 .source-note {
@@ -786,20 +776,20 @@ textarea:focus {
     z-index: 21;
 }
 
-.main-tag-floating {
-    position: fixed;
-    top: 108px;
-    right: 34px;
-    z-index: 21;
-    width: min(356px, calc(92vw - 64px));
-    padding: 12px 14px;
-    background: var(--paper);
-    border: 1px solid var(--line);
-    box-shadow: 0 8px 20px rgba(39, 52, 47, .1);
+.main-tag-button {
+    border: 0;
+    background: transparent;
+    color: var(--moss-dark);
+    padding: 3px 0;
+    font: 10px 'DM Mono', monospace;
+    text-transform: lowercase;
 }
 
-.main-tag-floating label {
-    gap: 5px;
+.main-tag-button:hover,
+.main-tag-button.active {
+    background: #e8eee3;
+    color: var(--moss-dark);
+    text-decoration: underline;
 }
 
 .danger-button {
@@ -914,16 +904,17 @@ textarea:focus {
     overflow-y: auto;
 }
 
+.composer.drawer:not(.tag-editor) {
+    padding-top: 30px;
+}
+
 .modal-heading {
     display: flex;
     justify-content: space-between;
 }
 
-.modal-heading h2 {
-    margin: 8px 0 25px;
-}
-
 .segmented {
+    text-align: center;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 4px;
