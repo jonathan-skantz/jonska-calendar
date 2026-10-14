@@ -1,0 +1,81 @@
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/google/uuid"
+	"github.com/joho/godotenv"
+	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/auth"
+	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
+)
+
+func main() {
+
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
+	}
+	connURL := os.Getenv("DATABASE_URL")
+	if connURL == "" {
+		log.Fatal("DATABASE_URL environment variable is not set")
+	}
+
+	ctx := context.Background()
+
+	dbPool, err := db.NewDBPool(ctx, connURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer dbPool.Close()
+
+	log.Println("Connected to the database")
+
+	handler := auth.New(
+		db.NewStore(dbPool),
+	)
+	timelineHandler := timeline.New(handler.Store, func(r *http.Request) (uuid.UUID, error) {
+		user, err := handler.UserFromRequest(r)
+		return user.ID, err
+	})
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Hello, World!"))
+	})
+
+	mux.HandleFunc("POST /api/auth/register", handler.Register)
+	mux.HandleFunc("POST /api/auth/login", handler.Login)
+	mux.HandleFunc("POST /api/auth/logout", handler.Logout)
+	mux.HandleFunc("GET /api/auth/me", handler.CurrentUser)
+	mux.HandleFunc("POST /api/events", timelineHandler.CreateEvent)
+	mux.HandleFunc("PUT /api/events/{eventID}", timelineHandler.UpdateEvent)
+	mux.HandleFunc("POST /api/tasks", timelineHandler.CreateTask)
+	mux.HandleFunc("PUT /api/tasks/{taskID}", timelineHandler.UpdateTask)
+	mux.HandleFunc("PATCH /api/tasks/{taskID}", timelineHandler.SetTaskCompleted)
+	mux.HandleFunc("DELETE /api/timeline/{itemID}", timelineHandler.DeleteTimelineItem)
+	mux.HandleFunc("GET /api/timeline", timelineHandler.ListTimeline)
+	mux.HandleFunc("POST /api/tags", timelineHandler.CreateTag)
+	mux.HandleFunc("GET /api/tags", timelineHandler.ListTags)
+	mux.HandleFunc("PATCH /api/tags/{tagID}", timelineHandler.RenameTag)
+	mux.HandleFunc("DELETE /api/tags/{tagID}", timelineHandler.DeleteTag)
+	mux.HandleFunc("PUT /api/tags/default", timelineHandler.SetDefaultTag)
+	mux.HandleFunc("POST /api/timeline/{itemID}/tags", timelineHandler.AddTagToItem)
+	mux.HandleFunc("DELETE /api/timeline/{itemID}/tags/{tagID}", timelineHandler.RemoveTagFromItem)
+	mux.HandleFunc("POST /api/events/{eventID}/shares", timelineHandler.ShareEvent)
+	mux.HandleFunc("GET /api/shared-events/{shareID}", timelineHandler.GetSharedEvent)
+	mux.HandleFunc("PATCH /api/shared-events/{shareID}", timelineHandler.UpdateSharedEvent)
+
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	if err := server.ListenAndServe(); err != nil {
+		dbPool.Close()
+		log.Fatal(err)
+	}
+
+}
