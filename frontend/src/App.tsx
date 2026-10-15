@@ -24,20 +24,9 @@ import {
   sameInstant,
   startOfCalendarWeek,
 } from "./lib/calendar";
+import { api } from "./lib/api";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import "./App.css";
-
-const api = async <T,>(path: string, options?: RequestInit): Promise<T> => {
-  const response = await fetch(path, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    ...options,
-  });
-  if (!response.ok)
-    throw new Error((await response.text()) || "Request failed");
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
-};
 
 const tagTextColor = (hex: string) =>
   wcagContrast(hex, "white") > wcagContrast(hex, "black")
