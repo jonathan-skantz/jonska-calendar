@@ -39,6 +39,44 @@ func TestCreateRequiresAuthentication(t *testing.T) {
 	}
 }
 
+func TestRequireUserWritesUnauthorizedResponse(t *testing.T) {
+	handler := New(nil, func(*http.Request) (uuid.UUID, error) {
+		return uuid.Nil, errors.New("not authenticated")
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/timeline", nil)
+
+	userID, ok := handler.requireUser(response, request)
+
+	if ok || userID != uuid.Nil {
+		t.Fatalf("expected no user, got %s", userID)
+	}
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, response.Code)
+	}
+	if response.Body.String() != "authentication required\n" {
+		t.Fatalf("unexpected response body %q", response.Body.String())
+	}
+}
+
+func TestRequireUserReturnsAuthenticatedUser(t *testing.T) {
+	expectedID := uuid.New()
+	handler := New(nil, func(*http.Request) (uuid.UUID, error) {
+		return expectedID, nil
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/timeline", nil)
+
+	userID, ok := handler.requireUser(response, request)
+
+	if !ok || userID != expectedID {
+		t.Fatalf("expected user %s, got %s", expectedID, userID)
+	}
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected no response before handler work, got status %d", response.Code)
+	}
+}
+
 func TestCreateEventValidatesInput(t *testing.T) {
 	handler := New(nil, func(*http.Request) (uuid.UUID, error) { return uuid.New(), nil })
 	request := httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(`{

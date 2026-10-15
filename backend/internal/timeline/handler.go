@@ -103,10 +103,18 @@ func New(store *db.Store, currentUser CurrentUser) *Handler {
 	return &Handler{Store: store, CurrentUser: currentUser}
 }
 
-func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	userID, err := h.CurrentUser(r)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return uuid.Nil, false
+	}
+	return userID, true
+}
+
+func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 
@@ -144,9 +152,8 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	eventID, err := uuid.Parse(r.PathValue("eventID"))
@@ -201,9 +208,8 @@ func validateEventRequest(request eventRequest) error {
 }
 
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 
@@ -235,9 +241,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	taskID, err := uuid.Parse(r.PathValue("taskID"))
@@ -273,9 +278,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SetTaskCompleted(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	taskID, err := uuid.Parse(r.PathValue("taskID"))
@@ -300,9 +304,8 @@ func (h *Handler) SetTaskCompleted(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteTimelineItem(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	itemID, err := uuid.Parse(r.PathValue("itemID"))
@@ -322,9 +325,8 @@ func (h *Handler) DeleteTimelineItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListTimeline(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 
@@ -338,9 +340,8 @@ func (h *Handler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	var request tagRequest
@@ -363,9 +364,8 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListTags(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	tags, err := h.Store.ListTags(r.Context(), userID)
@@ -378,9 +378,8 @@ func (h *Handler) ListTags(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SetDefaultTag(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	var request tagSelectionRequest
@@ -396,9 +395,8 @@ func (h *Handler) SetDefaultTag(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) RenameTag(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	tagID, err := uuid.Parse(r.PathValue("tagID"))
@@ -439,9 +437,8 @@ func validTagColor(color string) bool {
 }
 
 func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	tagID, err := uuid.Parse(r.PathValue("tagID"))
@@ -461,9 +458,8 @@ func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AddTagToItem(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	itemID, err := uuid.Parse(r.PathValue("itemID"))
@@ -486,9 +482,8 @@ func (h *Handler) AddTagToItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) RemoveTagFromItem(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	itemID, err := uuid.Parse(r.PathValue("itemID"))
@@ -513,9 +508,8 @@ func (h *Handler) RemoveTagFromItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
-	ownerID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	ownerID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	eventID, err := uuid.Parse(r.PathValue("eventID"))
@@ -547,9 +541,8 @@ func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetSharedEvent(w http.ResponseWriter, r *http.Request) {
-	recipientID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	recipientID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	shareID, err := uuid.Parse(r.PathValue("shareID"))
@@ -567,9 +560,8 @@ func (h *Handler) GetSharedEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateSharedEvent(w http.ResponseWriter, r *http.Request) {
-	recipientID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	recipientID, ok := h.requireUser(w, r)
+	if !ok {
 		return
 	}
 	shareID, err := uuid.Parse(r.PathValue("shareID"))
