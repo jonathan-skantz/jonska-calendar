@@ -39,6 +39,9 @@ import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { AuthScreen } from "./components/AuthScreen";
+import { EventTagPicker } from "./components/EventTagPicker";
+import { Sidebar } from "./components/Sidebar";
+import { TagEditorDrawer } from "./components/TagEditorDrawer";
 import { WeekCalendar } from "./components/WeekCalendar";
 import { WeekHeader } from "./components/WeekHeader";
 import { TopBar } from "./components/TopBar";
@@ -588,79 +591,17 @@ function App() {
             )}
           />
         </div>
-        <aside className="side-panel">
-          <div className="pulse-panel">
-            <span className="pulse-dot" />
-            <div>
-              <p className="eyebrow">Today</p>
-              <strong>
-                {openTasks} open task{openTasks === 1 ? "" : "s"}
-              </strong>
-            </div>
-          </div>
-          <div className="side-section">
-            <div className="section-heading small">
-              <h2>Event filters</h2>
-              <button
-                className="icon-button"
-                aria-label="Add tag"
-                onClick={createTag}
-              >
-                ＋
-              </button>
-            </div>
-            <div className="tag-cloud">
-              {tags.length ? (
-                tags.map((tag) => {
-                  const isHidden = hiddenTagIds.includes(tag.id);
-                  return (
-                    <div className="tag-control" key={tag.id}>
-                      <button
-                        className={isHidden ? "tag large hidden" : "tag large"}
-                        style={{
-                          backgroundColor: tag.color,
-                          color: tagTextColor(tag.color),
-                        }}
-                        onClick={() => toggleTagVisibility(tag.id)}
-                        aria-label={`${isHidden ? "Show" : "Hide"} ${tag.name} events`}
-                      >
-                        <span
-                          className={`eye-icon ${isHidden ? "closed" : "open"}`}
-                          aria-hidden="true"
-                        />
-                        {tag.name}
-                      </button>
-                    </div>
-                  );
-                })
-              ) : (
-                <span className="muted">No tags yet</span>
-              )}
-            </div>
-            <p className="tag-help">
-              Click a tag to hide or show its events. Default:{" "}
-              {tags.find((tag) => tag.is_default)?.name ?? "none"}
-            </p>
-          </div>
-          <div className="tag-editor-trigger">
-            <button
-              className="text-button"
-              onClick={() => {
-                setActionError("");
-                setShowTagEditor(true);
-              }}
-            >
-              Edit
-            </button>
-          </div>
-          <div className="side-section family-note">
-            <span className="note-symbol">✳</span>
-            <p>
-              Shared events stay yours to arrange. Changes you make to their
-              appearance are private.
-            </p>
-          </div>
-        </aside>
+        <Sidebar
+          openTaskCount={openTasks}
+          tags={tags}
+          hiddenTagIds={hiddenTagIds}
+          onToggleTagVisibility={toggleTagVisibility}
+          onAddTag={createTag}
+          onEditTags={() => {
+            setActionError("");
+            setShowTagEditor(true);
+          }}
+        />
       </section>
       {showComposer && (
         <div
@@ -787,43 +728,13 @@ function App() {
                       placeholder="Home, online, or somewhere else"
                     />
                   </label>
-                  <fieldset className="tag-picker">
-                    <legend>Event tags</legend>
-                    {tags.map((tag) => (
-                      <div className="tag-option" key={tag.id}>
-                        <button
-                          type="button"
-                          className={
-                            composerMainTagId === tag.id
-                              ? "main-tag-button active"
-                              : "main-tag-button"
-                          }
-                          onClick={() => {
-                            setComposerMainTagId(tag.id);
-                            setComposerTagIds((current) =>
-                              current.includes(tag.id) ? current : [...current, tag.id],
-                            );
-                          }}
-                        >
-                          main
-                        </button>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={composerTagIds.includes(tag.id)}
-                            onChange={() =>
-                              setComposerTagIds((current) =>
-                                current.includes(tag.id)
-                                  ? current.filter((id) => id !== tag.id)
-                                  : [...current, tag.id],
-                              )
-                            }
-                          />
-                          {tag.name}
-                        </label>
-                      </div>
-                    ))}
-                  </fieldset>
+                  <EventTagPicker
+                    tags={tags}
+                    selectedTagIds={composerTagIds}
+                    mainTagId={composerMainTagId}
+                    onSelectedTagIdsChange={setComposerTagIds}
+                    onMainTagIdChange={setComposerMainTagId}
+                  />
                 </>
               ) : (
                 <label>
@@ -857,71 +768,14 @@ function App() {
         </button>
       )}
       {showTagEditor && (
-        <div
-          className="drawer-backdrop"
-          onMouseDown={(event) =>
-            event.target === event.currentTarget && setShowTagEditor(false)
-          }
-        >
-          <aside className="composer drawer tag-editor">
-            <div className="modal-heading">
-              <div>
-                <p className="eyebrow">Event filters</p>
-                <h2>Edit tags.</h2>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => setShowTagEditor(false)}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            {actionError && <p className="error">{actionError}</p>}
-            <div className="tag-editor-list">
-              {tags.map((tag) => (
-                <form
-                  className="tag-editor-entry"
-                  key={tag.id}
-                  onSubmit={(event) => updateTag(event, tag)}
-                >
-                  <label>
-                    Name
-                    <input name="name" defaultValue={tag.name} required />
-                  </label>
-                  <label>
-                    Color
-                    <input
-                      className="tag-color-input"
-                      name="color"
-                      type="color"
-                      defaultValue={tag.color}
-                    />
-                  </label>
-                  <div className="tag-editor-actions">
-                    <button className="primary-button" type="submit">
-                      Save
-                    </button>
-                    <button
-                      className="text-button"
-                      type="button"
-                      onClick={() => updateDefaultTag(tag.id)}
-                    >
-                      {tag.is_default ? "Default tag" : "Make default"}
-                    </button>
-                    <button
-                      className="danger-button"
-                      type="button"
-                      onClick={() => deleteTag(tag)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </form>
-              ))}
-            </div>
-          </aside>
-        </div>
+        <TagEditorDrawer
+          tags={tags}
+          error={actionError}
+          onClose={() => setShowTagEditor(false)}
+          onUpdate={updateTag}
+          onUpdateDefault={(tag) => updateDefaultTag(tag.id)}
+          onDelete={deleteTag}
+        />
       )}
     </main>
   );
