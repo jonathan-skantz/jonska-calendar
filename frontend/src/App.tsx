@@ -106,11 +106,16 @@ function App() {
   );
   const [draftEventStart, setDraftEventStart] = useState<string | null>(null);
   const [hiddenTagIds, setHiddenTagIds] = useState<string[]>([]);
-  const [today] = useState(() => new Date());
+  const [today, setToday] = useState(() => new Date());
   const [weekStart, setWeekStart] = useState(() => startOfCalendarWeek(today));
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
   const [actionError, setActionError] = useState("");
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
+
+  useEffect(() => {
+    const clock = window.setInterval(() => setToday(new Date()), 60_000);
+    return () => window.clearInterval(clock);
+  }, []);
 
   const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
