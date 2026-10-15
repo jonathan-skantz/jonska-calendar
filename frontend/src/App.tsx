@@ -16,7 +16,6 @@ import {
   inputDateTime,
   localDateKey,
   minutesIntoDay,
-  startOfCalendarWeek,
 } from "./lib/calendar";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
@@ -35,6 +34,7 @@ import { useWorkspace } from "./hooks/useWorkspace";
 import { useAuth } from "./features/auth/useAuth";
 import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
 import { useTagMutations } from "./features/tags/useTagMutations";
+import { useCalendarState } from "./features/calendar/useCalendarState";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
 import { CalendarEntry } from "./components/CalendarEntry";
@@ -63,8 +63,8 @@ function App() {
   const [showTagEditor, setShowTagEditor] = useState(false);
   const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } = useTagVisibility();
   const today = useCurrentTime();
-  const [weekStart, setWeekStart] = useState(() => startOfCalendarWeek(today));
-  const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
+  const { weekStart, selectedDate, setSelectedDate, moveWeek } =
+    useCalendarState(today);
   const [actionError, setActionError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
   const tagMutations = useTagMutations(setActionError, removeHiddenTag);
@@ -200,11 +200,6 @@ function App() {
   const dates = Array.from({ length: WEEK_DAY_COUNT }, (_, index) =>
     addDays(weekStart, index),
   );
-  const moveWeek = (days: number) => {
-    const nextWeek = addDays(weekStart, days);
-    setWeekStart(nextWeek);
-    setSelectedDate(dateKey(nextWeek));
-  };
   const openTasks = entries.filter(
     (entry) => entry.type === "task" && !entry.is_completed,
   ).length;
