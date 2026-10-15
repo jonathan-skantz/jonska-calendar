@@ -724,7 +724,10 @@ function App() {
             <div className="week-day-headings">
               <span />
               {dates.map((date) => (
-                <div className="day-heading" key={dateKey(date)}>
+                <div
+                  className={`day-heading ${date.getDay() === 0 || date.getDay() === 6 ? "weekend" : ""}`}
+                  key={dateKey(date)}
+                >
                   <strong>{date.getDate()}</strong>
                   <span>{formatDate(date).split(",")[0]}</span>
                 </div>
@@ -738,7 +741,7 @@ function App() {
               </div>
               {dates.map((date) => (
                 <div
-                  className="day-column"
+                  className={`day-column ${date.getDay() === 0 || date.getDay() === 6 ? "weekend" : ""}`}
                   key={dateKey(date)}
                   onClick={(event) => openNewEventAt(event, date)}
                 >

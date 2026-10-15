@@ -329,6 +329,10 @@ textarea:focus {
     text-transform: uppercase;
 }
 
+.day-heading.weekend {
+    background: #fff0ee;
+}
+
 .week-grid {
     display: grid;
     grid-template-columns: 56px repeat(7, minmax(110px, 1fr));
@@ -353,6 +357,10 @@ textarea:focus {
     border-left: 1px solid var(--line);
     background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2rem - 1px), #e8ece4 calc(2rem - 1px), #e8ece4 2rem);
     cursor: crosshair;
+}
+
+.day-column.weekend {
+    background-color: #fff7f5;
 }
 
 .grid-entry {
