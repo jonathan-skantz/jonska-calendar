@@ -9,7 +9,6 @@ type CalendarEntryProps = {
   durationMinutes: number;
   trimTop: boolean;
   trimBottom: boolean;
-  fullyElapsed: boolean;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
 };
@@ -20,7 +19,6 @@ export const CalendarEntry = ({
   durationMinutes,
   trimTop,
   trimBottom,
-  fullyElapsed,
   onEdit,
   onToggleTask,
 }: CalendarEntryProps) => {
@@ -43,7 +41,7 @@ export const CalendarEntry = ({
 
   return (
     <article
-      className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${fullyElapsed ? "elapsed" : ""}`}
+      className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""}`}
       style={{
         top: `${(startMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
         height: `calc(${(durationMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem - ${(trimTop ? EVENT_SEPARATOR_PIXELS : 0) + (trimBottom ? EVENT_SEPARATOR_PIXELS : 0)}px)`,

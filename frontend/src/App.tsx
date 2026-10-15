@@ -167,20 +167,18 @@ function App() {
   ) => openNewComposer(getClickedEventStart(event, date));
   const renderGridEntry = (
     entry: TimelineEntry,
+    layout: ReturnType<typeof getCalendarEntryLayout>,
     trimTop = false,
     trimBottom = false,
   ) => {
-    const { startMinutes, durationMinutes, fullyElapsed } =
-      getCalendarEntryLayout(entry, today);
     return (
       <CalendarEntry
         key={entry.id}
         entry={entry}
-        startMinutes={startMinutes}
-        durationMinutes={durationMinutes}
+        startMinutes={layout.startMinutes}
+        durationMinutes={layout.durationMinutes}
         trimTop={trimTop}
         trimBottom={trimBottom}
-        fullyElapsed={fullyElapsed}
         onEdit={editItem}
         onToggleTask={toggleTask}
       />
@@ -188,7 +186,7 @@ function App() {
   };
   const renderDayEntries = (date: Date) => {
     const dayEntries = getEntriesForDate(weekEntries, date);
-    return dayEntries.map((entry, index) => {
+    const entriesWithLayout = dayEntries.map((entry, index) => {
       const previous = dayEntries[index - 1];
       const next = dayEntries[index + 1];
       const { trimTop, trimBottom } = getEventAdjacency(
@@ -196,7 +194,27 @@ function App() {
         previous,
         next,
       );
-      return renderGridEntry(entry, trimTop, trimBottom);
+      const layout = getCalendarEntryLayout(entry, today);
+      return {
+        layout,
+        rendered: renderGridEntry(entry, layout, trimTop, trimBottom),
+      };
+    });
+    const elapsedEntries = entriesWithLayout.filter(
+      (item) => item.layout.fullyElapsed,
+    );
+    const firstElapsedIndex = entriesWithLayout.findIndex(
+      (item) => item.layout.fullyElapsed,
+    );
+
+    return entriesWithLayout.map((item, index) => {
+      if (!item.layout.fullyElapsed) return item.rendered;
+      if (index !== firstElapsedIndex) return null;
+      return (
+        <div className="elapsed-event-group" key="elapsed-event-group">
+          {elapsedEntries.map((elapsedEntry) => elapsedEntry.rendered)}
+        </div>
+      );
     });
   };
   return (

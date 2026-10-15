@@ -122,7 +122,7 @@
     white-space: nowrap;
 }
 
-.grid-entry.event.elapsed {
+.elapsed-event-group {
     filter: grayscale(0.1);
     opacity: .62;
 }
