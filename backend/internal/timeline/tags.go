@@ -2,7 +2,6 @@ package timeline
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 
@@ -26,12 +25,14 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tag, err := h.Store.CreateTag(r.Context(), userID, strings.TrimSpace(request.Name))
-	if errors.Is(err, db.ErrTagAlreadyExists) {
-		http.Error(w, "tag already exists", http.StatusConflict)
-		return
-	}
 	if err != nil {
-		http.Error(w, "failed to create tag", http.StatusInternalServerError)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to create tag"},
+			mappedErrorResponse{
+				cause:    db.ErrTagAlreadyExists,
+				response: httpErrorResponse{status: http.StatusConflict, message: "tag already exists"},
+			},
+		)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -94,11 +95,13 @@ func (h *Handler) RenameTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.RenameTag(r.Context(), userID, tagID, strings.TrimSpace(request.Name), request.Color); err != nil {
-		if errors.Is(err, db.ErrTagAlreadyExists) {
-			http.Error(w, "tag already exists", http.StatusConflict)
-			return
-		}
-		http.Error(w, "tag not found", http.StatusNotFound)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusNotFound, message: "tag not found"},
+			mappedErrorResponse{
+				cause:    db.ErrTagAlreadyExists,
+				response: httpErrorResponse{status: http.StatusConflict, message: "tag already exists"},
+			},
+		)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -115,11 +118,13 @@ func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.DeleteTag(r.Context(), userID, tagID); err != nil {
-		if errors.Is(err, db.ErrLastTag) {
-			http.Error(w, "at least one tag is required", http.StatusConflict)
-			return
-		}
-		http.Error(w, "tag not found", http.StatusNotFound)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusNotFound, message: "tag not found"},
+			mappedErrorResponse{
+				cause:    db.ErrLastTag,
+				response: httpErrorResponse{status: http.StatusConflict, message: "at least one tag is required"},
+			},
+		)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -167,11 +172,13 @@ func (h *Handler) RemoveTagFromItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.RemoveTagFromItem(r.Context(), userID, itemID, tagID); err != nil {
-		if errors.Is(err, db.ErrLastTag) {
-			http.Error(w, "events must have at least one tag", http.StatusConflict)
-			return
-		}
-		http.Error(w, "item tag not found", http.StatusNotFound)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusNotFound, message: "item tag not found"},
+			mappedErrorResponse{
+				cause:    db.ErrLastTag,
+				response: httpErrorResponse{status: http.StatusConflict, message: "events must have at least one tag"},
+			},
+		)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

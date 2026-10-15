@@ -2,7 +2,6 @@ package timeline
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -41,11 +40,13 @@ func (h *Handler) DeleteTimelineItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.DeleteTimelineItem(r.Context(), userID, itemID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "timeline item not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, "failed to delete timeline item", http.StatusInternalServerError)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to delete timeline item"},
+			mappedErrorResponse{
+				cause:    pgx.ErrNoRows,
+				response: httpErrorResponse{status: http.StatusNotFound, message: "timeline item not found"},
+			},
+		)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

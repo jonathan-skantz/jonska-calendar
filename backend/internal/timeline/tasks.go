@@ -2,7 +2,6 @@ package timeline
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -63,11 +62,13 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		Title: request.Title, Description: request.Description, URL: request.URL,
 		DeadlineAt: request.DeadlineAt,
 	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "task not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, "failed to update task", http.StatusInternalServerError)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update task"},
+			mappedErrorResponse{
+				cause:    pgx.ErrNoRows,
+				response: httpErrorResponse{status: http.StatusNotFound, message: "task not found"},
+			},
+		)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -89,11 +90,13 @@ func (h *Handler) SetTaskCompleted(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.SetTaskCompleted(r.Context(), userID, taskID, request.IsCompleted); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "task not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, "failed to update task", http.StatusInternalServerError)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update task"},
+			mappedErrorResponse{
+				cause:    pgx.ErrNoRows,
+				response: httpErrorResponse{status: http.StatusNotFound, message: "task not found"},
+			},
+		)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

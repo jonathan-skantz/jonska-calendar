@@ -2,7 +2,6 @@ package timeline
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -40,11 +39,13 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		MainTagID:            request.MainTagID,
 	})
 	if err != nil {
-		if errors.Is(err, db.ErrTagNotFound) {
-			http.Error(w, "main tag not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, "failed to create event", http.StatusInternalServerError)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to create event"},
+			mappedErrorResponse{
+				cause:    db.ErrTagNotFound,
+				response: httpErrorResponse{status: http.StatusNotFound, message: "main tag not found"},
+			},
+		)
 		return
 	}
 	writeCreated(w, id)
@@ -76,15 +77,17 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		CommuteAfterSeconds: request.CommuteAfterSeconds,
 		MainTagID:           request.MainTagID,
 	}); err != nil {
-		if errors.Is(err, db.ErrTagNotFound) {
-			http.Error(w, "main tag not found", http.StatusNotFound)
-			return
-		}
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "event not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, "failed to update event", http.StatusInternalServerError)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update event"},
+			mappedErrorResponse{
+				cause:    db.ErrTagNotFound,
+				response: httpErrorResponse{status: http.StatusNotFound, message: "main tag not found"},
+			},
+			mappedErrorResponse{
+				cause:    pgx.ErrNoRows,
+				response: httpErrorResponse{status: http.StatusNotFound, message: "event not found"},
+			},
+		)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
