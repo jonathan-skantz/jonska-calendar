@@ -117,6 +117,12 @@ The owner is derived through `event_shares.event_id -> events.timeline_item_id -
 
 A shared event is a projection, not a copy. The source fields are read from the owner's current event, and local override fields are applied only for the recipient. This is why the API can show both the source title and the recipient's local title.
 
+## SQL Code Generation
+
+`sqlc` was evaluated for the current PostgreSQL store and is not adopted yet. It supports PostgreSQL, pgx/v5, generated typed query methods, transaction-bound query sets, and type overrides for `google/uuid`. See the [sqlc configuration guide](https://docs.sqlc.dev/en/stable/reference/config.html), [transaction guide](https://docs.sqlc.dev/en/stable/howto/transactions.html), and [type override guide](https://docs.sqlc.dev/en/stable/howto/overrides.html).
+
+The store currently has 26 methods and about 44 pgx query or exec calls. Its files already group SQL by feature. The main benefit from `sqlc` would be generated parameter and result types, with less manual row scanning. Adoption would also require named query files, code generation configuration, generated Go files, and a UUID override to keep `google/uuid`. Several operations still need handwritten transaction and validation workflows around queries. Keep the current pgx methods and review `sqlc` again if the query count or repeated scan code grows. The CLI would be a development tool, not a runtime dependency.
+
 ## Request Flow
 
 For an authenticated timeline request:
