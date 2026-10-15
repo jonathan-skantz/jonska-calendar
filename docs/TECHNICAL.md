@@ -45,11 +45,10 @@ The frontend is a separate development server. Vite proxies `/api` to the Go ser
 - [backend/internal/auth/handler.go](../backend/internal/auth/handler.go)
   - Registration, login, logout, current-user endpoint, and session-cookie parsing.
   - Password hashing uses Argon2id.
-- [backend/internal/timeline/handler.go](../backend/internal/timeline/handler.go)
-  - HTTP decoding, validation, ownership-aware calls, and JSON responses for events, tasks, tags, timeline listing, and sharing.
-- [backend/db/store.go](../backend/db/store.go)
-  - PostgreSQL queries and transaction boundaries.
-  - It currently contains user/session, timeline, sharing, tag, and projection queries. It is the first backend file to split when the domain grows further.
+- [backend/internal/timeline/](../backend/internal/timeline/)
+  - `handler.go` contains shared handler setup and timeline operations. `requests.go` defines API payloads and responses. Feature files contain event, task, tag, and sharing endpoints. `validation.go` contains request validation.
+- [backend/db/](../backend/db/)
+  - `store.go` owns the PostgreSQL pool reference and setup. `users.go`, `events.go`, `tasks.go`, `tags.go`, `sharing.go`, and `timeline.go` group queries by feature. `models.go` and `errors.go` define store types and sentinel errors.
 - [backend/db/migrations](../backend/db/migrations)
   - Ordered Goose migrations. Never edit an applied migration; add a new one.
 - `handler_test.go` files
@@ -60,10 +59,9 @@ The frontend is a separate development server. Vite proxies `/api` to the Go ser
 - [frontend/src/main.tsx](../frontend/src/main.tsx)
   - Creates the React root and the TanStack Query client provider.
 - [frontend/src/App.tsx](../frontend/src/App.tsx)
-  - Current application shell, auth screen, workspace, custom week grid, composer, and item actions.
-  - This is intentionally compact for the demo, but it is now the main frontend refactoring target.
+  - Application shell and coordination for authentication, workspace, calendar, and drawers. Presentational components live under `frontend/src/components/`; shared state helpers live under `frontend/src/hooks/`.
 - [frontend/src/App.css](../frontend/src/App.css)
-  - All current application styles, including the grid geometry.
+  - Imports feature styles from `frontend/src/styles/`, including tokens, base rules, auth, calendar, sidebar, and drawers.
 - [frontend/src/index.css](../frontend/src/index.css)
   - Global reset, fonts, and base element styles.
 - [frontend/vite.config.ts](../frontend/vite.config.ts)
@@ -129,6 +127,44 @@ For an authenticated timeline request:
 
 Authorization is intentionally enforced at the database query boundary as well as in the handler. A guessed UUID must not be enough to edit, complete, tag, or delete another user's data.
 
+## HTTP API
+
+All API routes use JSON request and response bodies unless the response is `204 No Content`. Error responses use plain text. Authenticated routes require the HTTP-only `calendar_session` cookie.
+
+| Method and path | Request JSON | Successful response |
+| --- | --- | --- |
+| `POST /api/auth/register` | `email`, `password` | `201` with `{ "id": "<uuid>" }` |
+| `POST /api/auth/login` | `email`, `password` | `200` with `{ "id": "<uuid>" }` and a session cookie |
+| `POST /api/auth/logout` | None | `204`; clears the session cookie |
+| `GET /api/auth/me` | None | `{ "id": "<uuid>", "email": "..." }` |
+| `GET /api/timeline` | None | Array of timeline entries |
+| `POST /api/events` | Event fields below | `201` with `{ "id": "<uuid>" }` |
+| `PUT /api/events/{eventID}` | Event fields below | `204` |
+| `POST /api/tasks` | Task fields below | `201` with `{ "id": "<uuid>" }` |
+| `PUT /api/tasks/{taskID}` | Task fields below | `204` |
+| `PATCH /api/tasks/{taskID}` | `is_completed` | `204` |
+| `DELETE /api/timeline/{itemID}` | None | `204` |
+| `GET /api/tags` | None | Array of tags |
+| `POST /api/tags` | `name` | `201` with a tag |
+| `PATCH /api/tags/{tagID}` | `name`, `color` | `204` |
+| `DELETE /api/tags/{tagID}` | None | `204` |
+| `PUT /api/tags/default` | `tag_id` | `204` |
+| `POST /api/timeline/{itemID}/tags` | `tag_id` | `204` |
+| `DELETE /api/timeline/{itemID}/tags/{tagID}` | None | `204` |
+| `POST /api/events/{eventID}/shares` | `recipient_email` | `201` with `{ "id": "<share-uuid>" }` |
+| `GET /api/shared-events/{shareID}` | None | Shared event response below |
+| `PATCH /api/shared-events/{shareID}` | Any supplied override fields below | `204` |
+
+Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. The `kind` value is `attendable` or `informational`. Commute durations cannot be negative. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
+
+Task request fields are `title`, `description`, `url`, and `deadline_at`. The title and deadline are required. `deadline_at` is a timestamp.
+
+Tag colors use the six-digit hexadecimal form `#RRGGBB`. Tag responses contain `id`, `name`, `color`, and `is_default`.
+
+Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `source_title`, `custom_info`, `tags`, and `main_tag_id`. Optional response fields are omitted when empty. Timestamps use JSON time format.
+
+Shared event responses contain `share_id`, `event_id`, `original_title`, `starts_at`, `ends_at`, and `kind`. Optional fields are `original_description`, `original_url`, `original_location`, `local_title`, `local_description`, `local_url`, `local_location`, and `private_custom_info`. The patch accepts any subset of the local fields: `title`, `description`, `url`, `location`, and `custom_info`.
+
 ## Frontend Data Flow
 
 The frontend uses:
@@ -147,18 +183,18 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Need | Primary location | Related location |
 | --- | --- | --- |
 | Add or change an API route | `backend/cmd/server.go` | handler file for the domain |
-| Change auth/session behavior | `backend/internal/auth/handler.go` | auth methods in `backend/db/store.go`, migration 2 |
-| Change event/task validation | `backend/internal/timeline/handler.go` | PostgreSQL constraints and store method |
-| Change event/task persistence | `backend/db/store.go` | migrations 1 and 3 |
-| Change sharing ownership or overrides | `backend/db/store.go` | migration 4/5, timeline handler |
-| Change tag ownership, defaults, or attachment | `backend/db/store.go` | migrations 6-8, timeline handler |
-| Change timeline JSON shape | `db.TimelineEntry` in `backend/db/store.go` | frontend `TimelineEntry` type and grid rendering |
+| Change auth/session behavior | `backend/internal/auth/handler.go` | `backend/db/users.go`, migration 2 |
+| Change event/task validation | `backend/internal/timeline/validation.go` | PostgreSQL constraints and feature handler/store files |
+| Change event/task persistence | `backend/db/events.go` or `backend/db/tasks.go` | migrations 1 and 3 |
+| Change sharing ownership or overrides | `backend/db/sharing.go` and `backend/db/timeline.go` | migrations 4/5, timeline handlers |
+| Change tag ownership, defaults, or attachment | `backend/db/tags.go` | migrations 6-8, timeline handlers |
+| Change timeline JSON shape | `db.TimelineEntry` in `backend/db/models.go` | frontend `TimelineEntry` type and grid rendering |
 | Change week navigation/date math | `frontend/src/App.tsx` date helpers and week state | `date-fns` imports |
 | Change event block placement | `frontend/src/App.tsx` `renderGridEntry` | `.grid-entry` in `frontend/src/App.css` |
 | Change hour grid dimensions | `frontend/src/App.css` `.week-grid`, `.hour-labels`, `.day-column` | `renderGridEntry` positioning |
 | Change create-item fields | composer in `frontend/src/App.tsx` | backend request structs and validation |
 | Change client caching/loading | TanStack Query setup in `frontend/src/main.tsx` and workspace query in `App.tsx` | API wrapper |
-| Change colors, spacing, or layout | `frontend/src/App.css` | `frontend/src/index.css` for global rules |
+| Change colors, spacing, or layout | `frontend/src/styles/` | `frontend/src/index.css` for global rules |
 
 ## Maintainability Rules
 
@@ -176,12 +212,9 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 
 The current demo is functional, but `App.tsx` and `store.go` are becoming broad. Refactor in this order when the next feature requires it:
 
-1. Split the frontend into `api/`, `features/auth/`, `features/timeline/`, and `components/`.
-2. Move the week grid into a `WeekView` component and keep date/layout helpers beside it.
-3. Move the composer into an `ItemComposer` component and share typed event/task form models.
-4. Split `store.go` into `auth_store.go`, `timeline_store.go`, `sharing_store.go`, and `tag_store.go` while keeping `db.Store` as the shared connection owner.
-5. Add a small backend service layer only when workflows span multiple stores or need reusable business rules. Do not add one solely for indirection.
-6. Add UI and API support for edit/share/local overrides before implementing future scheduling or recurrence features.
+1. Move remaining auth, timeline, tag, and calendar mutations out of `App.tsx` only when this reduces state coordination.
+2. Consider a backend service layer only when workflows span multiple stores or need reusable business rules. Do not add one solely for indirection.
+3. Add UI and API support for edit/share/local overrides before implementing future scheduling or recurrence features.
 
 ## Future Architecture Pressure
 
