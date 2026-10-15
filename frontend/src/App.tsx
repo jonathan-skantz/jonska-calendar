@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { wcagContrast } from "culori";
 import type { FormEvent, MouseEvent } from "react";
 import { addDays, format } from "date-fns";
 import {
@@ -25,13 +24,9 @@ import {
   startOfCalendarWeek,
 } from "./lib/calendar";
 import { api } from "./lib/api";
+import { tagTextColor } from "./lib/colors";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import "./App.css";
-
-const tagTextColor = (hex: string) =>
-  wcagContrast(hex, "white") > wcagContrast(hex, "black")
-    ? "#ffffff"
-    : "#000000";
 
 function App() {
   const queryClient = useQueryClient();
