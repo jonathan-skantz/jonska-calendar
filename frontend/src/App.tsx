@@ -37,6 +37,7 @@ import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
+import { AuthScreen } from "./components/AuthScreen";
 import { queryKeys } from "./lib/queryKeys";
 import "./App.css";
 
@@ -370,60 +371,18 @@ function App() {
     return <div className="loading-screen">Loading your calendar...</div>;
   if (!user) {
     return (
-      <main className="auth-screen">
-        <div className="auth-mark">JS / CAL</div>
-        <section className="auth-panel">
-          <p className="eyebrow">A private family calendar</p>
-          <h1>
-            Make room for
-            <br />
-            <em>what matters.</em>
-          </h1>
-          <p className="auth-copy">
-            Your days, shared with the people who belong in them.
-          </p>
-          <form onSubmit={submitAuth}>
-            <label>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </label>
-            {error && <p className="error">{error}</p>}
-            <button className="primary-button" type="submit">
-              {authMode === "login" ? "Enter calendar" : "Create account"}{" "}
-              <span>↗</span>
-            </button>
-          </form>
-          <button
-            className="text-button"
-            onClick={() =>
-              setAuthMode(authMode === "login" ? "register" : "login")
-            }
-          >
-            {authMode === "login"
-              ? "New here? Create an account"
-              : "Already have an account? Sign in"}
-          </button>
-        </section>
-        <div className="auth-note">
-          Built for close circles
-          <br />
-          and ordinary days.
-        </div>
-      </main>
+      <AuthScreen
+        mode={authMode}
+        email={email}
+        password={password}
+        error={error}
+        onSubmit={submitAuth}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onToggleMode={() =>
+          setAuthMode(authMode === "login" ? "register" : "login")
+        }
+      />
     );
   }
 
