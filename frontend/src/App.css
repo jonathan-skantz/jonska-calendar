@@ -413,6 +413,10 @@ textarea:focus {
     font-size: 10px;
 }
 
+.grid-entry.event:not(.preview) span {
+    color: inherit;
+}
+
 .grid-entry input {
     position: absolute;
     right: 5px;

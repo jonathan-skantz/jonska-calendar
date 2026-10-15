@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { wcagContrast } from "culori";
 import type { FormEvent, MouseEvent } from "react";
 import { addDays, format, getHours, getMinutes, startOfWeek } from "date-fns";
 import "./App.css";
@@ -61,14 +62,10 @@ const minutesIntoDay = (value?: string) => {
   return getHours(date) * 60 + getMinutes(date);
 };
 
-const withAlpha = (hex: string, alpha: number) => {
-  const value = hex.replace("#", "");
-  if (value.length !== 6) return `rgba(84, 121, 104, ${alpha})`;
-  const channels = [0, 2, 4].map((offset) =>
-    Number.parseInt(value.slice(offset, offset + 2), 16),
-  );
-  return `rgba(${channels.join(", ")}, ${alpha})`;
-};
+const tagTextColor = (hex: string) =>
+  wcagContrast(hex, "white") > wcagContrast(hex, "black")
+    ? "#ffffff"
+    : "#000000";
 
 function App() {
   const queryClient = useQueryClient();
@@ -607,6 +604,16 @@ function App() {
         : [];
     const orderedStripTags = mainTag ? [mainTag, ...stripTags] : stripTags;
     const stripColors = orderedStripTags.map((tag) => tag.color);
+    const additionalStripWidth = stripTags.length ? 50 / stripTags.length : 0;
+    const stripStops = stripTags.length
+      ? [
+          `${mainTag?.color} 0%, ${mainTag?.color} 50%`,
+          ...stripTags.map(
+            (tag, index) =>
+              `${tag.color} ${50 + index * additionalStripWidth}%, ${tag.color} ${50 + (index + 1) * additionalStripWidth}%`,
+          ),
+        ]
+      : stripColors.map((color) => `${color} 0%, ${color} 100%`);
     return (
       <article
         className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""}`}
@@ -615,9 +622,10 @@ function App() {
           height: `${(duration / 60) * gridScale}rem`,
           ...(entry.type === "event" && mainTag
             ? {
-                backgroundColor: withAlpha(mainTag.color, 0.22),
+                backgroundColor: mainTag.color,
+                color: tagTextColor(mainTag.color),
                 borderLeftWidth: 0,
-                backgroundImage: `linear-gradient(to right, ${stripColors.map((color, index) => `${color} ${(index * 100) / stripColors.length}%, ${color} ${((index + 1) * 100) / stripColors.length}%`).join(", ")})`,
+                backgroundImage: `linear-gradient(to right, ${stripStops.join(", ")})`,
                 backgroundSize: "100% 3px",
                 backgroundPosition: "top",
                 backgroundRepeat: "no-repeat",
@@ -790,7 +798,10 @@ function App() {
                     <div className="tag-control" key={tag.id}>
                       <button
                         className={isHidden ? "tag large hidden" : "tag large"}
-                        style={{ backgroundColor: tag.color }}
+                        style={{
+                          backgroundColor: tag.color,
+                          color: tagTextColor(tag.color),
+                        }}
                         onClick={() => toggleTagVisibility(tag.id)}
                         aria-label={`${isHidden ? "Show" : "Hide"} ${tag.name} events`}
                       >
