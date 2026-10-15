@@ -1,11 +1,10 @@
-import type { FormEvent } from "react";
 import type { Tag } from "../types";
 
 type TagEditorDrawerProps = {
   tags: Tag[];
   error: string;
   onClose: () => void;
-  onUpdate: (event: FormEvent<HTMLFormElement>, tag: Tag) => void;
+  onUpdate: (tag: Tag, name: string, color: string) => void;
   onUpdateDefault: (tag: Tag) => void;
   onDelete: (tag: Tag) => void;
 };
@@ -38,7 +37,13 @@ export const TagEditorDrawer = ({
           <form
             className="tag-editor-entry"
             key={tag.id}
-            onSubmit={(event) => onUpdate(event, tag)}
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              const name = String(form.get("name") || "").trim();
+              const color = String(form.get("color") || tag.color);
+              onUpdate(tag, name, color);
+            }}
           >
             <label>
               Name

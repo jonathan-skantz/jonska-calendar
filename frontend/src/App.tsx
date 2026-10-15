@@ -95,14 +95,6 @@ function App() {
     });
   };
 
-  const updateTag = async (event: FormEvent<HTMLFormElement>, tag: Tag) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const name = String(form.get("name") || "").trim();
-    const color = String(form.get("color") || tag.color);
-    await tagMutations.updateTag(tag, name, color);
-  };
-
   const deleteTag = async (tag: Tag) => {
     await tagMutations.deleteTag(tag, () =>
       window.confirm(`Delete tag “${tag.name}”?`),
@@ -286,7 +278,7 @@ function App() {
           tags={tags}
           error={actionError}
           onClose={() => setShowTagEditor(false)}
-          onUpdate={updateTag}
+          onUpdate={tagMutations.updateTag}
           onUpdateDefault={(tag) => tagMutations.updateDefaultTag(tag.id)}
           onDelete={deleteTag}
         />
