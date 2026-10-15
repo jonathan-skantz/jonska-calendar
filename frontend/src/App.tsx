@@ -2,7 +2,28 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { wcagContrast } from "culori";
 import type { FormEvent, MouseEvent } from "react";
-import { addDays, format, getHours, getMinutes, startOfWeek } from "date-fns";
+import { addDays, format } from "date-fns";
+import {
+  CALENDAR_GRID_SCALE,
+  CLOCK_UPDATE_INTERVAL_MS,
+  EVENT_SEPARATOR_PIXELS,
+  HOURS_PER_DAY,
+  LAST_EVENT_START_HOUR,
+  MINIMUM_ENTRY_DURATION_MINUTES,
+  MINUTES_PER_HOUR,
+  PREVIEW_EVENT_DURATION_MINUTES,
+  TASK_DISPLAY_DURATION_MINUTES,
+  WEEK_DAY_COUNT,
+  dateKey,
+  formatDate,
+  formatTime,
+  inputDateTime,
+  localDateKey,
+  localDateTime,
+  minutesIntoDay,
+  sameInstant,
+  startOfCalendarWeek,
+} from "./lib/calendar";
 import "./App.css";
 
 type User = { id: string; email: string };
@@ -38,32 +59,6 @@ const api = async <T,>(path: string, options?: RequestInit): Promise<T> => {
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 };
-
-const formatTime = (value?: string) =>
-  value ? format(new Date(value), "p") : "";
-const formatDate = (value: Date) => format(value, "EEE, MMM d");
-const dateKey = (value: Date) => format(value, "yyyy-MM-dd");
-const inputDateTime = (value?: string) =>
-  value ? format(new Date(value), "yyyy-MM-dd'T'HH:mm") : "";
-const startOfCalendarWeek = (value: Date) =>
-  startOfWeek(value, { weekStartsOn: 0 });
-
-const localDateTime = (value: FormDataEntryValue | null) => {
-  if (typeof value !== "string" || !value) return undefined;
-  return new Date(value).toISOString();
-};
-
-const localDateKey = (value?: string) =>
-  value ? dateKey(new Date(value)) : "";
-
-const minutesIntoDay = (value?: string) => {
-  if (!value) return 0;
-  const date = new Date(value);
-  return getHours(date) * 60 + getMinutes(date);
-};
-
-const sameInstant = (left?: string, right?: string) =>
-  Boolean(left && right && new Date(left).getTime() === new Date(right).getTime());
 
 const tagTextColor = (hex: string) =>
   wcagContrast(hex, "white") > wcagContrast(hex, "black")
@@ -113,7 +108,7 @@ function App() {
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
 
   useEffect(() => {
-    const clock = window.setInterval(() => setToday(new Date()), 60_000);
+    const clock = window.setInterval(() => setToday(new Date()), CLOCK_UPDATE_INTERVAL_MS);
     return () => window.clearInterval(clock);
   }, []);
 
@@ -228,7 +223,7 @@ function App() {
     if (startsInput) startsInput.value = inputDateTime(draftEventStart);
     if (endsInput)
       endsInput.value = inputDateTime(
-        new Date(start.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+        new Date(start.getTime() + PREVIEW_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000).toISOString(),
       );
   }, [composerType, draftEventStart, editingItem, showComposer]);
 
@@ -529,7 +524,7 @@ function App() {
     );
   }
 
-  const dates = Array.from({ length: 7 }, (_, index) =>
+  const dates = Array.from({ length: WEEK_DAY_COUNT }, (_, index) =>
     addDays(weekStart, index),
   );
   const moveWeek = (days: number) => {
@@ -553,8 +548,8 @@ function App() {
     const hour = Math.max(
       0,
       Math.min(
-        22,
-        Math.round((event.clientY - bounds.top) / (bounds.height / 24)),
+        LAST_EVENT_START_HOUR,
+        Math.round((event.clientY - bounds.top) / (bounds.height / HOURS_PER_DAY)),
       ),
     );
     const start = new Date(date);
@@ -570,7 +565,7 @@ function App() {
       <div
         className="grid-entry event preview"
         style={{
-          top: `${(minutesIntoDay(draftEventStart ?? undefined) / 60) * 2}rem`,
+          top: `${(minutesIntoDay(draftEventStart ?? undefined) / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
           height: "4rem",
         }}
         aria-hidden="true"
@@ -580,7 +575,7 @@ function App() {
           {formatTime(draftEventStart ?? undefined)} –{" "}
           {formatTime(
             new Date(
-              draftStartDate.getTime() + 2 * 60 * 60 * 1000,
+              draftStartDate.getTime() + PREVIEW_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
             ).toISOString(),
           )}
         </span>
@@ -596,12 +591,15 @@ function App() {
         ? minutesIntoDay(entry.starts_at)
         : minutesIntoDay(entry.deadline_at);
     const end =
-      entry.type === "event" ? minutesIntoDay(entry.ends_at) : start + 45;
+      entry.type === "event"
+        ? minutesIntoDay(entry.ends_at)
+        : start + TASK_DISPLAY_DURATION_MINUTES;
     const duration = Math.max(
-      entry.type === "event" && end > start ? end - start : 45,
-      90,
+      entry.type === "event" && end > start
+        ? end - start
+        : TASK_DISPLAY_DURATION_MINUTES,
+      MINIMUM_ENTRY_DURATION_MINUTES,
     );
-    const gridScale = 2;
     const fullyElapsed =
       entry.type === "event" &&
       Boolean(entry.ends_at && new Date(entry.ends_at).getTime() <= today.getTime());
@@ -630,9 +628,11 @@ function App() {
       <article
         className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${fullyElapsed ? "elapsed" : ""}`}
         style={{
-          top: `${(start / 60) * gridScale}rem`,
-          height: `calc(${(duration / 60) * gridScale}rem - ${(trimTop ? 1 : 0) + (trimBottom ? 1 : 0)}px)`,
-          transform: trimTop ? "translateY(1px)" : undefined,
+          top: `${(start / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
+          height: `calc(${(duration / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem - ${(trimTop ? EVENT_SEPARATOR_PIXELS : 0) + (trimBottom ? EVENT_SEPARATOR_PIXELS : 0)}px)`,
+          transform: trimTop
+            ? `translateY(${EVENT_SEPARATOR_PIXELS}px)`
+            : undefined,
           ...(entry.type === "event" && mainTag
             ? {
                 backgroundColor: mainTag.color,
@@ -698,12 +698,15 @@ function App() {
       return <div className="day-elapsed-overlay past" aria-hidden="true" />;
     }
     if (dayDateKey !== currentDateKey) return null;
-    const currentMinutes = getHours(today) * 60 + getMinutes(today);
+    const currentMinutes =
+      today.getHours() * MINUTES_PER_HOUR + today.getMinutes();
     if (currentMinutes === 0) return null;
     return (
       <div
         className="day-elapsed-overlay today"
-        style={{ height: `${(currentMinutes / 60) * 2}rem` }}
+        style={{
+          height: `${(currentMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
+        }}
         aria-hidden="true"
       >
         <span className="current-time-label">{format(today, "p")}</span>
