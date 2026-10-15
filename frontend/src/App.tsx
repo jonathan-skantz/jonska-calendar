@@ -700,7 +700,9 @@ function App() {
         className="day-elapsed-overlay today"
         style={{ height: `${(currentMinutes / 60) * 2}rem` }}
         aria-hidden="true"
-      />
+      >
+        <span className="current-time-label">{format(today, "p")}</span>
+      </div>
     );
   };
 
