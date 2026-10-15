@@ -38,6 +38,7 @@ import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { AuthScreen } from "./components/AuthScreen";
+import { TopBar } from "./components/TopBar";
 import { queryKeys } from "./lib/queryKeys";
 import "./App.css";
 
@@ -562,18 +563,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-symbol">✳</span>
-          <span>calendar / home</span>
-        </div>
-        <div className="topbar-actions">
-          <span className="user-email">{user.email}</span>
-          <button className="text-button" onClick={logout}>
-            Sign out
-          </button>
-        </div>
-      </header>
+      <TopBar email={user.email} onLogout={logout} />
       <section className="content-grid">
         <div className="timeline-column">
           <div className="section-heading week-heading">
