@@ -39,7 +39,7 @@ import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { AuthScreen } from "./components/AuthScreen";
-import { EventTagPicker } from "./components/EventTagPicker";
+import { ComposerDrawer } from "./components/ComposerDrawer";
 import { Sidebar } from "./components/Sidebar";
 import { TagEditorDrawer } from "./components/TagEditorDrawer";
 import { WeekCalendar } from "./components/WeekCalendar";
@@ -604,159 +604,23 @@ function App() {
         />
       </section>
       {showComposer && (
-        <div
-          className="drawer-backdrop"
-          onMouseDown={(event) =>
-            event.target === event.currentTarget &&
-            (setShowComposer(false), setEditingItem(null))
-          }
-        >
-          <aside
-            className="composer drawer"
-            key={`${editingItem?.id ?? "new"}-${composerType}`}
-          >
-            <div className="modal-heading">
-              <div>
-                <p className="eyebrow">
-                  {editingItem ? "Edit item" : "New item"}
-                </p>
-                <h2>
-                  {editingItem ? "Update the details." : "Give it a place."}
-                </h2>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => {
-                  setShowComposer(false);
-                  setEditingItem(null);
-                }}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            {!editingItem && (
-              <div className="segmented">
-                <button
-                  type="button"
-                  className={composerType === "event" ? "selected" : ""}
-                  onClick={() => setComposerType("event")}
-                >
-                  Event
-                </button>
-                <button
-                  type="button"
-                  className={composerType === "task" ? "selected" : ""}
-                  onClick={() => setComposerType("task")}
-                >
-                  Task
-                </button>
-              </div>
-            )}
-            <form onSubmit={createItem}>
-              <label>
-                Title
-                <input
-                  name="title"
-                  defaultValue={editingItem?.title}
-                  placeholder={
-                    composerType === "event"
-                      ? "What is happening?"
-                      : "What needs doing?"
-                  }
-                  required
-                  autoFocus
-                />
-              </label>
-              <label>
-                Description
-                <textarea
-                  name="description"
-                  defaultValue={editingItem?.description}
-                />
-              </label>
-              <label>
-                URL
-                <input
-                  name="url"
-                  type="url"
-                  defaultValue={editingItem?.url}
-                  placeholder="https://"
-                />
-              </label>
-              {composerType === "event" ? (
-                <>
-                  <label>
-                    Kind
-                    <select
-                      name="kind"
-                      defaultValue={editingItem?.kind ?? "informational"}
-                    >
-                      <option value="informational">Informational</option>
-                      <option value="attendable">Attendable</option>
-                    </select>
-                  </label>
-                  <label>
-                    Starts
-                    <input
-                      name="starts_at"
-                      type="datetime-local"
-                      defaultValue={
-                        inputDateTime(editingItem?.starts_at) ||
-                        `${selectedDate}T09:00`
-                      }
-                      required
-                    />
-                  </label>
-                  <label>
-                    Ends
-                    <input
-                      name="ends_at"
-                      type="datetime-local"
-                      defaultValue={
-                        inputDateTime(editingItem?.ends_at) ||
-                        `${selectedDate}T10:00`
-                      }
-                      required
-                    />
-                  </label>
-                  <label>
-                    Location
-                    <input
-                      name="location"
-                      defaultValue={editingItem?.location}
-                      placeholder="Home, online, or somewhere else"
-                    />
-                  </label>
-                  <EventTagPicker
-                    tags={tags}
-                    selectedTagIds={composerTagIds}
-                    mainTagId={composerMainTagId}
-                    onSelectedTagIdsChange={setComposerTagIds}
-                    onMainTagIdChange={setComposerMainTagId}
-                  />
-                </>
-              ) : (
-                <label>
-                  Deadline
-                  <input
-                    name="deadline_at"
-                    type="datetime-local"
-                    defaultValue={
-                      inputDateTime(editingItem?.deadline_at) ||
-                      inputDateTime(draftEventStart ?? undefined) ||
-                      `${selectedDate}T17:00`
-                    }
-                    required
-                  />
-                </label>
-              )}
-              <button className="primary-button" type="submit">
-                {editingItem ? "Save changes" : "Save item"} <span>↗</span>
-              </button>
-            </form>
-          </aside>
-        </div>
+        <ComposerDrawer
+          type={composerType}
+          editingItem={editingItem}
+          selectedDate={selectedDate}
+          draftEventStart={draftEventStart}
+          tags={tags}
+          selectedTagIds={composerTagIds}
+          mainTagId={composerMainTagId}
+          onSubmit={createItem}
+          onClose={() => {
+            setShowComposer(false);
+            setEditingItem(null);
+          }}
+          onTypeChange={setComposerType}
+          onSelectedTagIdsChange={setComposerTagIds}
+          onMainTagIdChange={setComposerMainTagId}
+        />
       )}
       {showComposer && editingItem && (
         <button
