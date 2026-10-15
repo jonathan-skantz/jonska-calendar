@@ -1,18 +1,13 @@
 import { useEffect, useState } from "react";
-import type { FormEvent, MouseEvent } from "react";
-import { addDays, format } from "date-fns";
+import type { FormEvent } from "react";
+import { format } from "date-fns";
 import {
-  CALENDAR_GRID_SCALE,
-  HOURS_PER_DAY,
-  LAST_EVENT_START_HOUR,
   MINIMUM_ENTRY_DURATION_MINUTES,
   MINUTES_PER_HOUR,
   PREVIEW_EVENT_DURATION_MINUTES,
   TASK_DISPLAY_DURATION_MINUTES,
-  WEEK_DAY_COUNT,
   dateKey,
   formatDate,
-  formatTime,
   inputDateTime,
   localDateKey,
   minutesIntoDay,
@@ -22,9 +17,7 @@ import type { ComposerFieldErrors } from "./lib/formValidation";
 import {
   getBackToBackTrim,
   getEntryMinutes,
-  getElapsedOverlayState,
   getTimelineEntryDate,
-  isEventVisible,
 } from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
@@ -35,6 +28,13 @@ import { useAuth } from "./features/auth/useAuth";
 import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
 import { useTagMutations } from "./features/tags/useTagMutations";
 import { useCalendarState } from "./features/calendar/useCalendarState";
+import {
+  getCalendarDates,
+  getClickedEventStart,
+  getDayElapsedOverlay,
+  getEventPreview,
+  getVisibleWeekEntries,
+} from "./features/calendar/timelineView";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
 import { CalendarEntry } from "./components/CalendarEntry";
@@ -197,55 +197,34 @@ function App() {
     );
   }
 
-  const dates = Array.from({ length: WEEK_DAY_COUNT }, (_, index) =>
-    addDays(weekStart, index),
-  );
+  const dates = getCalendarDates(weekStart);
   const openTasks = entries.filter(
     (entry) => entry.type === "task" && !entry.is_completed,
   ).length;
-  const weekEntries = entries.filter((entry) => {
-    const value = getTimelineEntryDate(entry);
-    const inWeek = dates.some((date) => dateKey(date) === localDateKey(value));
-    return inWeek && isEventVisible(entry, hiddenTagIds);
-  });
-  const openNewEventAt = (event: MouseEvent<HTMLDivElement>, date: Date) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const hour = Math.max(
-      0,
-      Math.min(
-        LAST_EVENT_START_HOUR,
-        Math.round((event.clientY - bounds.top) / (bounds.height / HOURS_PER_DAY)),
-      ),
-    );
-    const start = new Date(date);
-    start.setHours(hour, 0, 0, 0);
-    openNewComposer(start);
-  };
-  const draftStartDate = draftEventStart ? new Date(draftEventStart) : null;
-  const renderPreview = (date: Date) =>
-    showComposer &&
-    !editingItem &&
-    draftStartDate &&
-    localDateKey(draftEventStart ?? undefined) === dateKey(date) ? (
+  const weekEntries = getVisibleWeekEntries(entries, dates, hiddenTagIds);
+  const openNewEventAt = (
+    event: Parameters<typeof getClickedEventStart>[0],
+    date: Date,
+  ) => openNewComposer(getClickedEventStart(event, date));
+  const renderPreview = (date: Date) => {
+    if (!showComposer || editingItem) return null;
+    const preview = getEventPreview(draftEventStart, date);
+    return preview ? (
       <div
         className="grid-entry event preview"
         style={{
-          top: `${(minutesIntoDay(draftEventStart ?? undefined) / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
+          top: preview.top,
           height: "4rem",
         }}
         aria-hidden="true"
       >
         <strong>New event</strong>
         <span>
-          {formatTime(draftEventStart ?? undefined)} –{" "}
-          {formatTime(
-            new Date(
-              draftStartDate.getTime() + PREVIEW_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
-            ).toISOString(),
-          )}
+          {preview.startsAt} – {preview.endsAt}
         </span>
       </div>
     ) : null;
+  };
   const renderGridEntry = (
     entry: TimelineEntry,
     trimTop = false,
@@ -298,7 +277,7 @@ function App() {
     });
   };
   const renderElapsedOverlay = (date: Date) => {
-    const state = getElapsedOverlayState(date, today, (value) => format(value, "p"));
+    const state = getDayElapsedOverlay(date, today, (value) => format(value, "p"));
     if (state.kind === "past") {
       return <div className="day-elapsed-overlay past" aria-hidden="true" />;
     }
