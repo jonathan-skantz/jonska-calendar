@@ -1,9 +1,8 @@
-import { useEffect, useRef } from "react";
+import { addMinutes } from "date-fns";
 import type { FormEvent } from "react";
 import {
+  DEFAULT_EVENT_DURATION_MINUTES,
   inputDateTime,
-  MINUTES_PER_HOUR,
-  PREVIEW_EVENT_DURATION_MINUTES,
 } from "../lib/calendar";
 import type { ComposerFieldErrors } from "../lib/formValidation";
 import type { Tag, TimelineEntry } from "../types";
@@ -42,19 +41,18 @@ export const ComposerDrawer = ({
   onSelectedTagIdsChange,
   onMainTagIdChange,
 }: ComposerDrawerProps) => {
-  const startsAtInput = useRef<HTMLInputElement>(null);
-  const endsAtInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!draftEventStart || editingItem || type !== "event") return;
-    startsAtInput.current!.value = inputDateTime(draftEventStart);
-    endsAtInput.current!.value = inputDateTime(
-      new Date(
-        new Date(draftEventStart).getTime() +
-          PREVIEW_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
+  const defaultEventStart =
+    inputDateTime(editingItem?.starts_at) ||
+    inputDateTime(draftEventStart ?? undefined) ||
+    `${selectedDate}T09:00`;
+  const defaultEventEnd =
+    inputDateTime(editingItem?.ends_at) ||
+    inputDateTime(
+      addMinutes(
+        new Date(defaultEventStart),
+        DEFAULT_EVENT_DURATION_MINUTES,
       ).toISOString(),
     );
-  }, [draftEventStart, editingItem, type]);
 
   return <div
     className="drawer-backdrop"
@@ -146,24 +144,22 @@ export const ComposerDrawer = ({
             <label className={fieldErrors.starts_at ? "field-invalid" : ""}>
               Starts
               <input
-                ref={startsAtInput}
                 name="starts_at"
                 aria-invalid={Boolean(fieldErrors.starts_at)}
                 aria-describedby={fieldErrors.starts_at && error ? "composer-error" : undefined}
                 type="datetime-local"
-                defaultValue={inputDateTime(editingItem?.starts_at) || `${selectedDate}T09:00`}
+                defaultValue={defaultEventStart}
                 required
               />
             </label>
             <label className={fieldErrors.ends_at ? "field-invalid" : ""}>
               Ends
               <input
-                ref={endsAtInput}
                 name="ends_at"
                 aria-invalid={Boolean(fieldErrors.ends_at)}
                 aria-describedby={fieldErrors.ends_at && error ? "composer-error" : undefined}
                 type="datetime-local"
-                defaultValue={inputDateTime(editingItem?.ends_at) || `${selectedDate}T10:00`}
+                defaultValue={defaultEventEnd}
                 required
               />
             </label>

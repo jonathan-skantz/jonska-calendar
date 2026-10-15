@@ -2,11 +2,11 @@ import { addDays } from "date-fns";
 import type { MouseEvent } from "react";
 import {
   CALENDAR_GRID_SCALE,
+  DEFAULT_EVENT_DURATION_MINUTES,
   HOURS_PER_DAY,
   LAST_EVENT_START_HOUR,
   MINIMUM_ENTRY_DURATION_MINUTES,
   MINUTES_PER_HOUR,
-  PREVIEW_EVENT_DURATION_MINUTES,
   TASK_DISPLAY_DURATION_MINUTES,
   WEEK_DAY_COUNT,
   dateKey,
@@ -78,7 +78,7 @@ export const getEventPreview = (
   if (!startAt || localDateKey(startAt) !== dateKey(date)) return null;
   const start = new Date(startAt);
   const end = new Date(
-    start.getTime() + PREVIEW_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
+    start.getTime() + DEFAULT_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
   ).toISOString();
   return {
     top: `${(minutesIntoDay(startAt) / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
