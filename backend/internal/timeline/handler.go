@@ -19,15 +19,6 @@ type Handler struct {
 	CurrentUser CurrentUser
 }
 
-var (
-	ErrInvalidRequest = errors.New("invalid request body")
-	ErrTitleRequired  = errors.New("title cannot be empty")
-	ErrInvalidTimes   = errors.New("end time must be after start time")
-	ErrInvalidKind    = errors.New("kind must be attendable or informational")
-	ErrInvalidCommute = errors.New("commute duration cannot be negative")
-	ErrDeadlineNeeded = errors.New("deadline is required")
-)
-
 func New(store *db.Store, currentUser CurrentUser) *Handler {
 	return &Handler{Store: store, CurrentUser: currentUser}
 }
@@ -120,22 +111,6 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func validateEventRequest(request eventRequest) error {
-	if request.Title == "" {
-		return ErrTitleRequired
-	}
-	if request.Kind != "attendable" && request.Kind != "informational" {
-		return ErrInvalidKind
-	}
-	if !request.EndsAt.After(request.StartsAt) {
-		return ErrInvalidTimes
-	}
-	if request.CommuteBeforeSeconds < 0 || request.CommuteAfterSeconds < 0 {
-		return ErrInvalidCommute
-	}
-	return nil
-}
-
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.requireUser(w, r)
 	if !ok {
@@ -147,12 +122,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	if request.Title == "" {
-		http.Error(w, ErrTitleRequired.Error(), http.StatusBadRequest)
-		return
-	}
-	if request.DeadlineAt.IsZero() {
-		http.Error(w, ErrDeadlineNeeded.Error(), http.StatusBadRequest)
+	if err := validateTaskRequest(request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -184,12 +155,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	if request.Title == "" {
-		http.Error(w, ErrTitleRequired.Error(), http.StatusBadRequest)
-		return
-	}
-	if request.DeadlineAt.IsZero() {
-		http.Error(w, ErrDeadlineNeeded.Error(), http.StatusBadRequest)
+	if err := validateTaskRequest(request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := h.Store.UpdateTask(r.Context(), userID, taskID, db.Task{
@@ -274,7 +241,11 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request tagRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || strings.TrimSpace(request.Name) == "" {
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validateTagName(request.Name); err != nil {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
@@ -312,7 +283,11 @@ func (h *Handler) SetDefaultTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request tagSelectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.TagID == uuid.Nil {
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validateTagSelectionRequest(request); err != nil {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
@@ -334,12 +309,12 @@ func (h *Handler) RenameTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request tagUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || strings.TrimSpace(request.Name) == "" {
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	if !validTagColor(request.Color) {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if err := validateTagUpdateRequest(request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := h.Store.RenameTag(r.Context(), userID, tagID, strings.TrimSpace(request.Name), request.Color); err != nil {
@@ -351,18 +326,6 @@ func (h *Handler) RenameTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func validTagColor(color string) bool {
-	if len(color) != 7 || color[0] != '#' {
-		return false
-	}
-	for _, character := range color[1:] {
-		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F')) {
-			return false
-		}
-	}
-	return true
 }
 
 func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
@@ -396,10 +359,12 @@ func (h *Handler) AddTagToItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid item id", http.StatusBadRequest)
 		return
 	}
-	var request struct {
-		TagID uuid.UUID `json:"tag_id"`
+	var request tagSelectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+		return
 	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.TagID == uuid.Nil {
+	if err := validateTagSelectionRequest(request); err != nil {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
