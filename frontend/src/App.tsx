@@ -4,7 +4,6 @@ import type { FormEvent, MouseEvent } from "react";
 import { addDays, format } from "date-fns";
 import {
   CALENDAR_GRID_SCALE,
-  CLOCK_UPDATE_INTERVAL_MS,
   EVENT_SEPARATOR_PIXELS,
   HOURS_PER_DAY,
   LAST_EVENT_START_HOUR,
@@ -34,6 +33,7 @@ import {
   isEventVisible,
 } from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
+import { useCurrentTime } from "./hooks/useCurrentTime";
 import "./App.css";
 
 function App() {
@@ -72,16 +72,11 @@ function App() {
   );
   const [draftEventStart, setDraftEventStart] = useState<string | null>(null);
   const [hiddenTagIds, setHiddenTagIds] = useState<string[]>([]);
-  const [today, setToday] = useState(() => new Date());
+  const today = useCurrentTime();
   const [weekStart, setWeekStart] = useState(() => startOfCalendarWeek(today));
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
   const [actionError, setActionError] = useState("");
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
-
-  useEffect(() => {
-    const clock = window.setInterval(() => setToday(new Date()), CLOCK_UPDATE_INTERVAL_MS);
-    return () => window.clearInterval(clock);
-  }, []);
 
   const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
