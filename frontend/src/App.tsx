@@ -182,6 +182,8 @@ function App() {
         trimTop={trimTop}
         trimBottom={trimBottom}
         overlapDepth={overlapDepth}
+        continuesFromPreviousDay={layout.continuesFromPreviousDay}
+        continuesToNextDay={layout.continuesToNextDay}
         onEdit={editItem}
         onToggleTask={toggleTask}
       />
@@ -197,7 +199,7 @@ function App() {
         previous,
         next,
       );
-      const layout = getCalendarEntryLayout(entry, today);
+      const layout = getCalendarEntryLayout(entry, today, date);
       const overlapDepth = getEventOverlapDepth(
         entry,
         dayEntries.slice(0, index),

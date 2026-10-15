@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import {
   CALENDAR_GRID_SCALE,
   EVENT_OVERLAP_INSET_PIXELS,
@@ -16,9 +17,34 @@ type CalendarEntryProps = {
   trimTop: boolean;
   trimBottom: boolean;
   overlapDepth: number;
+  continuesFromPreviousDay: boolean;
+  continuesToNextDay: boolean;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
 };
+
+const CONTINUATION_MARKER_HEIGHT = 6;
+const CONTINUATION_MARKER_SPACING = 12;
+
+const ContinuationMarkers = ({
+  position,
+  count,
+  color,
+}: {
+  position: "top" | "bottom";
+  count: number;
+  color: string;
+}) => (
+  <div
+    className={`continuation-markers ${position}`}
+    style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}
+    aria-hidden="true"
+  >
+    {Array.from({ length: count }, (_, index) => (
+      <i key={index} style={{ backgroundColor: color }} />
+    ))}
+  </div>
+);
 
 export const CalendarEntry = ({
   entry,
@@ -27,9 +53,13 @@ export const CalendarEntry = ({
   trimTop,
   trimBottom,
   overlapDepth,
+  continuesFromPreviousDay,
+  continuesToNextDay,
   onEdit,
   onToggleTask,
 }: CalendarEntryProps) => {
+  const entryRef = useRef<HTMLElement>(null);
+  const [continuationMarkerCount, setContinuationMarkerCount] = useState(1);
   const mainTag = getMainTag(entry);
   const stripTags = getOrderedStripTags(entry).filter(
     (tag) => tag.id !== mainTag?.id,
@@ -50,17 +80,44 @@ export const CalendarEntry = ({
   const overlapInset = hasEarlierOverlap
     ? `${3 + overlapDepth * EVENT_OVERLAP_INSET_PIXELS}px`
     : undefined;
+  const topInset =
+    (trimTop ? EVENT_SEPARATOR_PIXELS : 0) +
+    (continuesFromPreviousDay ? CONTINUATION_MARKER_HEIGHT : 0);
+  const bottomInset =
+    (trimBottom ? EVENT_SEPARATOR_PIXELS : 0) +
+    (continuesToNextDay ? CONTINUATION_MARKER_HEIGHT : 0);
+
+  useEffect(() => {
+    const entryElement = entryRef.current;
+    if (!entryElement || (!continuesFromPreviousDay && !continuesToNextDay)) return;
+
+    const updateMarkerCount = () => {
+      const count = Math.max(
+        1,
+        Math.floor(entryElement.clientWidth / CONTINUATION_MARKER_SPACING),
+      );
+      setContinuationMarkerCount((currentCount) =>
+        currentCount === count ? currentCount : count,
+      );
+    };
+
+    updateMarkerCount();
+    const observer = new ResizeObserver(updateMarkerCount);
+    observer.observe(entryElement);
+    return () => observer.disconnect();
+  }, [continuesFromPreviousDay, continuesToNextDay]);
 
   return (
     <article
-      className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""}`}
+      ref={entryRef}
+      className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""}`}
       style={{
         top: `${(startMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
-        height: `calc(${(durationMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem - ${(trimTop ? EVENT_SEPARATOR_PIXELS : 0) + (trimBottom ? EVENT_SEPARATOR_PIXELS : 0)}px)`,
+        height: `calc(${(durationMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem - ${topInset + bottomInset}px)`,
         left: overlapInset,
         right: overlapInset,
         zIndex: hasEarlierOverlap ? 2 : undefined,
-        transform: trimTop ? `translateY(${EVENT_SEPARATOR_PIXELS}px)` : undefined,
+        transform: topInset ? `translateY(${topInset}px)` : undefined,
         ...(entry.type === "event" && mainTag
           ? {
               backgroundColor: mainTag.color,
@@ -77,6 +134,13 @@ export const CalendarEntry = ({
         if (!entry.is_shared) onEdit(entry);
       }}
     >
+      {continuesFromPreviousDay && (
+        <ContinuationMarkers
+          position="top"
+          count={continuationMarkerCount}
+          color={mainTag?.color ?? "var(--yellow)"}
+        />
+      )}
       <strong>{entry.title}</strong>
       <span>
         {entry.type === "event"
@@ -84,6 +148,13 @@ export const CalendarEntry = ({
           : "Task"}
       </span>
       {entry.location && <span>{entry.location}</span>}
+      {continuesToNextDay && (
+        <ContinuationMarkers
+          position="bottom"
+          count={continuationMarkerCount}
+          color={mainTag?.color ?? "var(--yellow)"}
+        />
+      )}
       {entry.type === "task" && (
         <input
           type="checkbox"

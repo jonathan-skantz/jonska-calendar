@@ -103,10 +103,54 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: -3px;
     height: 6px;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='6' viewBox='0 0 16 6'%3E%3Cpath d='M0 3 C2 0 4 0 6 3 S10 6 12 3 S14 0 16 3' fill='none' stroke='%23d44f4f' stroke-width='2'/%3E%3C/svg%3E") repeat-x;
     pointer-events: none;
+}
+
+.day-elapsed-overlay.today::after {
+    bottom: -3px;
+}
+
+.continuation-markers {
+    position: absolute;
+    height: 6px;
+    left: 0;
+    right: 0;
+    display: grid;
+    pointer-events: none;
+}
+
+.continuation-markers i {
+    display: block;
+}
+
+.continuation-markers.top {
+    top: -6px;
+    height: 7px;
+    z-index: 1;
+}
+
+.continuation-markers.top i {
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.continuation-markers.bottom {
+    bottom: -6px;
+}
+
+.continuation-markers.bottom i {
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.grid-entry.event.continues-to-next-day {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.grid-entry.event.continues-from-previous-day {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
 .current-time-label {

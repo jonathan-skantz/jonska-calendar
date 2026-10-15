@@ -19,7 +19,13 @@ describe("calendar entry layout", () => {
         event({ ends_at: "2026-10-15T10:15:00" }),
         new Date(2026, 9, 15, 9),
       ),
-    ).toEqual({ startMinutes: 600, durationMinutes: 15, fullyElapsed: false });
+    ).toEqual({
+      startMinutes: 600,
+      durationMinutes: 15,
+      fullyElapsed: false,
+      continuesFromPreviousDay: false,
+      continuesToNextDay: false,
+    });
   });
 
   it("uses the configured task display duration and event completion time", () => {
@@ -30,14 +36,15 @@ describe("calendar entry layout", () => {
       deadline_at: "2026-10-15T17:00:00",
       is_completed: false,
     };
+    expect(getCalendarEntryLayout(task, new Date(2026, 9, 15, 18))).toEqual({
+      startMinutes: 1020,
+      durationMinutes: 90,
+      fullyElapsed: false,
+      continuesFromPreviousDay: false,
+      continuesToNextDay: false,
+    });
     expect(
-      getCalendarEntryLayout(task, new Date(2026, 9, 15, 18)),
-    ).toEqual({ startMinutes: 1020, durationMinutes: 90, fullyElapsed: false });
-    expect(
-      getCalendarEntryLayout(
-        event(),
-        new Date(2026, 9, 15, 11),
-      ).fullyElapsed,
+      getCalendarEntryLayout(event(), new Date(2026, 9, 15, 11)).fullyElapsed,
     ).toBe(true);
   });
 });
@@ -56,9 +63,8 @@ describe("calendar entries by date", () => {
       starts_at: "2026-10-16T10:00:00",
       ends_at: "2026-10-16T11:00:00",
     });
-    expect(getEntriesForDate([event(), task, otherDay], new Date(2026, 9, 15))).toEqual([
-      event(),
-      task,
-    ]);
+    expect(
+      getEntriesForDate([event(), task, otherDay], new Date(2026, 9, 15)),
+    ).toEqual([event(), task]);
   });
 });

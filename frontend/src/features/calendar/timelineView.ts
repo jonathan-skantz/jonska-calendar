@@ -1,4 +1,4 @@
-import { addDays } from "date-fns";
+import { addDays, startOfDay } from "date-fns";
 import type { MouseEvent } from "react";
 import {
   CALENDAR_GRID_SCALE,
@@ -34,23 +34,50 @@ export const getCalendarDates = (weekStart: Date) =>
     addDays(weekStart, index),
   );
 
+const eventOverlapsRange = (
+  entry: TimelineEntry,
+  rangeStart: Date,
+  rangeEnd: Date,
+) => {
+  if (entry.type !== "event" || !entry.starts_at || !entry.ends_at) {
+    return false;
+  }
+
+  const startsAt = new Date(entry.starts_at);
+  const endsAt = new Date(entry.ends_at);
+  return startsAt < rangeEnd && endsAt > rangeStart;
+};
+
 export const getVisibleWeekEntries = (
   entries: TimelineEntry[],
   dates: Date[],
   hiddenTagIds: string[],
-) =>
-  entries.filter((entry) => {
-    const entryDate = getTimelineEntryDate(entry);
-    const isInWeek = dates.some(
-      (date) => dateKey(date) === localDateKey(entryDate),
-    );
+) => {
+  if (dates.length === 0) return [];
+
+  const rangeStart = startOfDay(dates[0]);
+  const rangeEnd = addDays(startOfDay(dates[dates.length - 1]), 1);
+  return entries.filter((entry) => {
+    const isInWeek =
+      entry.type === "event"
+        ? eventOverlapsRange(entry, rangeStart, rangeEnd)
+        : dates.some(
+            (date) =>
+              dateKey(date) === localDateKey(getTimelineEntryDate(entry)),
+          );
     return isInWeek && isEventVisible(entry, hiddenTagIds);
   });
+};
 
-export const getEntriesForDate = (entries: TimelineEntry[], date: Date) =>
-  entries.filter(
-    (entry) => localDateKey(getTimelineEntryDate(entry)) === dateKey(date),
+export const getEntriesForDate = (entries: TimelineEntry[], date: Date) => {
+  const rangeStart = startOfDay(date);
+  const rangeEnd = addDays(rangeStart, 1);
+  return entries.filter((entry) =>
+    entry.type === "event"
+      ? eventOverlapsRange(entry, rangeStart, rangeEnd)
+      : localDateKey(getTimelineEntryDate(entry)) === dateKey(date),
   );
+};
 
 export const getClickedEventStart = (
   event: MouseEvent<HTMLDivElement>,
@@ -126,20 +153,68 @@ export const getEventOverlapDepth = (
 export const getCalendarEntryLayout = (
   entry: TimelineEntry,
   now: Date,
+  date = new Date(getTimelineEntryDate(entry) ?? now),
 ) => {
   const startMinutes = getEntryMinutes(entry);
-  const endMinutes =
-    entry.type === "event"
-      ? minutesIntoDay(entry.ends_at)
-      : startMinutes + TASK_DISPLAY_DURATION_MINUTES;
-  const durationMinutes = Math.max(
-    entry.type === "event" && endMinutes > startMinutes
-      ? endMinutes - startMinutes
-      : TASK_DISPLAY_DURATION_MINUTES,
-    MINIMUM_ENTRY_DURATION_MINUTES,
-  );
   const fullyElapsed =
     entry.type === "event" &&
     Boolean(entry.ends_at && new Date(entry.ends_at).getTime() <= now.getTime());
-  return { startMinutes, durationMinutes, fullyElapsed };
+
+  if (entry.type === "event") {
+    if (!entry.starts_at || !entry.ends_at) {
+      return {
+        startMinutes,
+        durationMinutes: MINIMUM_ENTRY_DURATION_MINUTES,
+        fullyElapsed,
+        continuesFromPreviousDay: false,
+        continuesToNextDay: false,
+      };
+    }
+
+    const dayStart = startOfDay(date);
+    const dayEnd = addDays(dayStart, 1);
+    const eventStart = new Date(entry.starts_at);
+    const eventEnd = new Date(entry.ends_at);
+    const segmentStart = eventStart > dayStart ? eventStart : dayStart;
+    const segmentEnd = eventEnd < dayEnd ? eventEnd : dayEnd;
+
+    if (segmentStart < segmentEnd) {
+      const segmentStartMinutes =
+        segmentStart.getTime() === dayStart.getTime()
+          ? 0
+          : segmentStart.getHours() * MINUTES_PER_HOUR +
+            segmentStart.getMinutes();
+      const segmentEndMinutes =
+        segmentEnd.getTime() === dayEnd.getTime()
+          ? HOURS_PER_DAY * MINUTES_PER_HOUR
+          : segmentEnd.getHours() * MINUTES_PER_HOUR +
+            segmentEnd.getMinutes();
+      return {
+        startMinutes: segmentStartMinutes,
+        durationMinutes: segmentEndMinutes - segmentStartMinutes,
+        fullyElapsed,
+        continuesFromPreviousDay: eventStart < dayStart,
+        continuesToNextDay: eventEnd > dayEnd,
+      };
+    }
+
+    return {
+      startMinutes,
+      durationMinutes: MINIMUM_ENTRY_DURATION_MINUTES,
+      fullyElapsed,
+      continuesFromPreviousDay: false,
+      continuesToNextDay: false,
+    };
+  }
+
+  return {
+    startMinutes,
+    durationMinutes: Math.max(
+      TASK_DISPLAY_DURATION_MINUTES,
+      MINIMUM_ENTRY_DURATION_MINUTES,
+    ),
+    fullyElapsed: false,
+    continuesFromPreviousDay: false,
+    continuesToNextDay: false,
+  };
 };
