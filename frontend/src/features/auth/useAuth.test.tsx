@@ -44,4 +44,26 @@ describe("useAuth", () => {
     });
     queryClient.clear();
   });
+
+  it("returns login failures for the authentication screen", async () => {
+    mockedApi.mockImplementation(async (path) => {
+      if (path === "/api/auth/me") throw new Error("Not signed in");
+      throw new Error("Invalid email or password");
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.authenticate("login", user.email, "wrong");
+    });
+
+    expect(result.current.error).toBe("Invalid email or password");
+    queryClient.clear();
+  });
 });
