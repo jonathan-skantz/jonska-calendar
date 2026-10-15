@@ -22,7 +22,8 @@ import {
 } from "./lib/calendar";
 import { api } from "./lib/api";
 import { tagTextColor } from "./lib/colors";
-import { getInvalidComposerFields } from "./lib/formValidation";
+import { getComposerFieldErrors } from "./lib/formValidation";
+import type { ComposerFieldErrors } from "./lib/formValidation";
 import { getRequestErrorMessage } from "./lib/requestErrors";
 import {
   clearWorkspace,
@@ -78,14 +79,14 @@ function App() {
   const [weekStart, setWeekStart] = useState(() => startOfCalendarWeek(today));
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
   const [actionError, setActionError] = useState("");
-  const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
   const composer = useComposer({
     tags,
     selectedDate,
     onSelectedDateChange: setSelectedDate,
     onResetErrors: () => {
       setActionError("");
-      setInvalidFields([]);
+      setFieldErrors({});
     },
   });
   const {
@@ -177,27 +178,6 @@ function App() {
       );
   }, [composerType, draftEventStart, editingItem, showComposer]);
 
-  useEffect(() => {
-    const composer = document.querySelector(".composer");
-    const form = composer?.querySelector("form");
-    if (form instanceof HTMLFormElement) form.noValidate = true;
-    composer?.querySelectorAll("input, select, textarea").forEach((control) => {
-      control
-        .closest("label")
-        ?.classList.toggle(
-          "field-invalid",
-          invalidFields.includes((control as HTMLInputElement).name),
-        );
-    });
-    composer
-      ?.querySelector(".tag-picker")
-      ?.classList.toggle(
-        "field-invalid",
-        invalidFields.includes("event-tags") ||
-          invalidFields.includes("main-tag"),
-      );
-  }, [invalidFields, showComposer]);
-
   const updateDefaultTag = async (tagID: string) => {
     try {
       await api("/api/tags/default", {
@@ -278,18 +258,18 @@ function App() {
 
   const createItem = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const invalidNames = getInvalidComposerFields(
+    const errors = getComposerFieldErrors(
       event.currentTarget,
       composerType,
       composerTagIds,
       composerMainTagId,
     );
-    if (invalidNames.length > 0) {
-      setInvalidFields([...new Set(invalidNames)]);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       setActionError("Please correct the highlighted fields.");
       return;
     }
-    setInvalidFields([]);
+    setFieldErrors({});
     setActionError("");
     const form = new FormData(event.currentTarget);
     const payload =
@@ -572,6 +552,7 @@ function App() {
           tags={tags}
           selectedTagIds={composerTagIds}
           mainTagId={composerMainTagId}
+          fieldErrors={fieldErrors}
           onSubmit={createItem}
           onClose={closeComposer}
           onTypeChange={setComposerType}

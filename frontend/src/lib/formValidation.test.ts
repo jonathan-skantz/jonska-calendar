@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getInvalidComposerFields } from "./formValidation";
+import { getComposerFieldErrors } from "./formValidation";
 
 const makeForm = (fields: Record<string, string>) => {
   const form = document.createElement("form");
@@ -21,8 +21,8 @@ describe("composer submission validation", () => {
       starts_at: "2026-10-15T10:00",
       ends_at: "2026-10-15T11:00",
     });
-    expect(getInvalidComposerFields(form, "event", ["work"], "work")).toEqual(
-      [],
+    expect(getComposerFieldErrors(form, "event", ["work"], "work")).toEqual(
+      {},
     );
   });
 
@@ -32,15 +32,19 @@ describe("composer submission validation", () => {
       starts_at: "2026-10-15T11:00",
       ends_at: "2026-10-15T10:00",
     });
-    expect(getInvalidComposerFields(form, "event", [], "other")).toEqual(
-      expect.arrayContaining(["title", "starts_at", "ends_at", "event-tags", "main-tag"]),
-    );
+    expect(getComposerFieldErrors(form, "event", [], "other")).toEqual({
+      title: true,
+      starts_at: true,
+      ends_at: true,
+      "event-tags": true,
+      "main-tag": true,
+    });
   });
 
   it("validates required task fields without applying event tag rules", () => {
     const form = makeForm({ title: "Follow up", deadline_at: "" });
-    expect(getInvalidComposerFields(form, "task", [], null)).toEqual([
-      "deadline_at",
-    ]);
+    expect(getComposerFieldErrors(form, "task", [], null)).toEqual({
+      deadline_at: true,
+    });
   });
 });

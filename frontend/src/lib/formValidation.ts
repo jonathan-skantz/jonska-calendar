@@ -1,6 +1,34 @@
 type ComposerType = "event" | "task";
 
-export const getInvalidComposerFields = (
+export type ComposerField =
+  | "title"
+  | "description"
+  | "url"
+  | "kind"
+  | "starts_at"
+  | "ends_at"
+  | "location"
+  | "deadline_at"
+  | "event-tags"
+  | "main-tag";
+
+export type ComposerFieldErrors = Partial<Record<ComposerField, true>>;
+
+const isComposerField = (name: string): name is ComposerField =>
+  [
+    "title",
+    "description",
+    "url",
+    "kind",
+    "starts_at",
+    "ends_at",
+    "location",
+    "deadline_at",
+    "event-tags",
+    "main-tag",
+  ].includes(name);
+
+export const getComposerFieldErrors = (
   form: HTMLFormElement,
   composerType: ComposerType,
   selectedTagIds: string[],
@@ -40,5 +68,9 @@ export const getInvalidComposerFields = (
     invalidNames.push("main-tag");
   }
 
-  return [...new Set(invalidNames)];
+  const errors: ComposerFieldErrors = {};
+  for (const name of new Set(invalidNames)) {
+    if (isComposerField(name)) errors[name] = true;
+  }
+  return errors;
 };

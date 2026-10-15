@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { inputDateTime } from "../lib/calendar";
+import type { ComposerFieldErrors } from "../lib/formValidation";
 import type { Tag, TimelineEntry } from "../types";
 import { EventTagPicker } from "./EventTagPicker";
 
@@ -11,6 +12,7 @@ type ComposerDrawerProps = {
   tags: Tag[];
   selectedTagIds: string[];
   mainTagId: string | null;
+  fieldErrors: ComposerFieldErrors;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onClose: () => void;
   onTypeChange: (type: "event" | "task") => void;
@@ -26,6 +28,7 @@ export const ComposerDrawer = ({
   tags,
   selectedTagIds,
   mainTagId,
+  fieldErrors,
   onSubmit,
   onClose,
   onTypeChange,
@@ -67,8 +70,8 @@ export const ComposerDrawer = ({
           </button>
         </div>
       )}
-      <form className="composer-form" onSubmit={onSubmit}>
-        <label>
+      <form className="composer-form" noValidate onSubmit={onSubmit}>
+        <label className={fieldErrors.title ? "field-invalid" : ""}>
           Title
           <input
             name="title"
@@ -78,11 +81,11 @@ export const ComposerDrawer = ({
             autoFocus
           />
         </label>
-        <label>
+        <label className={fieldErrors.description ? "field-invalid" : ""}>
           Description
           <textarea name="description" defaultValue={editingItem?.description} />
         </label>
-        <label>
+        <label className={fieldErrors.url ? "field-invalid" : ""}>
           URL
           <input
             name="url"
@@ -93,14 +96,14 @@ export const ComposerDrawer = ({
         </label>
         {type === "event" ? (
           <>
-            <label>
+            <label className={fieldErrors.kind ? "field-invalid" : ""}>
               Kind
               <select name="kind" defaultValue={editingItem?.kind ?? "informational"}>
                 <option value="informational">Informational</option>
                 <option value="attendable">Attendable</option>
               </select>
             </label>
-            <label>
+            <label className={fieldErrors.starts_at ? "field-invalid" : ""}>
               Starts
               <input
                 name="starts_at"
@@ -109,7 +112,7 @@ export const ComposerDrawer = ({
                 required
               />
             </label>
-            <label>
+            <label className={fieldErrors.ends_at ? "field-invalid" : ""}>
               Ends
               <input
                 name="ends_at"
@@ -118,7 +121,7 @@ export const ComposerDrawer = ({
                 required
               />
             </label>
-            <label>
+            <label className={fieldErrors.location ? "field-invalid" : ""}>
               Location
               <input
                 name="location"
@@ -130,12 +133,13 @@ export const ComposerDrawer = ({
               tags={tags}
               selectedTagIds={selectedTagIds}
               mainTagId={mainTagId}
+              invalid={Boolean(fieldErrors["event-tags"] || fieldErrors["main-tag"])}
               onSelectedTagIdsChange={onSelectedTagIdsChange}
               onMainTagIdChange={onMainTagIdChange}
             />
           </>
         ) : (
-          <label>
+          <label className={fieldErrors.deadline_at ? "field-invalid" : ""}>
             Deadline
             <input
               name="deadline_at"

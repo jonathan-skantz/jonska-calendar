@@ -4,6 +4,7 @@ type EventTagPickerProps = {
   tags: Tag[];
   selectedTagIds: string[];
   mainTagId: string | null;
+  invalid?: boolean;
   onSelectedTagIdsChange: (update: (current: string[]) => string[]) => void;
   onMainTagIdChange: (tagId: string) => void;
 };
@@ -12,10 +13,11 @@ export const EventTagPicker = ({
   tags,
   selectedTagIds,
   mainTagId,
+  invalid = false,
   onSelectedTagIdsChange,
   onMainTagIdChange,
 }: EventTagPickerProps) => (
-  <fieldset className="tag-picker">
+  <fieldset className={invalid ? "tag-picker field-invalid" : "tag-picker"}>
     <legend>Event tags</legend>
     {tags.map((tag) => (
       <div className="tag-option" key={tag.id}>
