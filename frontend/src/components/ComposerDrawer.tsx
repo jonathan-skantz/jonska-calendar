@@ -18,6 +18,7 @@ type ComposerDrawerProps = {
   selectedTagIds: string[];
   mainTagId: string | null;
   fieldErrors: ComposerFieldErrors;
+  error?: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onClose: () => void;
   onTypeChange: (type: "event" | "task") => void;
@@ -34,6 +35,7 @@ export const ComposerDrawer = ({
   selectedTagIds,
   mainTagId,
   fieldErrors,
+  error,
   onSubmit,
   onClose,
   onTypeChange,
@@ -71,6 +73,11 @@ export const ComposerDrawer = ({
           ×
         </button>
       </div>
+      {error && (
+        <p className="error" id="composer-error" role="alert">
+          {error}
+        </p>
+      )}
       {!editingItem && (
         <div className="segmented">
           <button
@@ -95,6 +102,7 @@ export const ComposerDrawer = ({
           <input
             name="title"
             aria-invalid={Boolean(fieldErrors.title)}
+            aria-describedby={fieldErrors.title && error ? "composer-error" : undefined}
             defaultValue={editingItem?.title}
             placeholder={type === "event" ? "What is happening?" : "What needs doing?"}
             required
@@ -106,6 +114,7 @@ export const ComposerDrawer = ({
           <textarea
             name="description"
             aria-invalid={Boolean(fieldErrors.description)}
+            aria-describedby={fieldErrors.description && error ? "composer-error" : undefined}
             defaultValue={editingItem?.description}
           />
         </label>
@@ -114,6 +123,7 @@ export const ComposerDrawer = ({
           <input
             name="url"
             aria-invalid={Boolean(fieldErrors.url)}
+            aria-describedby={fieldErrors.url && error ? "composer-error" : undefined}
             type="url"
             defaultValue={editingItem?.url}
             placeholder="https://"
@@ -126,6 +136,7 @@ export const ComposerDrawer = ({
               <select
                 name="kind"
                 aria-invalid={Boolean(fieldErrors.kind)}
+                aria-describedby={fieldErrors.kind && error ? "composer-error" : undefined}
                 defaultValue={editingItem?.kind ?? "informational"}
               >
                 <option value="informational">Informational</option>
@@ -138,6 +149,7 @@ export const ComposerDrawer = ({
                 ref={startsAtInput}
                 name="starts_at"
                 aria-invalid={Boolean(fieldErrors.starts_at)}
+                aria-describedby={fieldErrors.starts_at && error ? "composer-error" : undefined}
                 type="datetime-local"
                 defaultValue={inputDateTime(editingItem?.starts_at) || `${selectedDate}T09:00`}
                 required
@@ -149,6 +161,7 @@ export const ComposerDrawer = ({
                 ref={endsAtInput}
                 name="ends_at"
                 aria-invalid={Boolean(fieldErrors.ends_at)}
+                aria-describedby={fieldErrors.ends_at && error ? "composer-error" : undefined}
                 type="datetime-local"
                 defaultValue={inputDateTime(editingItem?.ends_at) || `${selectedDate}T10:00`}
                 required
@@ -159,6 +172,7 @@ export const ComposerDrawer = ({
               <input
                 name="location"
                 aria-invalid={Boolean(fieldErrors.location)}
+                aria-describedby={fieldErrors.location && error ? "composer-error" : undefined}
                 defaultValue={editingItem?.location}
                 placeholder="Home, online, or somewhere else"
               />
@@ -168,6 +182,7 @@ export const ComposerDrawer = ({
               selectedTagIds={selectedTagIds}
               mainTagId={mainTagId}
               invalid={Boolean(fieldErrors["event-tags"] || fieldErrors["main-tag"])}
+              errorId={error ? "composer-error" : undefined}
               onSelectedTagIdsChange={onSelectedTagIdsChange}
               onMainTagIdChange={onMainTagIdChange}
             />
@@ -178,6 +193,7 @@ export const ComposerDrawer = ({
             <input
               name="deadline_at"
               aria-invalid={Boolean(fieldErrors.deadline_at)}
+              aria-describedby={fieldErrors.deadline_at && error ? "composer-error" : undefined}
               type="datetime-local"
               defaultValue={
                 inputDateTime(editingItem?.deadline_at) ||

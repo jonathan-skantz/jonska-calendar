@@ -14,6 +14,7 @@ describe("ComposerDrawer validation state", () => {
         selectedTagIds={[]}
         mainTagId={null}
         fieldErrors={{ title: true, starts_at: true, ends_at: true }}
+        error="Please correct the highlighted fields."
         onSubmit={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
@@ -23,6 +24,8 @@ describe("ComposerDrawer validation state", () => {
     );
 
     expect(screen.getByLabelText("Title").getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByRole("alert").textContent).toBe("Please correct the highlighted fields.");
+    expect(screen.getByLabelText("Title").getAttribute("aria-describedby")).toBe("composer-error");
     expect(screen.getByLabelText("Starts").getAttribute("aria-invalid")).toBe("true");
     expect(screen.getByLabelText("Ends").getAttribute("aria-invalid")).toBe("true");
     expect(screen.getByLabelText("Description").getAttribute("aria-invalid")).toBe("false");

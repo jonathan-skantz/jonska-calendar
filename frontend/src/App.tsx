@@ -257,6 +257,7 @@ function App() {
           selectedTagIds={composerTagIds}
           mainTagId={composerMainTagId}
           fieldErrors={fieldErrors}
+          error={actionError}
           onSubmit={createItem}
           onClose={closeComposer}
           onTypeChange={setComposerType}
