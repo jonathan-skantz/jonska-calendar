@@ -96,6 +96,12 @@ func (s *Store) DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error {
 	if tagCount <= 1 {
 		return ErrLastTag
 	}
+	var replacementTagID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+		SELECT id FROM tags WHERE user_id = $1 AND id <> $2 ORDER BY name LIMIT 1
+	`, userID, tagID).Scan(&replacementTagID); err != nil {
+		return err
+	}
 
 	var isDefault bool
 	if err := tx.QueryRow(ctx, `SELECT default_tag_id = $2 FROM users WHERE id = $1`, userID, tagID).Scan(&isDefault); err != nil {
@@ -103,30 +109,34 @@ func (s *Store) DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error {
 	}
 	if isDefault {
 		if _, err := tx.Exec(ctx, `
-			UPDATE users SET default_tag_id = (
-				SELECT id FROM tags WHERE user_id = $1 AND id <> $2 ORDER BY name LIMIT 1
-			) WHERE id = $1
-		`, userID, tagID); err != nil {
+			UPDATE users SET default_tag_id = $2 WHERE id = $1
+		`, userID, replacementTagID); err != nil {
 			return err
 		}
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO timeline_item_tags (timeline_item_id, tag_id)
-		SELECT event.timeline_item_id, replacement.id
+		SELECT event.timeline_item_id, $3
 		FROM events AS event
 		JOIN timeline_items AS item ON item.id = event.timeline_item_id
-		CROSS JOIN LATERAL (
-			SELECT id FROM tags
-			WHERE user_id = $1 AND id <> $2
-			ORDER BY name LIMIT 1
-		) AS replacement
 		WHERE item.user_id = $1
-		  AND NOT EXISTS (
+		  AND (event.main_tag_id = $2 OR NOT EXISTS (
 			SELECT 1 FROM timeline_item_tags AS existing
 			WHERE existing.timeline_item_id = event.timeline_item_id
-		  )
+			  AND existing.tag_id <> $2
+		  ))
 		ON CONFLICT DO NOTHING
-	`, userID, tagID); err != nil {
+	`, userID, tagID, replacementTagID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE events AS event
+		SET main_tag_id = $3
+		FROM timeline_items AS item
+		WHERE item.id = event.timeline_item_id
+		  AND item.user_id = $1
+		  AND event.main_tag_id = $2
+	`, userID, tagID, replacementTagID); err != nil {
 		return err
 	}
 	result, err := tx.Exec(ctx, `DELETE FROM tags WHERE id = $1 AND user_id = $2`, tagID, userID)

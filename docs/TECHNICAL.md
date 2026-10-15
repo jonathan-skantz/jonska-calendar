@@ -93,9 +93,13 @@ tags 1 --- n timeline_item_tags n --- 1 timeline_items
 A tag belongs to a user. The database and store queries require both the item and tag to belong to the authenticated user before attaching or removing a tag. Shared-tag adoption is future functionality.
 
 Each user has a `general` tag and a `default_tag_id`. Event creation inserts
-the default tag in the same transaction as the event. Event tag removal locks
-the item and refuses to remove its final tag; deleting a tag first reassigns
-otherwise-untagged events to another user tag.
+the default tag in the same transaction as the event. Every event has a main
+tag, and that tag must also be attached to the event. Event updates validate
+both tag ownership and attachment. Event tag removal locks the item and refuses
+to remove its final tag. When a tag is deleted, events that use it as their main
+tag receive a replacement main tag, and events that would otherwise have no
+tags receive the replacement tag. Deleting the default tag selects the same
+replacement as the new default.
 
 ### Shared events
 
@@ -159,7 +163,7 @@ Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, 
 
 Task request fields are `title`, `description`, `url`, and `deadline_at`. The title and deadline are required. `deadline_at` is a timestamp.
 
-Tag colors use the six-digit hexadecimal form `#RRGGBB`. Tag responses contain `id`, `name`, `color`, and `is_default`.
+Tag colors use six hexadecimal digits with a leading `#`, such as `#547968`. The digits can use uppercase or lowercase letters. The frontend chooses black or white tag text by comparing each color's WCAG contrast ratio against both. Tag responses contain `id`, `name`, `color`, and `is_default`.
 
 Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `source_title`, `custom_info`, `tags`, and `main_tag_id`. Optional response fields are omitted when empty. Timestamps use JSON time format.
 

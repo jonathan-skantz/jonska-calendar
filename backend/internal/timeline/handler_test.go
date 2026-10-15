@@ -397,8 +397,12 @@ func TestPersonalTags(t *testing.T) {
 		t.Fatalf("expected general and Family tags, got %+v", listedTags)
 	}
 	var foundDefault bool
+	var defaultTagID uuid.UUID
 	for _, listedTag := range listedTags {
-		foundDefault = foundDefault || (listedTag.Name == "general" && listedTag.IsDefault)
+		if listedTag.Name == "general" && listedTag.IsDefault {
+			foundDefault = true
+			defaultTagID = listedTag.ID
+		}
 	}
 	if !foundDefault {
 		t.Fatalf("expected general to be default, got %+v", listedTags)
@@ -440,6 +444,47 @@ func TestPersonalTags(t *testing.T) {
 	if removeTagResponse.Code != http.StatusNoContent {
 		t.Fatalf("remove tag: expected status %d, got %d", http.StatusNoContent, removeTagResponse.Code)
 	}
+
+	eventWithDeletedMainTagID, err := store.CreateEvent(context.Background(), userID, db.Event{
+		Title:     "Event with tag to delete",
+		StartsAt:  time.Date(2026, 10, 10, 18, 0, 0, 0, time.UTC),
+		EndsAt:    time.Date(2026, 10, 10, 19, 0, 0, 0, time.UTC),
+		Kind:      "informational",
+		MainTagID: tag.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	deleteTagRequest := httptest.NewRequest(http.MethodDelete, "/api/tags/"+tag.ID.String(), nil)
+	deleteTagRequest.SetPathValue("tagID", tag.ID.String())
+	deleteTagResponse := httptest.NewRecorder()
+	handler.DeleteTag(deleteTagResponse, deleteTagRequest)
+	if deleteTagResponse.Code != http.StatusNoContent {
+		t.Fatalf("delete tag used as main tag: expected status %d, got %d: %s", http.StatusNoContent, deleteTagResponse.Code, deleteTagResponse.Body.String())
+	}
+
+	listResponse = httptest.NewRecorder()
+	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("list timeline after deleting main tag: expected status %d, got %d", http.StatusOK, listResponse.Code)
+	}
+	if err := json.NewDecoder(listResponse.Body).Decode(&entries); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.ID != eventWithDeletedMainTagID {
+			continue
+		}
+		if entry.MainTagID == nil || *entry.MainTagID != defaultTagID {
+			t.Fatalf("expected replacement main tag %s, got %+v", defaultTagID, entry.MainTagID)
+		}
+		if len(entry.Tags) != 1 || entry.Tags[0].ID != defaultTagID {
+			t.Fatalf("expected replacement tag to remain attached, got %+v", entry.Tags)
+		}
+		return
+	}
+	t.Fatalf("timeline did not contain event %s after deleting its main tag", eventWithDeletedMainTagID)
 }
 
 func TestShareEventAndUpdateLocalAppearance(t *testing.T) {
