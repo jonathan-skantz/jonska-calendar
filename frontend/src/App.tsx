@@ -15,7 +15,6 @@ import {
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import {
-  getBackToBackTrim,
   getEntryMinutes,
   getTimelineEntryDate,
 } from "./lib/timeline";
@@ -32,6 +31,7 @@ import {
   getCalendarDates,
   getClickedEventStart,
   getDayElapsedOverlay,
+  getEventAdjacency,
   getEventPreview,
   getVisibleWeekEntries,
 } from "./features/calendar/timelineView";
@@ -268,7 +268,7 @@ function App() {
     return dayEntries.map((entry, index) => {
       const previous = dayEntries[index - 1];
       const next = dayEntries[index + 1];
-      const { trimTop, trimBottom } = getBackToBackTrim(
+      const { trimTop, trimBottom } = getEventAdjacency(
         entry,
         previous,
         next,

@@ -14,6 +14,7 @@ import {
 } from "../../lib/calendar";
 import { getElapsedOverlayState } from "../../lib/timeline";
 import { getTimelineEntryDate, isEventVisible } from "../../lib/timeline";
+import { sameInstant } from "../../lib/calendar";
 import type { TimelineEntry } from "../../types";
 
 export const getCalendarDates = (weekStart: Date) =>
@@ -71,3 +72,18 @@ export const getDayElapsedOverlay = (
   today: Date,
   formatLabel: (value: Date) => string,
 ) => getElapsedOverlayState(date, today, formatLabel);
+
+export const getEventAdjacency = (
+  entry: TimelineEntry,
+  previous?: TimelineEntry,
+  next?: TimelineEntry,
+) => ({
+  trimTop:
+    entry.type === "event" &&
+    previous?.type === "event" &&
+    sameInstant(previous.ends_at, entry.starts_at),
+  trimBottom:
+    entry.type === "event" &&
+    next?.type === "event" &&
+    sameInstant(entry.ends_at, next.starts_at),
+});

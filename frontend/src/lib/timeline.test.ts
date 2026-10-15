@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { getEventAdjacency } from "../features/calendar/timelineView";
 import {
-  getBackToBackTrim,
   getElapsedOverlayState,
   getEventTagChanges,
   getDefaultEventTagSelection,
@@ -104,19 +104,19 @@ describe("timeline behavior", () => {
     const previous = event({ ends_at: "2026-10-15T10:00:00Z" });
     const current = event({ starts_at: "2026-10-15T10:00:00.000Z" });
     const next = event({ starts_at: "2026-10-15T11:00:00Z" });
-    expect(getBackToBackTrim(current, previous, next)).toEqual({
+    expect(getEventAdjacency(current, previous, next)).toEqual({
       trimTop: true,
       trimBottom: true,
     });
     expect(
-      getBackToBackTrim(
+      getEventAdjacency(
         current,
         event({ ends_at: "2026-10-15T09:59:00Z" }),
         event({ starts_at: "2026-10-15T11:01:00Z" }),
       ),
     ).toEqual({ trimTop: false, trimBottom: false });
     expect(
-      getBackToBackTrim({ ...current, type: "task" }, previous, next).trimTop,
+      getEventAdjacency({ ...current, type: "task" }, previous, next).trimTop,
     ).toBe(false);
   });
 
