@@ -28,6 +28,10 @@ var migrationNames = []string{
 }
 
 func NewStore(t *testing.T) *db.Store {
+	return db.NewStore(newTestPool(t, migrationNames))
+}
+
+func newTestPool(t *testing.T, migrations []string) *pgxpool.Pool {
 	t.Helper()
 	ctx := context.Background()
 	container, err := postgres.Run(
@@ -49,8 +53,8 @@ func NewStore(t *testing.T) *db.Store {
 
 	pool := connect(t, ctx, connectionString)
 	t.Cleanup(pool.Close)
-	applyMigrations(t, ctx, pool)
-	return db.NewStore(pool)
+	applyMigrations(t, ctx, pool, migrations)
+	return pool
 }
 
 func connect(t *testing.T, ctx context.Context, connectionString string) *pgxpool.Pool {
@@ -68,14 +72,14 @@ func connect(t *testing.T, ctx context.Context, connectionString string) *pgxpoo
 	return nil
 }
 
-func applyMigrations(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+func applyMigrations(t *testing.T, ctx context.Context, pool *pgxpool.Pool, migrations []string) {
 	t.Helper()
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("failed to locate test utility source")
 	}
 	migrationDirectory := filepath.Join(filepath.Dir(filename), "..", "..", "db", "migrations")
-	for _, migrationName := range migrationNames {
+	for _, migrationName := range migrations {
 		migration, err := os.ReadFile(filepath.Join(migrationDirectory, migrationName))
 		if err != nil {
 			t.Fatal(err)
