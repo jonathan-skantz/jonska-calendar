@@ -59,7 +59,7 @@ The frontend is a separate development server. Vite proxies `/api` to the Go ser
 - [frontend/src/main.tsx](../frontend/src/main.tsx)
   - Creates the React root and the TanStack Query client provider.
 - [frontend/src/App.tsx](../frontend/src/App.tsx)
-  - Application shell and coordination for authentication, workspace, calendar, and drawers. Presentational components live under `frontend/src/components/`; shared state helpers live under `frontend/src/hooks/`.
+  - Application shell and coordination for workspace, calendar, and drawers. Authentication query and actions live in `frontend/src/features/auth/useAuth.ts`. Presentational components live under `frontend/src/components/`; shared state helpers live under `frontend/src/hooks/`.
 - [frontend/src/App.css](../frontend/src/App.css)
   - Imports feature styles from `frontend/src/styles/`, including tokens, base rules, auth, calendar, sidebar, and drawers.
 - [frontend/src/index.css](../frontend/src/index.css)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent, MouseEvent } from "react";
 import { addDays, format } from "date-fns";
 import {
@@ -23,11 +23,7 @@ import { api } from "./lib/api";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import { getRequestErrorMessage } from "./lib/requestErrors";
-import {
-  clearWorkspace,
-  invalidateCurrentUserAndWorkspace,
-  invalidateWorkspace,
-} from "./lib/queryInvalidation";
+import { invalidateWorkspace } from "./lib/queryInvalidation";
 import {
   buildTimelineItemRequest,
   getBackToBackTrim,
@@ -37,11 +33,12 @@ import {
   getTimelineEntryDate,
   isEventVisible,
 } from "./lib/timeline";
-import type { AuthMode, Tag, TimelineEntry, User } from "./types";
+import type { AuthMode, Tag, TimelineEntry } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useComposer } from "./hooks/useComposer";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
+import { useAuth } from "./features/auth/useAuth";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
 import { CalendarEntry } from "./components/CalendarEntry";
@@ -50,22 +47,21 @@ import { TagEditorDrawer } from "./components/TagEditorDrawer";
 import { WeekCalendar } from "./components/WeekCalendar";
 import { WeekHeader } from "./components/WeekHeader";
 import { TopBar } from "./components/TopBar";
-import { queryKeys } from "./lib/queryKeys";
 import "./App.css";
 
 function App() {
   const queryClient = useQueryClient();
-  const currentUserQuery = useQuery({
-    queryKey: queryKeys.currentUser,
-    queryFn: () => api<User>("/api/auth/me"),
-    retry: false,
-  });
-  const workspaceQuery = useWorkspace(Boolean(currentUserQuery.data));
-  const user = currentUserQuery.data ?? null;
+  const {
+    user,
+    isLoading: authLoading,
+    error,
+    authenticate,
+    logout,
+  } = useAuth();
+  const workspaceQuery = useWorkspace(Boolean(user));
   const entries = workspaceQuery.data?.entries ?? [];
   const tags = workspaceQuery.data?.tags ?? [];
-  const loading = currentUserQuery.isLoading || workspaceQuery.isLoading;
-  const [error, setError] = useState("");
+  const loading = authLoading || workspaceQuery.isLoading;
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -102,31 +98,9 @@ function App() {
     close: closeComposer,
   } = composer;
 
-  const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
+  const submitAuth = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError("");
-    try {
-      const path = `/api/auth/${authMode === "login" ? "login" : "register"}`;
-      await api<User>(path, {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
-      if (authMode === "register") {
-        await api("/api/auth/login", {
-          method: "POST",
-          body: JSON.stringify({ email, password }),
-        });
-      }
-      await invalidateCurrentUserAndWorkspace(queryClient);
-    } catch (requestError) {
-      setError(getRequestErrorMessage(requestError, "Unable to sign in"));
-    }
-  };
-
-  const logout = async () => {
-    await api("/api/auth/logout", { method: "POST" });
-    await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
-    clearWorkspace(queryClient);
+    void authenticate(authMode, email, password);
   };
 
   const toggleTask = async (entry: TimelineEntry) => {
