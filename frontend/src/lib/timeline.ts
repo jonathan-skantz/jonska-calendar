@@ -1,5 +1,5 @@
 import { localDateTime, minutesIntoDay } from "./calendar";
-import type { TimelineEntry } from "../types";
+import type { Tag, TimelineEntry } from "../types";
 
 export type EventPayload = {
   title: string;
@@ -23,6 +23,20 @@ export const getTimelineEntryDate = (entry: TimelineEntry) =>
 
 export const getEntryMinutes = (entry: TimelineEntry) =>
   minutesIntoDay(getTimelineEntryDate(entry));
+
+export const getMainTag = (entry: TimelineEntry) =>
+  entry.tags?.find((tag) => tag.id === entry.main_tag_id) ?? entry.tags?.[0];
+
+export const getOrderedStripTags = (entry: TimelineEntry): Tag[] => {
+  const mainTag = getMainTag(entry);
+  const additionalTags =
+    entry.type === "event"
+      ? [...(entry.tags?.filter((tag) => tag.id !== mainTag?.id) ?? [])].sort(
+          (left, right) => left.name.localeCompare(right.name),
+        )
+      : [];
+  return mainTag ? [mainTag, ...additionalTags] : additionalTags;
+};
 
 export const buildEventPayload = (form: FormData): EventPayload => ({
   title: String(form.get("title") || ""),

@@ -28,6 +28,8 @@ import {
   buildEventPayload,
   buildTaskPayload,
   getEntryMinutes,
+  getMainTag,
+  getOrderedStripTags,
   getTimelineEntryDate,
 } from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
@@ -554,16 +556,9 @@ function App() {
     const fullyElapsed =
       entry.type === "event" &&
       Boolean(entry.ends_at && new Date(entry.ends_at).getTime() <= today.getTime());
-    const mainTag =
-      entry.tags?.find((tag) => tag.id === entry.main_tag_id) ??
-      entry.tags?.[0];
-    const stripTags =
-      entry.type === "event"
-        ? [...(entry.tags?.filter((tag) => tag.id !== mainTag?.id) ?? [])].sort(
-            (left, right) => left.name.localeCompare(right.name),
-          )
-        : [];
-    const orderedStripTags = mainTag ? [mainTag, ...stripTags] : stripTags;
+    const mainTag = getMainTag(entry);
+    const orderedStripTags = getOrderedStripTags(entry);
+    const stripTags = orderedStripTags.filter((tag) => tag.id !== mainTag?.id);
     const stripColors = orderedStripTags.map((tag) => tag.color);
     const additionalStripWidth = stripTags.length ? 50 / stripTags.length : 0;
     const stripStops = stripTags.length
