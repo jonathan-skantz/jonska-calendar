@@ -109,7 +109,6 @@ function App() {
   const [today] = useState(() => new Date());
   const [weekStart, setWeekStart] = useState(() => startOfCalendarWeek(today));
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
 
@@ -166,7 +165,6 @@ function App() {
     try {
       await api(`/api/timeline/${entry.id}`, { method: "DELETE" });
       await queryClient.invalidateQueries({ queryKey: ["workspace"] });
-      setOpenMenuId(null);
       setShowComposer(false);
       setEditingItem(null);
       setDraftEventStart(null);
@@ -183,7 +181,6 @@ function App() {
     setEditingItem(entry);
     setComposerType(entry.type);
     setDraftEventStart(null);
-    setOpenMenuId(null);
     setActionError("");
     setInvalidFields([]);
     setComposerTagIds(entry.tags?.map((tag) => tag.id) ?? []);
@@ -646,7 +643,7 @@ function App() {
         key={entry.id}
         onClick={(event) => {
           event.stopPropagation();
-          if (entry.type === "event" && !entry.is_shared) editItem(entry);
+          if (!entry.is_shared) editItem(entry);
         }}
       >
         <strong>{entry.title}</strong>
@@ -660,28 +657,10 @@ function App() {
           <input
             type="checkbox"
             checked={entry.is_completed}
+            onClick={(event) => event.stopPropagation()}
             onChange={() => toggleTask(entry)}
             aria-label={`Complete ${entry.title}`}
           />
-        )}
-        {entry.type === "task" && !entry.is_shared && (
-          <div className="grid-entry-actions">
-            <button
-              className="more-button"
-              aria-label={`More options for ${entry.title}`}
-              onClick={() =>
-                setOpenMenuId(openMenuId === entry.id ? null : entry.id)
-              }
-            >
-              ···
-            </button>
-            {openMenuId === entry.id && (
-              <div className="item-menu">
-                <button onClick={() => editItem(entry)}>Edit</button>
-                <button onClick={() => deleteItem(entry)}>Delete</button>
-              </div>
-            )}
-          </div>
         )}
       </article>
     );
@@ -1055,6 +1034,7 @@ function App() {
                     type="datetime-local"
                     defaultValue={
                       inputDateTime(editingItem?.deadline_at) ||
+                      inputDateTime(draftEventStart ?? undefined) ||
                       `${selectedDate}T17:00`
                     }
                     required

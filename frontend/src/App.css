@@ -456,22 +456,6 @@ textarea:focus {
     accent-color: var(--moss);
 }
 
-.grid-entry-actions {
-    position: absolute;
-    right: 3px;
-    top: 2px;
-}
-
-.grid-entry-actions .more-button {
-    padding: 0 2px;
-    color: var(--ink);
-}
-
-.grid-entry-actions .item-menu {
-    top: 20px;
-    z-index: 20;
-}
-
 .tag {
     display: inline-block;
     color: var(--moss);
@@ -603,39 +587,10 @@ textarea:focus {
     gap: 8px;
 }
 
-.more-button,
 .icon-button {
     border: 0;
     background: transparent;
     color: var(--muted);
-}
-
-.more-button {
-    font-weight: 700;
-    letter-spacing: 2px;
-}
-
-.item-menu {
-    position: absolute;
-    right: 0;
-    top: 26px;
-    z-index: 1;
-    padding: 5px;
-    background: var(--paper);
-    border: 1px solid var(--line);
-    box-shadow: 0 8px 20px rgba(39, 52, 47, .12);
-}
-
-.item-menu button {
-    border: 0;
-    background: transparent;
-    color: #b24e42;
-    padding: 8px 12px;
-    white-space: nowrap;
-}
-
-.item-menu button:hover {
-    background: #f8e9e4;
 }
 
 .drawer-delete-action {
