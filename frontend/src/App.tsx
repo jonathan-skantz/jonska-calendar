@@ -617,8 +617,9 @@ function App() {
             ? {
                 backgroundColor: withAlpha(mainTag.color, 0.22),
                 borderLeftWidth: 0,
-                backgroundImage: `linear-gradient(to bottom, ${stripColors.map((color, index) => `${color} ${(index * 100) / stripColors.length}%, ${color} ${((index + 1) * 100) / stripColors.length}%`).join(", ")})`,
-                backgroundSize: "3px 100%",
+                backgroundImage: `linear-gradient(to right, ${stripColors.map((color, index) => `${color} ${(index * 100) / stripColors.length}%, ${color} ${((index + 1) * 100) / stripColors.length}%`).join(", ")})`,
+                backgroundSize: "100% 3px",
+                backgroundPosition: "top",
                 backgroundRepeat: "no-repeat",
               }
             : {}),
