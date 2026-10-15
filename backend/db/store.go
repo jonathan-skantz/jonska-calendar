@@ -16,97 +16,9 @@ type Store struct {
 	db *pgxpool.Pool
 }
 
-type User struct {
-	ID           uuid.UUID
-	Email        string
-	PasswordHash string
-}
-
-type Event struct {
-	ID                   uuid.UUID
-	Title                string
-	Description          *string
-	URL                  *string
-	StartsAt             time.Time
-	EndsAt               time.Time
-	Kind                 string
-	Location             *string
-	CommuteBeforeSeconds int
-	CommuteAfterSeconds  int
-	MainTagID            uuid.UUID
-}
-
-type Task struct {
-	ID          uuid.UUID
-	Title       string
-	Description *string
-	URL         *string
-	DeadlineAt  time.Time
-	IsCompleted bool
-}
-
-type Tag struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Color     string    `json:"color"`
-	IsDefault bool      `json:"is_default"`
-}
-
-// SharedEvent combines the owner's current event fields with the recipient's
-// local overrides. Original* values come from the joined source event; they
-// are not duplicated columns in the sharing tables.
-type SharedEvent struct {
-	ShareID             uuid.UUID
-	EventID             uuid.UUID
-	RecipientUserID     uuid.UUID
-	OriginalTitle       string
-	OriginalDescription *string
-	OriginalURL         *string
-	OriginalLocation    *string
-	StartsAt            time.Time
-	EndsAt              time.Time
-	Kind                string
-	LocalTitle          *string
-	LocalDescription    *string
-	LocalURL            *string
-	LocalLocation       *string
-	PrivateCustomInfo   *string
-}
-
-type TimelineEntry struct {
-	ID                   uuid.UUID  `json:"id"`
-	Type                 string     `json:"type"`
-	Title                string     `json:"title"`
-	Description          *string    `json:"description,omitempty"`
-	URL                  *string    `json:"url,omitempty"`
-	StartsAt             *time.Time `json:"starts_at,omitempty"`
-	EndsAt               *time.Time `json:"ends_at,omitempty"`
-	DeadlineAt           *time.Time `json:"deadline_at,omitempty"`
-	Kind                 *string    `json:"kind,omitempty"`
-	Location             *string    `json:"location,omitempty"`
-	CommuteBeforeSeconds int        `json:"commute_before_seconds,omitempty"`
-	CommuteAfterSeconds  int        `json:"commute_after_seconds,omitempty"`
-	IsCompleted          bool       `json:"is_completed"`
-	IsShared             bool       `json:"is_shared,omitempty"`
-	SourceTitle          *string    `json:"source_title,omitempty"`
-	CustomInfo           *string    `json:"custom_info,omitempty"`
-	Tags                 []Tag      `json:"tags,omitempty"`
-	MainTagID            *uuid.UUID `json:"main_tag_id,omitempty"`
-}
-
 func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
-
-var (
-	ErrEmailAlreadyExists  = errors.New("email already exists")
-	ErrSessionNotFound     = errors.New("session not found")
-	ErrSharedEventNotFound = errors.New("shared event not found")
-	ErrTagAlreadyExists    = errors.New("tag already exists")
-	ErrTagNotFound         = errors.New("tag not found")
-	ErrLastTag             = errors.New("at least one tag is required")
-	ErrDefaultTagNotFound  = errors.New("default tag not found")
-)
 
 func NewDBPool(ctx context.Context, connURL string) (*pgxpool.Pool, error) {
 
