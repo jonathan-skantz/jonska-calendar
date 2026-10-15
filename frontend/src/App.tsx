@@ -2,17 +2,13 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { format } from "date-fns";
 import {
-  MINIMUM_ENTRY_DURATION_MINUTES,
-  TASK_DISPLAY_DURATION_MINUTES,
   dateKey,
   formatDate,
   localDateKey,
-  minutesIntoDay,
 } from "./lib/calendar";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import {
-  getEntryMinutes,
   getTimelineEntryDate,
 } from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
@@ -25,6 +21,7 @@ import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
 import { useTagMutations } from "./features/tags/useTagMutations";
 import { useCalendarState } from "./features/calendar/useCalendarState";
 import {
+  getCalendarEntryLayout,
   getCalendarDates,
   getClickedEventStart,
   getDayElapsedOverlay,
@@ -205,26 +202,14 @@ function App() {
     trimTop = false,
     trimBottom = false,
   ) => {
-    const start = getEntryMinutes(entry);
-    const end =
-      entry.type === "event"
-        ? minutesIntoDay(entry.ends_at)
-        : start + TASK_DISPLAY_DURATION_MINUTES;
-    const duration = Math.max(
-      entry.type === "event" && end > start
-        ? end - start
-        : TASK_DISPLAY_DURATION_MINUTES,
-      MINIMUM_ENTRY_DURATION_MINUTES,
-    );
-    const fullyElapsed =
-      entry.type === "event" &&
-      Boolean(entry.ends_at && new Date(entry.ends_at).getTime() <= today.getTime());
+    const { startMinutes, durationMinutes, fullyElapsed } =
+      getCalendarEntryLayout(entry, today);
     return (
       <CalendarEntry
         key={entry.id}
         entry={entry}
-        startMinutes={start}
-        durationMinutes={duration}
+        startMinutes={startMinutes}
+        durationMinutes={durationMinutes}
         trimTop={trimTop}
         trimBottom={trimBottom}
         fullyElapsed={fullyElapsed}

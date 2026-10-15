@@ -4,17 +4,23 @@ import {
   CALENDAR_GRID_SCALE,
   HOURS_PER_DAY,
   LAST_EVENT_START_HOUR,
+  MINIMUM_ENTRY_DURATION_MINUTES,
   MINUTES_PER_HOUR,
   PREVIEW_EVENT_DURATION_MINUTES,
+  TASK_DISPLAY_DURATION_MINUTES,
   WEEK_DAY_COUNT,
   dateKey,
   formatTime,
   localDateKey,
   minutesIntoDay,
+  sameInstant,
 } from "../../lib/calendar";
-import { getElapsedOverlayState } from "../../lib/timeline";
-import { getTimelineEntryDate, isEventVisible } from "../../lib/timeline";
-import { sameInstant } from "../../lib/calendar";
+import {
+  getElapsedOverlayState,
+  getEntryMinutes,
+  getTimelineEntryDate,
+  isEventVisible,
+} from "../../lib/timeline";
 import type { TimelineEntry } from "../../types";
 
 export const getCalendarDates = (weekStart: Date) =>
@@ -87,3 +93,24 @@ export const getEventAdjacency = (
     next?.type === "event" &&
     sameInstant(entry.ends_at, next.starts_at),
 });
+
+export const getCalendarEntryLayout = (
+  entry: TimelineEntry,
+  now: Date,
+) => {
+  const startMinutes = getEntryMinutes(entry);
+  const endMinutes =
+    entry.type === "event"
+      ? minutesIntoDay(entry.ends_at)
+      : startMinutes + TASK_DISPLAY_DURATION_MINUTES;
+  const durationMinutes = Math.max(
+    entry.type === "event" && endMinutes > startMinutes
+      ? endMinutes - startMinutes
+      : TASK_DISPLAY_DURATION_MINUTES,
+    MINIMUM_ENTRY_DURATION_MINUTES,
+  );
+  const fullyElapsed =
+    entry.type === "event" &&
+    Boolean(entry.ends_at && new Date(entry.ends_at).getTime() <= now.getTime());
+  return { startMinutes, durationMinutes, fullyElapsed };
+};
