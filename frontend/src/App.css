@@ -51,8 +51,7 @@
 }
 
 .eyebrow,
-.section-kicker,
-.item-type {
+.section-kicker {
     margin: 0;
     color: var(--moss);
     font: 11px 'DM Mono', monospace;
@@ -62,7 +61,6 @@
 
 h1,
 h2,
-h3,
 p {
     margin-top: 0;
 }
@@ -227,61 +225,8 @@ textarea:focus {
     font-size: 12px;
 }
 
-.workspace-heading {
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: 24px;
-    padding: 58px clamp(20px, 8vw, 140px) 35px;
-}
-
-.workspace-heading h1 {
-    font-size: clamp(36px, 5.5vw, 72px);
-    margin-bottom: 0;
-}
-
 .compact {
     min-width: 180px;
-}
-
-.date-strip {
-    display: flex;
-    gap: 8px;
-    padding: 0 clamp(20px, 8vw, 140px) 30px;
-    overflow: auto;
-}
-
-.date-cell {
-    min-width: 86px;
-    display: grid;
-    gap: 3px;
-    justify-items: start;
-    padding: 13px;
-    border: 1px solid var(--line);
-    background: transparent;
-    color: var(--muted);
-    text-align: left;
-}
-
-.date-cell strong {
-    color: var(--ink);
-    font-size: 22px;
-    font-weight: 500;
-}
-
-.date-cell span {
-    font: 10px 'DM Mono', monospace;
-    text-transform: uppercase;
-}
-
-.date-cell.active {
-    background: var(--moss);
-    border-color: var(--moss);
-    color: #dce8dd;
-}
-
-.date-cell.active strong {
-    color: #fff;
 }
 
 .week-nav {
@@ -445,10 +390,6 @@ textarea:focus {
     pointer-events: none;
 }
 
-.grid-entry.menu-open {
-    z-index: 10;
-}
-
 .grid-entry strong {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -487,86 +428,6 @@ textarea:focus {
 .grid-entry-actions .item-menu {
     top: 20px;
     z-index: 20;
-}
-
-.timeline-list {
-    display: grid;
-    gap: 12px;
-}
-
-.timeline-card {
-    position: relative;
-    display: grid;
-    grid-template-columns: 76px 12px 1fr 30px;
-    gap: 14px;
-    align-items: start;
-    padding: 18px 16px 19px 0;
-    border-top: 1px solid var(--line);
-}
-
-.timeline-card.event {
-    border-left: 3px solid var(--yellow);
-}
-
-.timeline-card.event.informational {
-    border-left-color: #a8b8c0;
-}
-
-.timeline-card.task {
-    border-left: 3px solid var(--coral);
-}
-
-.timeline-card.completed {
-    opacity: .55;
-}
-
-.card-time {
-    display: grid;
-    gap: 3px;
-    padding-left: 12px;
-    color: var(--muted);
-    font: 11px 'DM Mono', monospace;
-}
-
-.card-time strong {
-    color: var(--ink);
-    font-size: 12px;
-}
-
-.card-marker {
-    width: 8px;
-    height: 8px;
-    margin-top: 6px;
-    background: var(--yellow);
-    border-radius: 50%;
-}
-
-.task .card-marker {
-    background: var(--coral);
-}
-
-.card-topline {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 7px;
-}
-
-.card-content h3 {
-    margin: 6px 0 5px;
-    font-size: 18px;
-    font-weight: 500;
-}
-
-.card-content p {
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.45;
-    margin: 4px 0;
-}
-
-.item-type {
-    font-size: 9px;
 }
 
 .tag {
@@ -700,40 +561,6 @@ textarea:focus {
     gap: 8px;
 }
 
-.source-note {
-    color: var(--coral) !important;
-    font-size: 11px !important;
-}
-
-.location {
-    color: var(--moss-dark) !important;
-}
-
-.custom-note {
-    padding: 8px 10px;
-    border-left: 2px solid var(--yellow);
-    background: #f8f1dd;
-}
-
-.task-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--ink);
-    font-size: 18px;
-    font-weight: 500;
-}
-
-.task-title input {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--moss);
-}
-
-.card-actions {
-    position: relative;
-}
-
 .more-button,
 .icon-button {
     border: 0;
@@ -801,29 +628,6 @@ textarea:focus {
 
 .danger-button:hover {
     background: #f8e9e4;
-}
-
-.empty-state {
-    padding: 60px 30px;
-    text-align: center;
-    border: 1px dashed var(--line);
-    color: var(--muted);
-}
-
-.empty-state span {
-    color: var(--coral);
-    font-size: 28px;
-}
-
-.empty-state h3 {
-    color: var(--ink);
-    font-size: 20px;
-    font-weight: 500;
-    margin: 12px 0 4px;
-}
-
-.empty-state p {
-    font-size: 13px;
 }
 
 .side-panel {
@@ -958,15 +762,6 @@ textarea:focus {
         display: none;
     }
 
-    .workspace-heading {
-        display: block;
-        padding-top: 40px;
-    }
-
-    .workspace-heading .primary-button {
-        margin-top: 25px;
-    }
-
     .content-grid {
         display: block;
         padding-top: 10px;
@@ -976,7 +771,4 @@ textarea:focus {
         margin-top: 45px;
     }
 
-    .month-cell {
-        margin-left: 0;
-    }
 }
