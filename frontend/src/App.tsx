@@ -62,6 +62,9 @@ const minutesIntoDay = (value?: string) => {
   return getHours(date) * 60 + getMinutes(date);
 };
 
+const sameInstant = (left?: string, right?: string) =>
+  Boolean(left && right && new Date(left).getTime() === new Date(right).getTime());
+
 const tagTextColor = (hex: string) =>
   wcagContrast(hex, "white") > wcagContrast(hex, "black")
     ? "#ffffff"
@@ -581,7 +584,11 @@ function App() {
         </span>
       </div>
     ) : null;
-  const renderGridEntry = (entry: TimelineEntry) => {
+  const renderGridEntry = (
+    entry: TimelineEntry,
+    trimTop = false,
+    trimBottom = false,
+  ) => {
     const start =
       entry.type === "event"
         ? minutesIntoDay(entry.starts_at)
@@ -619,7 +626,8 @@ function App() {
         className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""}`}
         style={{
           top: `${(start / 60) * gridScale}rem`,
-          height: `${(duration / 60) * gridScale}rem`,
+          height: `calc(${(duration / 60) * gridScale}rem - ${(trimTop ? 1 : 0) + (trimBottom ? 1 : 0)}px)`,
+          transform: trimTop ? "translateY(1px)" : undefined,
           ...(entry.type === "event" && mainTag
             ? {
                 backgroundColor: mainTag.color,
@@ -674,6 +682,27 @@ function App() {
         )}
       </article>
     );
+  };
+  const renderDayEntries = (date: Date) => {
+    const dayEntries = weekEntries.filter(
+      (entry) =>
+        localDateKey(
+          entry.type === "event" ? entry.starts_at : entry.deadline_at,
+        ) === dateKey(date),
+    );
+    return dayEntries.map((entry, index) => {
+      const previous = dayEntries[index - 1];
+      const next = dayEntries[index + 1];
+      const trimTop =
+        entry.type === "event" &&
+        previous?.type === "event" &&
+        sameInstant(previous.ends_at, entry.starts_at);
+      const trimBottom =
+        entry.type === "event" &&
+        next?.type === "event" &&
+        sameInstant(entry.ends_at, next.starts_at);
+      return renderGridEntry(entry, trimTop, trimBottom);
+    });
   };
 
   return (
@@ -753,16 +782,7 @@ function App() {
                   key={dateKey(date)}
                   onClick={(event) => openNewEventAt(event, date)}
                 >
-                  {weekEntries
-                    .filter(
-                      (entry) =>
-                        localDateKey(
-                          entry.type === "event"
-                            ? entry.starts_at
-                            : entry.deadline_at,
-                        ) === dateKey(date),
-                    )
-                    .map(renderGridEntry)}
+                  {renderDayEntries(date)}
                   {renderPreview(date)}
                 </div>
               ))}
