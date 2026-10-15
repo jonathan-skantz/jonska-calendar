@@ -12,7 +12,7 @@ export type EventPayload = {
   title: string;
   description: string | null;
   url: string | null;
-  kind: FormDataEntryValue | null;
+  kind: "attendable" | "informational";
   starts_at: string | undefined;
   ends_at: string | undefined;
   location: FormDataEntryValue | null;
@@ -92,7 +92,7 @@ export const buildEventPayload = (form: FormData): EventPayload => ({
   title: String(form.get("title") || ""),
   description: String(form.get("description") || "") || null,
   url: String(form.get("url") || "") || null,
-  kind: form.get("kind") || "informational",
+  kind: form.get("kind") === "attendable" ? "attendable" : "informational",
   starts_at: localDateTime(form.get("starts_at")),
   ends_at: localDateTime(form.get("ends_at")),
   location: form.get("location") || null,
