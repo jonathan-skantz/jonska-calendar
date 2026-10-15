@@ -94,6 +94,7 @@ export const ComposerDrawer = ({
           Title
           <input
             name="title"
+            aria-invalid={Boolean(fieldErrors.title)}
             defaultValue={editingItem?.title}
             placeholder={type === "event" ? "What is happening?" : "What needs doing?"}
             required
@@ -102,12 +103,17 @@ export const ComposerDrawer = ({
         </label>
         <label className={fieldErrors.description ? "field-invalid" : ""}>
           Description
-          <textarea name="description" defaultValue={editingItem?.description} />
+          <textarea
+            name="description"
+            aria-invalid={Boolean(fieldErrors.description)}
+            defaultValue={editingItem?.description}
+          />
         </label>
         <label className={fieldErrors.url ? "field-invalid" : ""}>
           URL
           <input
             name="url"
+            aria-invalid={Boolean(fieldErrors.url)}
             type="url"
             defaultValue={editingItem?.url}
             placeholder="https://"
@@ -117,7 +123,11 @@ export const ComposerDrawer = ({
           <>
             <label className={fieldErrors.kind ? "field-invalid" : ""}>
               Kind
-              <select name="kind" defaultValue={editingItem?.kind ?? "informational"}>
+              <select
+                name="kind"
+                aria-invalid={Boolean(fieldErrors.kind)}
+                defaultValue={editingItem?.kind ?? "informational"}
+              >
                 <option value="informational">Informational</option>
                 <option value="attendable">Attendable</option>
               </select>
@@ -127,6 +137,7 @@ export const ComposerDrawer = ({
               <input
                 ref={startsAtInput}
                 name="starts_at"
+                aria-invalid={Boolean(fieldErrors.starts_at)}
                 type="datetime-local"
                 defaultValue={inputDateTime(editingItem?.starts_at) || `${selectedDate}T09:00`}
                 required
@@ -137,6 +148,7 @@ export const ComposerDrawer = ({
               <input
                 ref={endsAtInput}
                 name="ends_at"
+                aria-invalid={Boolean(fieldErrors.ends_at)}
                 type="datetime-local"
                 defaultValue={inputDateTime(editingItem?.ends_at) || `${selectedDate}T10:00`}
                 required
@@ -146,6 +158,7 @@ export const ComposerDrawer = ({
               Location
               <input
                 name="location"
+                aria-invalid={Boolean(fieldErrors.location)}
                 defaultValue={editingItem?.location}
                 placeholder="Home, online, or somewhere else"
               />
@@ -164,6 +177,7 @@ export const ComposerDrawer = ({
             Deadline
             <input
               name="deadline_at"
+              aria-invalid={Boolean(fieldErrors.deadline_at)}
               type="datetime-local"
               defaultValue={
                 inputDateTime(editingItem?.deadline_at) ||
