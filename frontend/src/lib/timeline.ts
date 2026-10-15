@@ -1,4 +1,11 @@
-import { localDateTime, minutesIntoDay, sameInstant } from "./calendar";
+import {
+  CALENDAR_GRID_SCALE,
+  MINUTES_PER_HOUR,
+  dateKey,
+  localDateTime,
+  minutesIntoDay,
+  sameInstant,
+} from "./calendar";
 import type { Tag, TimelineEntry } from "../types";
 
 export type EventPayload = {
@@ -16,6 +23,30 @@ export type TaskPayload = {
   description: string | null;
   url: string | null;
   deadline_at: string | undefined;
+};
+
+export type ElapsedOverlayState =
+  | { kind: "past" }
+  | { kind: "today"; height: string; label: string }
+  | { kind: "none" };
+
+export const getElapsedOverlayState = (
+  date: Date,
+  today: Date,
+  formatTimeLabel: (value: Date) => string,
+): ElapsedOverlayState => {
+  const dayKey = dateKey(date);
+  const todayKey = dateKey(today);
+  if (dayKey < todayKey) return { kind: "past" };
+  if (dayKey !== todayKey) return { kind: "none" };
+
+  const currentMinutes = today.getHours() * MINUTES_PER_HOUR + today.getMinutes();
+  if (currentMinutes === 0) return { kind: "none" };
+  return {
+    kind: "today",
+    height: `${(currentMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
+    label: formatTimeLabel(today),
+  };
 };
 
 export const getTimelineEntryDate = (entry: TimelineEntry) =>

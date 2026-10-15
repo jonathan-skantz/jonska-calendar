@@ -28,6 +28,7 @@ import {
   buildTaskPayload,
   getBackToBackTrim,
   getEntryMinutes,
+  getElapsedOverlayState,
   getMainTag,
   getOrderedStripTags,
   getTimelineEntryDate,
@@ -539,24 +540,20 @@ function App() {
     });
   };
   const renderElapsedOverlay = (date: Date) => {
-    const currentDateKey = dateKey(today);
-    const dayDateKey = dateKey(date);
-    if (dayDateKey < currentDateKey) {
+    const state = getElapsedOverlayState(date, today, (value) => format(value, "p"));
+    if (state.kind === "past") {
       return <div className="day-elapsed-overlay past" aria-hidden="true" />;
     }
-    if (dayDateKey !== currentDateKey) return null;
-    const currentMinutes =
-      today.getHours() * MINUTES_PER_HOUR + today.getMinutes();
-    if (currentMinutes === 0) return null;
+    if (state.kind === "none") return null;
     return (
       <div
         className="day-elapsed-overlay today"
         style={{
-          height: `${(currentMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
+          height: state.height,
         }}
         aria-hidden="true"
       >
-        <span className="current-time-label">{format(today, "p")}</span>
+        <span className="current-time-label">{state.label}</span>
       </div>
     );
   };
