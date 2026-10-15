@@ -23,6 +23,7 @@ import {
 import { api } from "./lib/api";
 import { tagTextColor } from "./lib/colors";
 import { getInvalidComposerFields } from "./lib/formValidation";
+import { getRequestErrorMessage } from "./lib/requestErrors";
 import {
   buildEventPayload,
   buildTaskPayload,
@@ -116,11 +117,7 @@ function App() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to sign in",
-      );
+      setError(getRequestErrorMessage(requestError, "Unable to sign in"));
     }
   };
 
@@ -138,11 +135,7 @@ function App() {
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
-      setActionError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to update task",
-      );
+      setActionError(getRequestErrorMessage(requestError, "Unable to update task"));
     }
   };
 
@@ -154,11 +147,7 @@ function App() {
       closeComposer();
       setDraftEventStart(null);
     } catch (requestError) {
-      setActionError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to delete item",
-      );
+      setActionError(getRequestErrorMessage(requestError, "Unable to delete item"));
     }
   };
 
@@ -213,11 +202,7 @@ function App() {
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
-      setActionError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to set default tag",
-      );
+      setActionError(getRequestErrorMessage(requestError, "Unable to set default tag"));
     }
   };
 
@@ -234,11 +219,7 @@ function App() {
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
-      setActionError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to update tag",
-      );
+      setActionError(getRequestErrorMessage(requestError, "Unable to update tag"));
     }
   };
 
@@ -249,11 +230,7 @@ function App() {
       removeHiddenTag(tag.id);
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
-      setActionError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to delete tag",
-      );
+      setActionError(getRequestErrorMessage(requestError, "Unable to delete tag"));
     }
   };
 
@@ -291,11 +268,7 @@ function App() {
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
-      setActionError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to create tag",
-      );
+      setActionError(getRequestErrorMessage(requestError, "Unable to create tag"));
     }
   };
 
@@ -353,11 +326,7 @@ function App() {
       closeComposer();
       setActionError("");
     } catch (requestError) {
-      setActionError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to create item",
-      );
+      setActionError(getRequestErrorMessage(requestError, "Unable to create item"));
     }
   };
 
