@@ -13,13 +13,13 @@ const event = (overrides: Partial<TimelineEntry> = {}): TimelineEntry => ({
 });
 
 describe("calendar entry layout", () => {
-  it("keeps event duration at the minimum visual height", () => {
+  it("uses the event duration instead of the minimum visual height", () => {
     expect(
       getCalendarEntryLayout(
         event({ ends_at: "2026-10-15T10:15:00" }),
         new Date(2026, 9, 15, 9),
       ),
-    ).toEqual({ startMinutes: 600, durationMinutes: 90, fullyElapsed: false });
+    ).toEqual({ startMinutes: 600, durationMinutes: 15, fullyElapsed: false });
   });
 
   it("uses the configured task display duration and event completion time", () => {

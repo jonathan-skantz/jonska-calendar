@@ -151,6 +151,10 @@
     background: #f8e4dd;
 }
 
+.grid-entry.event {
+    min-height: 0;
+}
+
 .grid-entry.completed {
     opacity: .55;
 }
