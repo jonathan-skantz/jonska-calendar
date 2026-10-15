@@ -22,6 +22,7 @@ import {
   isEventVisible,
 } from "../../lib/timeline";
 import type { TimelineEntry } from "../../types";
+import type { TimeFormatPreference } from "../../lib/calendar";
 
 export type EventPreview = {
   top: string;
@@ -101,16 +102,18 @@ export const getClickedEventStart = (
 export const getEventPreview = (
   startAt: string | null,
   date: Date,
+  timeFormat: TimeFormatPreference = "browser",
 ): EventPreview | null => {
   if (!startAt || localDateKey(startAt) !== dateKey(date)) return null;
   const start = new Date(startAt);
   const end = new Date(
-    start.getTime() + DEFAULT_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
+    start.getTime() +
+      DEFAULT_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
   ).toISOString();
   return {
     top: `${(minutesIntoDay(startAt) / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
-    startsAt: formatTime(startAt),
-    endsAt: formatTime(end),
+    startsAt: formatTime(startAt, { preference: timeFormat }),
+    endsAt: formatTime(end, { preference: timeFormat }),
   };
 };
 
@@ -158,7 +161,9 @@ export const getCalendarEntryLayout = (
   const startMinutes = getEntryMinutes(entry);
   const fullyElapsed =
     entry.type === "event" &&
-    Boolean(entry.ends_at && new Date(entry.ends_at).getTime() <= now.getTime());
+    Boolean(
+      entry.ends_at && new Date(entry.ends_at).getTime() <= now.getTime(),
+    );
 
   if (entry.type === "event") {
     if (!entry.starts_at || !entry.ends_at) {
@@ -187,8 +192,7 @@ export const getCalendarEntryLayout = (
       const segmentEndMinutes =
         segmentEnd.getTime() === dayEnd.getTime()
           ? HOURS_PER_DAY * MINUTES_PER_HOUR
-          : segmentEnd.getHours() * MINUTES_PER_HOUR +
-            segmentEnd.getMinutes();
+          : segmentEnd.getHours() * MINUTES_PER_HOUR + segmentEnd.getMinutes();
       return {
         startMinutes: segmentStartMinutes,
         durationMinutes: segmentEndMinutes - segmentStartMinutes,

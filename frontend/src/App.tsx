@@ -12,6 +12,8 @@ import { useAuth } from "./features/auth/useAuth";
 import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
 import { useTagMutations } from "./features/tags/useTagMutations";
 import { useCalendarState } from "./features/calendar/useCalendarState";
+import { useCalendarPreferences } from "./features/calendar/useCalendarPreferences";
+import { getEffectiveWeekStart } from "./features/calendar/calendarPreferences";
 import {
   getCalendarEntryLayout,
   getCalendarDates,
@@ -32,6 +34,7 @@ import { TagEditorDrawer } from "./components/TagEditorDrawer";
 import { WeekCalendar } from "./components/WeekCalendar";
 import { WeekHeader } from "./components/WeekHeader";
 import { TopBar } from "./components/TopBar";
+import { SettingsPage } from "./components/SettingsPage";
 import "./App.css";
 
 function App() {
@@ -50,11 +53,16 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showTagEditor, setShowTagEditor] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const { preferences, updatePreferences } = useCalendarPreferences(
+    user?.id ?? "",
+  );
   const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } =
     useTagVisibility();
   const today = useCurrentTime();
+  const weekStartsOn = getEffectiveWeekStart(preferences.weekStartsOn);
   const { weekStart, selectedDate, setSelectedDate, moveWeek } =
-    useCalendarState(today);
+    useCalendarState(today, weekStartsOn);
   const [actionError, setActionError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
   const tagMutations = useTagMutations(setActionError, removeHiddenTag);
@@ -187,6 +195,7 @@ function App() {
         trimTop={trimTop}
         trimBottom={trimBottom}
         overlapDepth={overlapDepth}
+        timeFormat={preferences.timeFormat}
         continuesFromPreviousDay={layout.continuesFromPreviousDay}
         continuesToNextDay={layout.continuesToNextDay}
         onEdit={editItem}
@@ -235,52 +244,76 @@ function App() {
   };
   return (
     <main className="app-shell">
-      <TopBar email={user.email} onLogout={logout} />
-      <section className="content-grid">
-        <div className="timeline-column">
-          <WeekHeader
-            title={`${formatDate(dates[0])} – ${formatDate(dates[6])}`}
-            itemCount={weekEntries.length}
-            onPrevious={() => moveWeek(-7)}
-            onNext={() => moveWeek(7)}
-            onAddItem={() => openNewComposer()}
-          >
-            {actionError && !showComposer && !showTagEditor && (
-              <p className="error action-error">{actionError}</p>
-            )}
-          </WeekHeader>
-          <WeekCalendar
-            dates={dates}
-            onDayClick={openNewEventAt}
-            renderDay={(date) => (
-              <>
-                {renderDayEntries(date)}
-                <CalendarDayIndicators
-                  preview={
-                    showComposer && !editingItem
-                      ? getEventPreview(draftEventStart, date)
-                      : null
-                  }
-                  elapsed={getDayElapsedOverlay(date, today, (value) =>
-                    formatTime(value),
-                  )}
-                />
-              </>
-            )}
-          />
-        </div>
-        <Sidebar
-          openTaskCount={openTasks}
-          tags={tags}
-          hiddenTagIds={hiddenTagIds}
-          onToggleTagVisibility={toggleTagVisibility}
-          onAddTag={createTag}
-          onEditTags={() => {
-            setActionError("");
-            setShowTagEditor(true);
-          }}
+      <TopBar
+        email={user.email}
+        onOpenSettings={() => {
+          setShowSettings(true);
+          setShowTagEditor(false);
+          closeComposer();
+        }}
+        onLogout={logout}
+      />
+      {showSettings ? (
+        <SettingsPage
+          preferences={preferences}
+          onTimeFormatChange={(timeFormat) => updatePreferences({ timeFormat })}
+          onWeekStartChange={(weekStartsOn) =>
+            updatePreferences({ weekStartsOn })
+          }
+          onBack={() => setShowSettings(false)}
         />
-      </section>
+      ) : (
+        <section className="content-grid">
+          <div className="timeline-column">
+            <WeekHeader
+              title={`${formatDate(dates[0])} – ${formatDate(dates[6])}`}
+              itemCount={weekEntries.length}
+              onPrevious={() => moveWeek(-7)}
+              onNext={() => moveWeek(7)}
+              onAddItem={() => openNewComposer()}
+            >
+              {actionError && !showComposer && !showTagEditor && (
+                <p className="error action-error">{actionError}</p>
+              )}
+            </WeekHeader>
+            <WeekCalendar
+              dates={dates}
+              timeFormat={preferences.timeFormat}
+              onDayClick={openNewEventAt}
+              renderDay={(date) => (
+                <>
+                  {renderDayEntries(date)}
+                  <CalendarDayIndicators
+                    preview={
+                      showComposer && !editingItem
+                        ? getEventPreview(
+                            draftEventStart,
+                            date,
+                            preferences.timeFormat,
+                          )
+                        : null
+                    }
+                    elapsed={getDayElapsedOverlay(date, today, (value) =>
+                      formatTime(value, { preference: preferences.timeFormat }),
+                    )}
+                  />
+                </>
+              )}
+            />
+          </div>
+          <Sidebar
+            openTaskCount={openTasks}
+            tags={tags}
+            hiddenTagIds={hiddenTagIds}
+            onToggleTagVisibility={toggleTagVisibility}
+            onAddTag={createTag}
+            onEditTags={() => {
+              setActionError("");
+              setShowTagEditor(true);
+            }}
+          />
+        </section>
+      )}
       {showComposer && (
         <ComposerDrawer
           type={composerType}

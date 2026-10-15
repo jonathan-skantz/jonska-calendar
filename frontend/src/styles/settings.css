@@ -1,0 +1,73 @@
+.settings-page {
+  width: min(100% - 40px, 760px);
+  margin: 0 auto;
+  padding: 42px 0 80px;
+}
+
+.settings-back {
+  margin-bottom: 38px;
+  cursor: pointer;
+}
+
+.settings-page > h1 {
+  margin: 8px 0;
+  color: var(--moss-dark);
+  font:
+    500 32px Georgia,
+    serif;
+}
+
+.settings-section > p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settings-section {
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-section h2 {
+  margin: 0;
+  color: var(--moss-dark);
+  font:
+    500 20px Georgia,
+    serif;
+}
+
+.settings-options {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.settings-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--moss-dark);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-option input {
+  accent-color: var(--moss-dark);
+}
+
+.settings-select-label {
+  display: block;
+  margin: 18px 0 7px;
+  color: var(--moss-dark);
+  font-size: 12px;
+}
+
+.settings-section select {
+  width: min(100%, 320px);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--moss-dark);
+  padding: 11px 12px;
+  font: inherit;
+}

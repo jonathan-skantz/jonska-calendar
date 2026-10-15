@@ -6,6 +6,7 @@ import {
   MINUTES_PER_HOUR,
   formatTime,
 } from "../lib/calendar";
+import type { TimeFormatPreference } from "../lib/calendar";
 import { tagTextColor } from "../lib/colors";
 import { getMainTag, getOrderedStripTags } from "../lib/timeline";
 import type { TimelineEntry } from "../types";
@@ -19,6 +20,7 @@ type CalendarEntryProps = {
   overlapDepth: number;
   continuesFromPreviousDay: boolean;
   continuesToNextDay: boolean;
+  timeFormat: TimeFormatPreference;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
 };
@@ -55,6 +57,7 @@ export const CalendarEntry = ({
   overlapDepth,
   continuesFromPreviousDay,
   continuesToNextDay,
+  timeFormat,
   onEdit,
   onToggleTask,
 }: CalendarEntryProps) => {
@@ -89,7 +92,8 @@ export const CalendarEntry = ({
 
   useEffect(() => {
     const entryElement = entryRef.current;
-    if (!entryElement || (!continuesFromPreviousDay && !continuesToNextDay)) return;
+    if (!entryElement || (!continuesFromPreviousDay && !continuesToNextDay))
+      return;
 
     const updateMarkerCount = () => {
       const count = Math.max(
@@ -144,7 +148,10 @@ export const CalendarEntry = ({
       <strong>{entry.title}</strong>
       <span>
         {entry.type === "event"
-          ? `${formatTime(entry.starts_at)}${entry.ends_at ? ` – ${formatTime(entry.ends_at)}` : ""}`
+          ? [entry.starts_at, entry.ends_at]
+              .filter(Boolean)
+              .map((time) => formatTime(time, { preference: timeFormat }))
+              .join(" – ")
           : "Task"}
       </span>
       {entry.location && <span>{entry.location}</span>}

@@ -16,7 +16,16 @@ describe("browser locale calendar preferences", () => {
   });
 
   it("uses the locale's default hour cycle for the hour labels", () => {
-    expect(formatHour(13, "en-US")).toMatch(/1:00\s*PM/i);
-    expect(formatHour(13, "sv-SE")).toBe("13:00");
+    expect(formatHour(13, { locale: "en-US" })).toMatch(/1:00\s*PM/i);
+    expect(formatHour(13, { locale: "sv-SE" })).toBe("13:00");
+  });
+
+  it("allows an explicit 12-hour or 24-hour format", () => {
+    expect(formatHour(13, { locale: "sv-SE", preference: "12-hour" })).toMatch(
+      /1:00\s*em/i,
+    );
+    expect(formatHour(13, { locale: "en-US", preference: "24-hour" })).toMatch(
+      /^13:00$/,
+    );
   });
 });

@@ -13,7 +13,12 @@ export const EVENT_OVERLAP_INSET_PIXELS = 6;
 export const LAST_EVENT_START_HOUR = 22;
 
 type LocaleWeekInfo = { firstDay: number };
-type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type TimeFormatPreference = "browser" | "12-hour" | "24-hour";
+export type TimeFormatOptions = {
+  locale?: string;
+  preference?: TimeFormatPreference;
+};
 type LocaleWithWeekInfo = Intl.Locale & {
   getWeekInfo?: () => LocaleWeekInfo;
   weekInfo?: LocaleWeekInfo;
@@ -32,32 +37,52 @@ export const getWeekStartsOn = (
   return firstDay === undefined ? 1 : ((firstDay % 7) as WeekStartsOn);
 };
 
-const formatTimeValue = (value: Date, locale?: string) => {
+const formatTimeValue = (
+  value: Date,
+  { locale, preference = "browser" }: TimeFormatOptions = {},
+) => {
   if (typeof Intl.DateTimeFormat === "function") {
-    return new Intl.DateTimeFormat(locale, {
+    const hourCycle =
+      preference === "12-hour"
+        ? "h12"
+        : preference === "24-hour"
+          ? "h23"
+          : undefined;
+    const formatter = new Intl.DateTimeFormat(locale, {
       hour: "numeric",
       minute: "2-digit",
-    }).format(value);
+      ...(hourCycle ? { hourCycle } : {}),
+    });
+    return formatter.format(value);
+  }
+  if (preference === "12-hour") {
+    const hour = value.getHours();
+    return `${hour % 12 || 12}:${String(value.getMinutes()).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
   }
   return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
 };
 
-export const formatTime = (value?: string | Date, locale?: string) => {
+export const formatTime = (
+  value?: string | Date,
+  options?: TimeFormatOptions,
+) => {
   if (!value) return "";
   return formatTimeValue(
     value instanceof Date ? value : new Date(value),
-    locale,
+    options,
   );
 };
 
-export const formatHour = (hour: number, locale?: string) =>
-  formatTimeValue(new Date(2020, 0, 1, hour), locale);
+export const formatHour = (hour: number, options?: TimeFormatOptions) =>
+  formatTimeValue(new Date(2020, 0, 1, hour), options);
 export const formatDate = (value: Date) => format(value, "EEE, MMM d");
 export const dateKey = (value: Date) => format(value, "yyyy-MM-dd");
 export const inputDateTime = (value?: string) =>
   value ? format(new Date(value), "yyyy-MM-dd'T'HH:mm") : "";
-export const startOfCalendarWeek = (value: Date) =>
-  startOfWeek(value, { weekStartsOn: getWeekStartsOn() });
+export const startOfCalendarWeek = (
+  value: Date,
+  weekStartsOn = getWeekStartsOn(),
+) => startOfWeek(value, { weekStartsOn });
 
 export const localDateTime = (value: FormDataEntryValue | null) => {
   if (typeof value !== "string" || !value) return undefined;
