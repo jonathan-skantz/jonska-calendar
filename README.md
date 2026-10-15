@@ -83,10 +83,8 @@ goose -dir backend/db/migrations postgres "$DATABASE_URL" up
 Use `docker compose down` without `-v` when you only want to stop the project
 without deleting data.
 
-Run tests and static checks:
+Run the full verification suite from the repository root:
 
 ```sh
-go test ./... -count=1
-go vet ./...
-cd frontend && mise exec -- npm run build && mise exec -- npm run lint
+mise exec -- go vet ./... && mise exec -- go test ./... -count=1 && cd frontend && mise exec -- npm run test && mise exec -- npm run build && mise exec -- npm run lint
 ```
