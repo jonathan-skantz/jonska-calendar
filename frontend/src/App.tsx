@@ -25,11 +25,9 @@ import type { ComposerFieldErrors } from "./lib/formValidation";
 import { getRequestErrorMessage } from "./lib/requestErrors";
 import { invalidateWorkspace } from "./lib/queryInvalidation";
 import {
-  buildTimelineItemRequest,
   getBackToBackTrim,
   getEntryMinutes,
   getElapsedOverlayState,
-  getEventTagChanges,
   getTimelineEntryDate,
   isEventVisible,
 } from "./lib/timeline";
@@ -39,6 +37,7 @@ import { useComposer } from "./hooks/useComposer";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { useAuth } from "./features/auth/useAuth";
+import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
 import { CalendarEntry } from "./components/CalendarEntry";
@@ -73,6 +72,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
   const [actionError, setActionError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
+  const { toggleTask, deleteItem, saveItem } = useTimelineMutations(setActionError);
   const composer = useComposer({
     tags,
     selectedDate,
@@ -103,28 +103,11 @@ function App() {
     void authenticate(authMode, email, password);
   };
 
-  const toggleTask = async (entry: TimelineEntry) => {
-    try {
-      await api(`/api/tasks/${entry.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ is_completed: !entry.is_completed }),
-      });
-      await invalidateWorkspace(queryClient);
-    } catch (requestError) {
-      setActionError(getRequestErrorMessage(requestError, "Unable to update task"));
-    }
-  };
-
-  const deleteItem = async (entry: TimelineEntry) => {
-    if (!window.confirm(`Delete “${entry.title}”?`)) return;
-    try {
-      await api(`/api/timeline/${entry.id}`, { method: "DELETE" });
-      await invalidateWorkspace(queryClient);
+  const handleDeleteItem = async (entry: TimelineEntry) => {
+    await deleteItem(entry, () => window.confirm(`Delete “${entry.title}”?`), () => {
       closeComposer();
       setDraftEventStart(null);
-    } catch (requestError) {
-      setActionError(getRequestErrorMessage(requestError, "Unable to delete item"));
-    }
+    });
   };
 
   useEffect(() => {
@@ -189,27 +172,6 @@ function App() {
     }
   };
 
-  const saveEventTags = async (
-    itemID: string,
-    previous: Tag[],
-    next: string[],
-  ) => {
-    const changes = getEventTagChanges(previous, next);
-    await Promise.all([
-      ...changes.add
-        .map((tagID) =>
-          api(`/api/timeline/${itemID}/tags`, {
-            method: "POST",
-            body: JSON.stringify({ tag_id: tagID }),
-          }),
-        ),
-      ...changes.remove
-        .map((tag) =>
-          api(`/api/timeline/${itemID}/tags/${tag.id}`, { method: "DELETE" }),
-        ),
-    ]);
-  };
-
   const createTag = async () => {
     const name = window.prompt("Tag name")?.trim();
     if (!name) return;
@@ -240,39 +202,18 @@ function App() {
     setFieldErrors({});
     setActionError("");
     const form = new FormData(event.currentTarget);
-    try {
-      if (composerType === "event" && editingItem) {
-        await saveEventTags(
-          editingItem.id,
-          editingItem.tags ?? [],
-          composerTagIds,
-        );
-      }
-      const request = buildTimelineItemRequest(
-        composerType,
-        editingItem?.id ?? null,
-        form,
-        composerMainTagId,
-      );
-      const response = await api<{ id: string } | undefined>(request.path, {
-        method: request.method,
-        body: JSON.stringify(request.body),
-      });
-      if (composerType === "event") {
-        const existingTags =
-          editingItem?.tags ??
-          (composerMainTagId
-            ? tags.filter((tag) => tag.id === composerMainTagId)
-            : tags.filter((tag) => tag.is_default));
-        if (!editingItem)
-          await saveEventTags(response?.id ?? "", existingTags, composerTagIds);
-      }
-      await invalidateWorkspace(queryClient);
-      closeComposer();
-      setActionError("");
-    } catch (requestError) {
-      setActionError(getRequestErrorMessage(requestError, "Unable to create item"));
-    }
+    await saveItem({
+      type: composerType,
+      editingItem,
+      form,
+      mainTagId: composerMainTagId,
+      selectedTagIds: composerTagIds,
+      tags,
+      onSaved: () => {
+        closeComposer();
+        setActionError("");
+      },
+    });
   };
 
   if (loading)
@@ -479,7 +420,7 @@ function App() {
         <button
           className="danger-button drawer-delete-action"
           type="button"
-          onClick={() => deleteItem(editingItem)}
+          onClick={() => handleDeleteItem(editingItem)}
         >
           Delete item
         </button>
