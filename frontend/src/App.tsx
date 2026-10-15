@@ -35,6 +35,7 @@ import {
 } from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
+import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { queryKeys } from "./lib/queryKeys";
 import "./App.css";
@@ -64,7 +65,8 @@ function App() {
     null,
   );
   const [draftEventStart, setDraftEventStart] = useState<string | null>(null);
-  const [hiddenTagIds, setHiddenTagIds] = useState<string[]>([]);
+  const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } =
+    useTagVisibility();
   const today = useCurrentTime();
   const [weekStart, setWeekStart] = useState(() => startOfCalendarWeek(today));
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
@@ -207,14 +209,6 @@ function App() {
       );
   }, [invalidFields, showComposer]);
 
-  const toggleTagVisibility = (tagID: string) => {
-    setHiddenTagIds((current) =>
-      current.includes(tagID)
-        ? current.filter((id) => id !== tagID)
-        : [...current, tagID],
-    );
-  };
-
   const updateDefaultTag = async (tagID: string) => {
     try {
       await api("/api/tags/default", {
@@ -256,7 +250,7 @@ function App() {
     if (!window.confirm(`Delete tag “${tag.name}”?`)) return;
     try {
       await api(`/api/tags/${tag.id}`, { method: "DELETE" });
-      setHiddenTagIds((current) => current.filter((id) => id !== tag.id));
+      removeHiddenTag(tag.id);
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
       setActionError(
