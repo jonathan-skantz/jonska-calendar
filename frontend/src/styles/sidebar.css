@@ -1,0 +1,130 @@
+.tag {
+    display: inline-block;
+    color: var(--moss);
+    background: #e5eee2;
+    border-radius: 20px;
+    padding: 3px 8px;
+    font: 10px 'DM Mono', monospace;
+}
+
+.tag.large {
+    padding: 6px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--tag-color, #e5eee2);
+}
+
+.tag-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tag.hidden {
+    background: #edf0ec;
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+.eye-icon {
+    position: relative;
+    display: inline-block;
+    width: 12px;
+    height: 8px;
+    border: 1px solid currentColor;
+    border-radius: 100% 0;
+    transform: rotate(45deg);
+}
+
+.eye-icon::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 3px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.eye-icon.closed {
+    height: 1px;
+    margin-top: 1px;
+    border: 0;
+    border-radius: 0;
+    background: currentColor;
+    transform: rotate(-20deg);
+}
+
+.eye-icon.closed::after {
+    display: none;
+}
+
+.tag-help {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.side-panel {
+    display: grid;
+    align-content: start;
+    gap: 30px;
+}
+
+.pulse-panel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 17px;
+    background: #e8eee3;
+}
+
+.pulse-panel strong {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.pulse-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--coral);
+    box-shadow: 0 0 0 5px rgba(216, 120, 95, .13);
+}
+
+.side-section {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+}
+
+.tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 15px;
+}
+
+.family-note {
+    display: flex;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.family-note p {
+    margin: 0;
+}
+
+.note-symbol {
+    color: var(--coral);
+    font-size: 19px;
+}
+
+@media (max-width:800px) {
+    .side-panel {
+        margin-top: 45px;
+    }
+}
