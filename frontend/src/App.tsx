@@ -24,29 +24,8 @@ import {
   sameInstant,
   startOfCalendarWeek,
 } from "./lib/calendar";
+import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import "./App.css";
-
-type User = { id: string; email: string };
-type Tag = { id: string; name: string; color: string; is_default: boolean };
-type TimelineEntry = {
-  id: string;
-  type: "event" | "task";
-  title: string;
-  description?: string;
-  url?: string;
-  starts_at?: string;
-  ends_at?: string;
-  deadline_at?: string;
-  kind?: "attendable" | "informational";
-  location?: string;
-  is_completed: boolean;
-  is_shared?: boolean;
-  source_title?: string;
-  custom_info?: string;
-  tags?: Tag[];
-  main_tag_id?: string;
-};
-type AuthMode = "login" | "register";
 
 const api = async <T,>(path: string, options?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
