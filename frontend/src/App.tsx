@@ -35,12 +35,13 @@ import {
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useWorkspace } from "./hooks/useWorkspace";
+import { queryKeys } from "./lib/queryKeys";
 import "./App.css";
 
 function App() {
   const queryClient = useQueryClient();
   const currentUserQuery = useQuery({
-    queryKey: ["current-user"],
+    queryKey: queryKeys.currentUser,
     queryFn: () => api<User>("/api/auth/me"),
     retry: false,
   });
@@ -84,8 +85,8 @@ function App() {
           body: JSON.stringify({ email, password }),
         });
       }
-      await queryClient.invalidateQueries({ queryKey: ["current-user"] });
-      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -97,8 +98,8 @@ function App() {
 
   const logout = async () => {
     await api("/api/auth/logout", { method: "POST" });
-    await queryClient.invalidateQueries({ queryKey: ["current-user"] });
-    queryClient.removeQueries({ queryKey: ["workspace"] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
+    queryClient.removeQueries({ queryKey: queryKeys.workspace });
   };
 
   const toggleTask = async (entry: TimelineEntry) => {
@@ -107,7 +108,7 @@ function App() {
         method: "PATCH",
         body: JSON.stringify({ is_completed: !entry.is_completed }),
       });
-      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
       setActionError(
         requestError instanceof Error
@@ -121,7 +122,7 @@ function App() {
     if (!window.confirm(`Delete “${entry.title}”?`)) return;
     try {
       await api(`/api/timeline/${entry.id}`, { method: "DELETE" });
-      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
       setShowComposer(false);
       setEditingItem(null);
       setDraftEventStart(null);
@@ -219,7 +220,7 @@ function App() {
         method: "PUT",
         body: JSON.stringify({ tag_id: tagID }),
       });
-      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
       setActionError(
         requestError instanceof Error
@@ -240,7 +241,7 @@ function App() {
         method: "PATCH",
         body: JSON.stringify({ name, color }),
       });
-      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
       setActionError(
         requestError instanceof Error
@@ -255,7 +256,7 @@ function App() {
     try {
       await api(`/api/tags/${tag.id}`, { method: "DELETE" });
       setHiddenTagIds((current) => current.filter((id) => id !== tag.id));
-      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
       setActionError(
         requestError instanceof Error
@@ -297,7 +298,7 @@ function App() {
         method: "POST",
         body: JSON.stringify({ name }),
       });
-      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
     } catch (requestError) {
       setActionError(
         requestError instanceof Error
@@ -393,7 +394,7 @@ function App() {
         if (!editingItem)
           await saveEventTags(response?.id ?? "", existingTags, composerTagIds);
       }
-      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
       setShowComposer(false);
       setEditingItem(null);
       setActionError("");
