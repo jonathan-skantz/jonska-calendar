@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+echo "Formatting staged files..."
+mise exec -- frontend/node_modules/.bin/lint-staged --config .lintstagedrc.json
+
+echo "Running Go vet..."
+mise exec -- go vet ./...
+
+echo "Running Go tests..."
+mise exec -- go test ./... -count=1
+
+echo "Running frontend lint..."
+(cd frontend && mise exec -- npm run lint)
+
+echo "Running frontend tests..."
+(cd frontend && mise exec -- npm run test)
+
+echo "Building frontend..."
+(cd frontend && mise exec -- npm run build)

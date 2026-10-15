@@ -1,0 +1,4 @@
+{
+  "*.{js,jsx,ts,tsx,json,css,md,yml,yaml,html}": "frontend/node_modules/.bin/prettier --write",
+  "*.go": "mise exec -- gofmt -w"
+}

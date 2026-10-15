@@ -5,7 +5,7 @@ Requirements: Go 1.27, Node 22, Docker, `mise`, and Goose.
 ## One-time setup
 
 1. Create `.env` with the PostgreSQL variables used by `compose.yaml` and the
-	API connection string:
+   API connection string:
 
 ```dotenv
 DATABASE_URL=postgres://<user>:<password>@localhost:5432/<database>?sslmode=disable
@@ -88,3 +88,14 @@ Run the full verification suite from the repository root:
 ```sh
 mise exec -- go vet ./... && mise exec -- go test ./... -count=1 && cd frontend && mise exec -- npm run test && mise exec -- npm run build && mise exec -- npm run lint
 ```
+
+## Commit checks
+
+Enable the tracked pre-commit hook once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+The hook formats staged files, runs Go vet and tests, then runs frontend lint,
+tests, and build. It formats only staged files and preserves unstaged changes.
