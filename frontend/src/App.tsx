@@ -600,6 +600,9 @@ function App() {
       90,
     );
     const gridScale = 2;
+    const fullyElapsed =
+      entry.type === "event" &&
+      Boolean(entry.ends_at && new Date(entry.ends_at).getTime() <= today.getTime());
     const mainTag =
       entry.tags?.find((tag) => tag.id === entry.main_tag_id) ??
       entry.tags?.[0];
@@ -623,7 +626,7 @@ function App() {
       : stripColors.map((color) => `${color} 0%, ${color} 100%`);
     return (
       <article
-        className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""}`}
+        className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${fullyElapsed ? "elapsed" : ""}`}
         style={{
           top: `${(start / 60) * gridScale}rem`,
           height: `calc(${(duration / 60) * gridScale}rem - ${(trimTop ? 1 : 0) + (trimBottom ? 1 : 0)}px)`,
@@ -703,6 +706,23 @@ function App() {
         sameInstant(entry.ends_at, next.starts_at);
       return renderGridEntry(entry, trimTop, trimBottom);
     });
+  };
+  const renderElapsedOverlay = (date: Date) => {
+    const currentDateKey = dateKey(today);
+    const dayDateKey = dateKey(date);
+    if (dayDateKey < currentDateKey) {
+      return <div className="day-elapsed-overlay past" aria-hidden="true" />;
+    }
+    if (dayDateKey !== currentDateKey) return null;
+    const currentMinutes = getHours(today) * 60 + getMinutes(today);
+    if (currentMinutes === 0) return null;
+    return (
+      <div
+        className="day-elapsed-overlay today"
+        style={{ height: `${(currentMinutes / 60) * 2}rem` }}
+        aria-hidden="true"
+      />
+    );
   };
 
   return (
@@ -784,6 +804,7 @@ function App() {
                 >
                   {renderDayEntries(date)}
                   {renderPreview(date)}
+                  {renderElapsedOverlay(date)}
                 </div>
               ))}
             </div>
