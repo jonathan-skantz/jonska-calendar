@@ -169,6 +169,57 @@ func TestUpdateEventAndTask(t *testing.T) {
 	}
 }
 
+func TestEventMainTagMustBeOwnedAndAttached(t *testing.T) {
+	store, ownerID := setupTestStore(t)
+	otherUserID, err := store.Register(context.Background(), "other@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherTag, err := store.CreateTag(context.Background(), otherUserID, "Other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerTag, err := store.CreateTag(context.Background(), ownerID, "Owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventID, err := store.CreateEvent(context.Background(), ownerID, db.Event{
+		Title:    "Main tag test",
+		StartsAt: time.Date(2026, 10, 9, 10, 0, 0, 0, time.UTC),
+		EndsAt:   time.Date(2026, 10, 9, 11, 0, 0, 0, time.UTC),
+		Kind:     "informational",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(store, func(*http.Request) (uuid.UUID, error) { return ownerID, nil })
+	update := func(tagID uuid.UUID) int {
+		request := httptest.NewRequest(http.MethodPut, "/api/events/"+eventID.String(), bytes.NewBufferString(`{
+			"title":"Main tag test",
+			"starts_at":"2026-10-09T10:00:00Z",
+			"ends_at":"2026-10-09T11:00:00Z",
+			"kind":"informational",
+			"main_tag_id":"`+tagID.String()+`"
+		}`))
+		request.SetPathValue("eventID", eventID.String())
+		response := httptest.NewRecorder()
+		handler.UpdateEvent(response, request)
+		return response.Code
+	}
+	if status := update(otherTag.ID); status != http.StatusNotFound {
+		t.Fatalf("other user's main tag: expected status %d, got %d", http.StatusNotFound, status)
+	}
+	if status := update(ownerTag.ID); status != http.StatusNotFound {
+		t.Fatalf("unattached main tag: expected status %d, got %d", http.StatusNotFound, status)
+	}
+	if err := store.AddTagToItem(context.Background(), ownerID, eventID, ownerTag.ID); err != nil {
+		t.Fatal(err)
+	}
+	if status := update(ownerTag.ID); status != http.StatusNoContent {
+		t.Fatalf("attached main tag: expected status %d, got %d", http.StatusNoContent, status)
+	}
+}
+
 func TestSetTaskCompleted(t *testing.T) {
 	store, ownerID := setupTestStore(t)
 	taskID, err := store.CreateTask(context.Background(), ownerID, db.Task{

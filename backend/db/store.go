@@ -315,6 +315,22 @@ func (s *Store) UpdateEvent(ctx context.Context, userID, eventID uuid.UUID, even
 	if !validMainTag {
 		return ErrTagNotFound
 	}
+	var attachedMainTag bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM timeline_item_tags AS item_tag
+			JOIN timeline_items AS item ON item.id = item_tag.timeline_item_id
+			WHERE item_tag.timeline_item_id = $1
+			  AND item_tag.tag_id = $2
+			  AND item.user_id = $3
+		)
+	`, eventID, event.MainTagID, userID).Scan(&attachedMainTag); err != nil {
+		return err
+	}
+	if !attachedMainTag {
+		return ErrTagNotFound
+	}
 
 	result, err := tx.Exec(ctx, `
 		UPDATE timeline_items
