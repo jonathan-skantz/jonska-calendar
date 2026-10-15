@@ -25,6 +25,12 @@ export type TaskPayload = {
   deadline_at: string | undefined;
 };
 
+export type TimelineItemRequest = {
+  path: string;
+  method: "POST" | "PUT";
+  body: EventPayload | TaskPayload | (EventPayload & { main_tag_id: string | null });
+};
+
 export type ElapsedOverlayState =
   | { kind: "past" }
   | { kind: "today"; height: string; label: string }
@@ -95,7 +101,7 @@ export const buildEventPayload = (form: FormData): EventPayload => ({
   kind: form.get("kind") === "attendable" ? "attendable" : "informational",
   starts_at: localDateTime(form.get("starts_at")),
   ends_at: localDateTime(form.get("ends_at")),
-  location: form.get("location") || null,
+  location: String(form.get("location") || "") || null,
 });
 
 export const buildTaskPayload = (form: FormData): TaskPayload => ({
@@ -104,3 +110,22 @@ export const buildTaskPayload = (form: FormData): TaskPayload => ({
   url: String(form.get("url") || "") || null,
   deadline_at: localDateTime(form.get("deadline_at")),
 });
+
+export const buildTimelineItemRequest = (
+  type: "event" | "task",
+  editingItemId: string | null,
+  form: FormData,
+  mainTagId: string | null,
+): TimelineItemRequest => {
+  const resource = type === "event" ? "events" : "tasks";
+  const body =
+    type === "event"
+      ? { ...buildEventPayload(form), main_tag_id: mainTagId }
+      : buildTaskPayload(form);
+
+  return {
+    path: `/api/${resource}${editingItemId ? `/${editingItemId}` : ""}`,
+    method: editingItemId ? "PUT" : "POST",
+    body,
+  };
+};

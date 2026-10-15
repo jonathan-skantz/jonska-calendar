@@ -4,6 +4,7 @@ import {
   getElapsedOverlayState,
   getMainTag,
   isEventVisible,
+  buildTimelineItemRequest,
 } from "./timeline";
 import type { TimelineEntry } from "../types";
 
@@ -25,6 +26,46 @@ const event = (overrides: Partial<TimelineEntry> = {}): TimelineEntry => ({
 });
 
 describe("timeline behavior", () => {
+  it("builds event and task create and update requests", () => {
+    const eventForm = new FormData();
+    eventForm.set("title", "Planning");
+    eventForm.set("kind", "attendable");
+    eventForm.set("starts_at", "2026-10-15T10:00");
+    eventForm.set("ends_at", "2026-10-15T11:00");
+    eventForm.set("location", "Office");
+    const eventRequest = buildTimelineItemRequest(
+      "event",
+      null,
+      eventForm,
+      "work",
+    );
+    expect(eventRequest.path).toBe("/api/events");
+    expect(eventRequest.method).toBe("POST");
+    expect(eventRequest.body).toMatchObject({
+      title: "Planning",
+      kind: "attendable",
+      location: "Office",
+      main_tag_id: "work",
+    });
+    expect(
+      buildTimelineItemRequest("event", "event-1", eventForm, "work"),
+    ).toMatchObject({ path: "/api/events/event-1", method: "PUT" });
+
+    const taskForm = new FormData();
+    taskForm.set("title", "Follow up");
+    taskForm.set("deadline_at", "2026-10-16T17:00");
+    expect(
+      buildTimelineItemRequest("task", null, taskForm, null),
+    ).toMatchObject({
+      path: "/api/tasks",
+      method: "POST",
+      body: { title: "Follow up", deadline_at: expect.any(String) },
+    });
+    expect(
+      buildTimelineItemRequest("task", "task-1", taskForm, null),
+    ).toMatchObject({ path: "/api/tasks/task-1", method: "PUT" });
+  });
+
   it("shows tasks regardless of hidden event tags and hides events with a hidden tag", () => {
     expect(isEventVisible(event({ tags: [tag("work")] }), ["work"])).toBe(false);
     expect(isEventVisible(event({ tags: [tag("work")] }), ["home"])).toBe(true);

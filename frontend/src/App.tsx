@@ -31,8 +31,7 @@ import {
   invalidateWorkspace,
 } from "./lib/queryInvalidation";
 import {
-  buildEventPayload,
-  buildTaskPayload,
+  buildTimelineItemRequest,
   getBackToBackTrim,
   getEntryMinutes,
   getElapsedOverlayState,
@@ -272,16 +271,7 @@ function App() {
     setFieldErrors({});
     setActionError("");
     const form = new FormData(event.currentTarget);
-    const payload =
-      composerType === "event"
-        ? buildEventPayload(form)
-        : buildTaskPayload(form);
     try {
-      const path = editingItem
-        ? `/api/${composerType === "event" ? "events" : "tasks"}/${editingItem.id}`
-        : composerType === "event"
-          ? "/api/events"
-          : "/api/tasks";
       if (composerType === "event" && editingItem) {
         await saveEventTags(
           editingItem.id,
@@ -289,13 +279,15 @@ function App() {
           composerTagIds,
         );
       }
-      const response = await api<{ id: string } | undefined>(path, {
-        method: editingItem ? "PUT" : "POST",
-        body: JSON.stringify(
-          composerType === "event"
-            ? { ...payload, main_tag_id: composerMainTagId }
-            : payload,
-        ),
+      const request = buildTimelineItemRequest(
+        composerType,
+        editingItem?.id ?? null,
+        form,
+        composerMainTagId,
+      );
+      const response = await api<{ id: string } | undefined>(request.path, {
+        method: request.method,
+        body: JSON.stringify(request.body),
       });
       if (composerType === "event") {
         const existingTags =
