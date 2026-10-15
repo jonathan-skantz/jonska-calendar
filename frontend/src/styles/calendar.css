@@ -153,6 +153,11 @@
 
 .grid-entry.event {
     min-height: 0;
+    border: 0;
+}
+
+.grid-entry.event.overlapping-later-event {
+    border: 1px solid white;
 }
 
 .grid-entry.completed {

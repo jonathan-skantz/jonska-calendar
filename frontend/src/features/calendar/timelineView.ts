@@ -108,6 +108,21 @@ export const getEventAdjacency = (
     sameInstant(entry.ends_at, next.starts_at),
 });
 
+export const getEventOverlapDepth = (
+  entry: TimelineEntry,
+  earlierEntries: TimelineEntry[],
+) => {
+  if (entry.type !== "event" || !entry.starts_at) return 0;
+
+  const startsAt = new Date(entry.starts_at).getTime();
+  return earlierEntries.filter(
+    (earlierEntry) =>
+      earlierEntry.type === "event" &&
+      earlierEntry.ends_at &&
+      new Date(earlierEntry.ends_at).getTime() > startsAt,
+  ).length;
+};
+
 export const getCalendarEntryLayout = (
   entry: TimelineEntry,
   now: Date,

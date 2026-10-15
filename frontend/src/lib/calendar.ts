@@ -10,6 +10,7 @@ export const MINIMUM_ENTRY_DURATION_MINUTES = 90;
 export const PREVIEW_EVENT_DURATION_MINUTES = 120;
 export const CLOCK_UPDATE_INTERVAL_MS = 60_000;
 export const EVENT_SEPARATOR_PIXELS = 1;
+export const EVENT_OVERLAP_INSET_PIXELS = 6;
 export const LAST_EVENT_START_HOUR = 22;
 
 export const formatTime = (value?: string) =>

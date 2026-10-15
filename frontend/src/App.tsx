@@ -20,6 +20,7 @@ import {
   getDayElapsedOverlay,
   getEntriesForDate,
   getEventAdjacency,
+  getEventOverlapDepth,
   getEventPreview,
   getVisibleWeekEntries,
 } from "./features/calendar/timelineView";
@@ -170,6 +171,7 @@ function App() {
     layout: ReturnType<typeof getCalendarEntryLayout>,
     trimTop = false,
     trimBottom = false,
+    overlapDepth = 0,
   ) => {
     return (
       <CalendarEntry
@@ -179,6 +181,7 @@ function App() {
         durationMinutes={layout.durationMinutes}
         trimTop={trimTop}
         trimBottom={trimBottom}
+        overlapDepth={overlapDepth}
         onEdit={editItem}
         onToggleTask={toggleTask}
       />
@@ -195,9 +198,19 @@ function App() {
         next,
       );
       const layout = getCalendarEntryLayout(entry, today);
+      const overlapDepth = getEventOverlapDepth(
+        entry,
+        dayEntries.slice(0, index),
+      );
       return {
         layout,
-        rendered: renderGridEntry(entry, layout, trimTop, trimBottom),
+        rendered: renderGridEntry(
+          entry,
+          layout,
+          trimTop,
+          trimBottom,
+          overlapDepth,
+        ),
       };
     });
     const elapsedEntries = entriesWithLayout.filter(

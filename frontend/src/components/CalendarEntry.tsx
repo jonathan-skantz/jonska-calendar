@@ -1,4 +1,10 @@
-import { CALENDAR_GRID_SCALE, EVENT_SEPARATOR_PIXELS, MINUTES_PER_HOUR, formatTime } from "../lib/calendar";
+import {
+  CALENDAR_GRID_SCALE,
+  EVENT_OVERLAP_INSET_PIXELS,
+  EVENT_SEPARATOR_PIXELS,
+  MINUTES_PER_HOUR,
+  formatTime,
+} from "../lib/calendar";
 import { tagTextColor } from "../lib/colors";
 import { getMainTag, getOrderedStripTags } from "../lib/timeline";
 import type { TimelineEntry } from "../types";
@@ -9,6 +15,7 @@ type CalendarEntryProps = {
   durationMinutes: number;
   trimTop: boolean;
   trimBottom: boolean;
+  overlapDepth: number;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
 };
@@ -19,6 +26,7 @@ export const CalendarEntry = ({
   durationMinutes,
   trimTop,
   trimBottom,
+  overlapDepth,
   onEdit,
   onToggleTask,
 }: CalendarEntryProps) => {
@@ -38,19 +46,25 @@ export const CalendarEntry = ({
     : mainTag
       ? [`${mainTag.color} 0%, ${mainTag.color} 100%`]
       : [];
+  const hasEarlierOverlap = overlapDepth > 0;
+  const overlapInset = hasEarlierOverlap
+    ? `${3 + overlapDepth * EVENT_OVERLAP_INSET_PIXELS}px`
+    : undefined;
 
   return (
     <article
-      className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""}`}
+      className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""}`}
       style={{
         top: `${(startMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
         height: `calc(${(durationMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem - ${(trimTop ? EVENT_SEPARATOR_PIXELS : 0) + (trimBottom ? EVENT_SEPARATOR_PIXELS : 0)}px)`,
+        left: overlapInset,
+        right: overlapInset,
+        zIndex: hasEarlierOverlap ? 2 : undefined,
         transform: trimTop ? `translateY(${EVENT_SEPARATOR_PIXELS}px)` : undefined,
         ...(entry.type === "event" && mainTag
           ? {
               backgroundColor: mainTag.color,
               color: tagTextColor(mainTag.color),
-              borderLeftWidth: 0,
               backgroundImage: `linear-gradient(to right, ${stripStops.join(", ")})`,
               backgroundSize: "100% 3px",
               backgroundPosition: "top",
