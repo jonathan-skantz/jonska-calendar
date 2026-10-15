@@ -34,6 +34,7 @@ import {
 } from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
+import { useWorkspace } from "./hooks/useWorkspace";
 import "./App.css";
 
 function App() {
@@ -43,17 +44,7 @@ function App() {
     queryFn: () => api<User>("/api/auth/me"),
     retry: false,
   });
-  const workspaceQuery = useQuery({
-    queryKey: ["workspace"],
-    queryFn: async () => {
-      const [timeline, userTags] = await Promise.all([
-        api<TimelineEntry[]>("/api/timeline"),
-        api<Tag[]>("/api/tags"),
-      ]);
-      return { entries: timeline, tags: userTags };
-    },
-    enabled: Boolean(currentUserQuery.data),
-  });
+  const workspaceQuery = useWorkspace(Boolean(currentUserQuery.data));
   const user = currentUserQuery.data ?? null;
   const entries = workspaceQuery.data?.entries ?? [];
   const tags = workspaceQuery.data?.tags ?? [];
