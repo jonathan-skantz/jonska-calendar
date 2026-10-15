@@ -25,6 +25,28 @@ export type TaskPayload = {
   deadline_at: string | undefined;
 };
 
+export type EventTagSelection = {
+  tagIds: string[];
+  mainTagId: string | null;
+};
+
+export const getDefaultEventTagSelection = (tags: Tag[]): EventTagSelection => {
+  const defaultTag = tags.find((tag) => tag.is_default);
+  return {
+    tagIds: defaultTag ? [defaultTag.id] : [],
+    mainTagId: defaultTag?.id ?? tags[0]?.id ?? null,
+  };
+};
+
+export const getEventTagChanges = (previous: Tag[], nextTagIds: string[]) => {
+  const previousTagIds = new Set(previous.map((tag) => tag.id));
+  const nextIDs = new Set(nextTagIds);
+  return {
+    add: nextTagIds.filter((tagId) => !previousTagIds.has(tagId)),
+    remove: previous.filter((tag) => !nextIDs.has(tag.id)),
+  };
+};
+
 export type TimelineItemRequest = {
   path: string;
   method: "POST" | "PUT";

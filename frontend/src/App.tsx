@@ -33,6 +33,7 @@ import {
   getBackToBackTrim,
   getEntryMinutes,
   getElapsedOverlayState,
+  getEventTagChanges,
   getTimelineEntryDate,
   isEventVisible,
 } from "./lib/timeline";
@@ -219,19 +220,16 @@ function App() {
     previous: Tag[],
     next: string[],
   ) => {
-    const previousIDs = new Set(previous.map((tag) => tag.id));
-    const nextIDs = new Set(next);
+    const changes = getEventTagChanges(previous, next);
     await Promise.all([
-      ...next
-        .filter((tagID) => !previousIDs.has(tagID))
+      ...changes.add
         .map((tagID) =>
           api(`/api/timeline/${itemID}/tags`, {
             method: "POST",
             body: JSON.stringify({ tag_id: tagID }),
           }),
         ),
-      ...previous
-        .filter((tag) => !nextIDs.has(tag.id))
+      ...changes.remove
         .map((tag) =>
           api(`/api/timeline/${itemID}/tags/${tag.id}`, { method: "DELETE" }),
         ),

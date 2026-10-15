@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   getBackToBackTrim,
   getElapsedOverlayState,
+  getEventTagChanges,
+  getDefaultEventTagSelection,
   getMainTag,
   isEventVisible,
   buildTimelineItemRequest,
@@ -26,6 +28,26 @@ const event = (overrides: Partial<TimelineEntry> = {}): TimelineEntry => ({
 });
 
 describe("timeline behavior", () => {
+  it("selects the default event tag and computes membership changes", () => {
+    const tags = [tag("first"), { ...tag("default"), is_default: true }];
+    expect(getDefaultEventTagSelection(tags)).toEqual({
+      tagIds: ["default"],
+      mainTagId: "default",
+    });
+    expect(getDefaultEventTagSelection([tag("first")])).toEqual({
+      tagIds: [],
+      mainTagId: "first",
+    });
+    expect(getDefaultEventTagSelection([])).toEqual({
+      tagIds: [],
+      mainTagId: null,
+    });
+    expect(getEventTagChanges(tags, ["default", "new"])).toEqual({
+      add: ["new"],
+      remove: [{ ...tag("first"), is_default: false }],
+    });
+  });
+
   it("builds event and task create and update requests", () => {
     const eventForm = new FormData();
     eventForm.set("title", "Planning");

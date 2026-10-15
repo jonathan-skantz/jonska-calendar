@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { dateKey } from "../lib/calendar";
+import { getDefaultEventTagSelection } from "../lib/timeline";
 import type { Tag, TimelineEntry } from "../types";
 
 type UseComposerOptions = {
@@ -25,10 +26,9 @@ export const useComposer = ({
   const openNew = (startAt?: Date) => {
     setEditingItem(null);
     setType("event");
-    setSelectedTagIds(tags.filter((tag) => tag.is_default).map((tag) => tag.id));
-    setMainTagId(
-      tags.find((tag) => tag.is_default)?.id ?? tags[0]?.id ?? null,
-    );
+    const selection = getDefaultEventTagSelection(tags);
+    setSelectedTagIds(selection.tagIds);
+    setMainTagId(selection.mainTagId);
     const start = startAt ?? new Date(`${selectedDate}T09:00`);
     onSelectedDateChange(dateKey(start));
     setDraftEventStart(start.toISOString());
