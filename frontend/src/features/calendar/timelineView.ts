@@ -41,6 +41,11 @@ export const getVisibleWeekEntries = (
     return isInWeek && isEventVisible(entry, hiddenTagIds);
   });
 
+export const getEntriesForDate = (entries: TimelineEntry[], date: Date) =>
+  entries.filter(
+    (entry) => localDateKey(getTimelineEntryDate(entry)) === dateKey(date),
+  );
+
 export const getClickedEventStart = (
   event: MouseEvent<HTMLDivElement>,
   date: Date,

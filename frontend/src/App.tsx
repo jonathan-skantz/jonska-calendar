@@ -2,15 +2,10 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { format } from "date-fns";
 import {
-  dateKey,
   formatDate,
-  localDateKey,
 } from "./lib/calendar";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
-import {
-  getTimelineEntryDate,
-} from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useComposer } from "./hooks/useComposer";
@@ -25,6 +20,7 @@ import {
   getCalendarDates,
   getClickedEventStart,
   getDayElapsedOverlay,
+  getEntriesForDate,
   getEventAdjacency,
   getEventPreview,
   getVisibleWeekEntries,
@@ -219,12 +215,7 @@ function App() {
     );
   };
   const renderDayEntries = (date: Date) => {
-    const dayEntries = weekEntries.filter(
-      (entry) =>
-        localDateKey(
-          getTimelineEntryDate(entry),
-        ) === dateKey(date),
-    );
+    const dayEntries = getEntriesForDate(weekEntries, date);
     return dayEntries.map((entry, index) => {
       const previous = dayEntries[index - 1];
       const next = dayEntries[index + 1];

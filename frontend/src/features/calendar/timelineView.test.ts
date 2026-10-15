@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCalendarEntryLayout } from "./timelineView";
+import { getCalendarEntryLayout, getEntriesForDate } from "./timelineView";
 import type { TimelineEntry } from "../../types";
 
 const event = (overrides: Partial<TimelineEntry> = {}): TimelineEntry => ({
@@ -39,5 +39,26 @@ describe("calendar entry layout", () => {
         new Date(2026, 9, 15, 11),
       ).fullyElapsed,
     ).toBe(true);
+  });
+});
+
+describe("calendar entries by date", () => {
+  it("matches event start dates and task deadlines", () => {
+    const task: TimelineEntry = {
+      id: "task-1",
+      type: "task",
+      title: "Task",
+      deadline_at: "2026-10-15T17:00:00",
+      is_completed: false,
+    };
+    const otherDay = event({
+      id: "other-day",
+      starts_at: "2026-10-16T10:00:00",
+      ends_at: "2026-10-16T11:00:00",
+    });
+    expect(getEntriesForDate([event(), task, otherDay], new Date(2026, 9, 15))).toEqual([
+      event(),
+      task,
+    ]);
   });
 });
