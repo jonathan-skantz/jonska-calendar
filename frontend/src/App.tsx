@@ -4,7 +4,6 @@ import type { FormEvent, MouseEvent } from "react";
 import { addDays, format } from "date-fns";
 import {
   CALENDAR_GRID_SCALE,
-  EVENT_SEPARATOR_PIXELS,
   HOURS_PER_DAY,
   LAST_EVENT_START_HOUR,
   MINIMUM_ENTRY_DURATION_MINUTES,
@@ -21,7 +20,6 @@ import {
   startOfCalendarWeek,
 } from "./lib/calendar";
 import { api } from "./lib/api";
-import { tagTextColor } from "./lib/colors";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import { getRequestErrorMessage } from "./lib/requestErrors";
@@ -35,8 +33,6 @@ import {
   getBackToBackTrim,
   getEntryMinutes,
   getElapsedOverlayState,
-  getMainTag,
-  getOrderedStripTags,
   getTimelineEntryDate,
   isEventVisible,
 } from "./lib/timeline";
@@ -47,6 +43,7 @@ import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
+import { CalendarEntry } from "./components/CalendarEntry";
 import { Sidebar } from "./components/Sidebar";
 import { TagEditorDrawer } from "./components/TagEditorDrawer";
 import { WeekCalendar } from "./components/WeekCalendar";
@@ -398,64 +395,18 @@ function App() {
     const fullyElapsed =
       entry.type === "event" &&
       Boolean(entry.ends_at && new Date(entry.ends_at).getTime() <= today.getTime());
-    const mainTag = getMainTag(entry);
-    const orderedStripTags = getOrderedStripTags(entry);
-    const stripTags = orderedStripTags.filter((tag) => tag.id !== mainTag?.id);
-    const stripColors = orderedStripTags.map((tag) => tag.color);
-    const additionalStripWidth = stripTags.length ? 50 / stripTags.length : 0;
-    const stripStops = stripTags.length
-      ? [
-          `${mainTag?.color} 0%, ${mainTag?.color} 50%`,
-          ...stripTags.map(
-            (tag, index) =>
-              `${tag.color} ${50 + index * additionalStripWidth}%, ${tag.color} ${50 + (index + 1) * additionalStripWidth}%`,
-          ),
-        ]
-      : stripColors.map((color) => `${color} 0%, ${color} 100%`);
     return (
-      <article
-        className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${fullyElapsed ? "elapsed" : ""}`}
-        style={{
-          top: `${(start / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
-          height: `calc(${(duration / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem - ${(trimTop ? EVENT_SEPARATOR_PIXELS : 0) + (trimBottom ? EVENT_SEPARATOR_PIXELS : 0)}px)`,
-          transform: trimTop
-            ? `translateY(${EVENT_SEPARATOR_PIXELS}px)`
-            : undefined,
-          ...(entry.type === "event" && mainTag
-            ? {
-                backgroundColor: mainTag.color,
-                color: tagTextColor(mainTag.color),
-                borderLeftWidth: 0,
-                backgroundImage: `linear-gradient(to right, ${stripStops.join(", ")})`,
-                backgroundSize: "100% 3px",
-                backgroundPosition: "top",
-                backgroundRepeat: "no-repeat",
-              }
-            : {}),
-        }}
+      <CalendarEntry
         key={entry.id}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (!entry.is_shared) editItem(entry);
-        }}
-      >
-        <strong>{entry.title}</strong>
-        <span>
-          {entry.type === "event"
-            ? `${formatTime(entry.starts_at)}${entry.ends_at ? ` – ${formatTime(entry.ends_at)}` : ""}`
-            : "Task"}
-        </span>
-        {entry.location && <span>{entry.location}</span>}
-        {entry.type === "task" && (
-          <input
-            type="checkbox"
-            checked={entry.is_completed}
-            onClick={(event) => event.stopPropagation()}
-            onChange={() => toggleTask(entry)}
-            aria-label={`Complete ${entry.title}`}
-          />
-        )}
-      </article>
+        entry={entry}
+        startMinutes={start}
+        durationMinutes={duration}
+        trimTop={trimTop}
+        trimBottom={trimBottom}
+        fullyElapsed={fullyElapsed}
+        onEdit={editItem}
+        onToggleTask={toggleTask}
+      />
     );
   };
   const renderDayEntries = (date: Date) => {
