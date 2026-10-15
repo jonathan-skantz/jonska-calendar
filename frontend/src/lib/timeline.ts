@@ -1,4 +1,4 @@
-import { localDateTime, minutesIntoDay } from "./calendar";
+import { localDateTime, minutesIntoDay, sameInstant } from "./calendar";
 import type { Tag, TimelineEntry } from "../types";
 
 export type EventPayload = {
@@ -37,6 +37,25 @@ export const getOrderedStripTags = (entry: TimelineEntry): Tag[] => {
       : [];
   return mainTag ? [mainTag, ...additionalTags] : additionalTags;
 };
+
+export const isEventVisible = (entry: TimelineEntry, hiddenTagIds: string[]) =>
+  entry.type !== "event" ||
+  !entry.tags?.some((tag) => hiddenTagIds.includes(tag.id));
+
+export const getBackToBackTrim = (
+  entry: TimelineEntry,
+  previous?: TimelineEntry,
+  next?: TimelineEntry,
+) => ({
+  trimTop:
+    entry.type === "event" &&
+    previous?.type === "event" &&
+    sameInstant(previous.ends_at, entry.starts_at),
+  trimBottom:
+    entry.type === "event" &&
+    next?.type === "event" &&
+    sameInstant(entry.ends_at, next.starts_at),
+});
 
 export const buildEventPayload = (form: FormData): EventPayload => ({
   title: String(form.get("title") || ""),

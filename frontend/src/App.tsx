@@ -19,7 +19,6 @@ import {
   inputDateTime,
   localDateKey,
   minutesIntoDay,
-  sameInstant,
   startOfCalendarWeek,
 } from "./lib/calendar";
 import { api } from "./lib/api";
@@ -27,10 +26,12 @@ import { tagTextColor } from "./lib/colors";
 import {
   buildEventPayload,
   buildTaskPayload,
+  getBackToBackTrim,
   getEntryMinutes,
   getMainTag,
   getOrderedStripTags,
   getTimelineEntryDate,
+  isEventVisible,
 } from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import "./App.css";
@@ -494,10 +495,7 @@ function App() {
   const weekEntries = entries.filter((entry) => {
     const value = getTimelineEntryDate(entry);
     const inWeek = dates.some((date) => dateKey(date) === localDateKey(value));
-    const matchesTags =
-      entry.type !== "event" ||
-      !entry.tags?.some((tag) => hiddenTagIds.includes(tag.id));
-    return inWeek && matchesTags;
+    return inWeek && isEventVisible(entry, hiddenTagIds);
   });
   const openNewEventAt = (event: MouseEvent<HTMLDivElement>, date: Date) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -626,14 +624,11 @@ function App() {
     return dayEntries.map((entry, index) => {
       const previous = dayEntries[index - 1];
       const next = dayEntries[index + 1];
-      const trimTop =
-        entry.type === "event" &&
-        previous?.type === "event" &&
-        sameInstant(previous.ends_at, entry.starts_at);
-      const trimBottom =
-        entry.type === "event" &&
-        next?.type === "event" &&
-        sameInstant(entry.ends_at, next.starts_at);
+      const { trimTop, trimBottom } = getBackToBackTrim(
+        entry,
+        previous,
+        next,
+      );
       return renderGridEntry(entry, trimTop, trimBottom);
     });
   };
