@@ -39,6 +39,8 @@ import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { AuthScreen } from "./components/AuthScreen";
+import { WeekCalendar } from "./components/WeekCalendar";
+import { WeekHeader } from "./components/WeekHeader";
 import { TopBar } from "./components/TopBar";
 import { queryKeys } from "./lib/queryKeys";
 import "./App.css";
@@ -563,74 +565,28 @@ function App() {
       <TopBar email={user.email} onLogout={logout} />
       <section className="content-grid">
         <div className="timeline-column">
-          <div className="section-heading week-heading">
-            <div className="week-title">
-              <button
-                className="week-nav"
-                onClick={() => moveWeek(-7)}
-                aria-label="Previous week"
-              >
-                ←
-              </button>
-              <div>
-                <span className="section-kicker">Week view</span>
-                <h2>
-                  {formatDate(dates[0])} – {formatDate(dates[6])}
-                </h2>
-              </div>
-              <button
-                className="week-nav"
-                onClick={() => moveWeek(7)}
-                aria-label="Next week"
-              >
-                →
-              </button>
-            </div>
-            <div className="week-actions">
-              <span className="item-count">{weekEntries.length} items</span>
-              <button
-                className="primary-button compact"
-                onClick={() => openNewComposer()}
-              >
-                Add item <span>＋</span>
-              </button>
-            </div>
-          </div>
-          {actionError && !showComposer && !showTagEditor && (
-            <p className="error action-error">{actionError}</p>
-          )}
-          <div className="week-calendar" aria-label="Week calendar">
-            <div className="week-day-headings">
-              <span />
-              {dates.map((date) => (
-                <div
-                  className={`day-heading ${date.getDay() === 0 || date.getDay() === 6 ? "weekend" : ""}`}
-                  key={dateKey(date)}
-                >
-                  <strong>{date.getDate()}</strong>
-                  <span>{formatDate(date).split(",")[0]}</span>
-                </div>
-              ))}
-            </div>
-            <div className="week-grid">
-              <div className="hour-labels">
-                {Array.from({ length: 24 }, (_, hour) => (
-                  <span key={hour}>{String(hour).padStart(2, "0")}:00</span>
-                ))}
-              </div>
-              {dates.map((date) => (
-                <div
-                  className={`day-column ${date.getDay() === 0 || date.getDay() === 6 ? "weekend" : ""}`}
-                  key={dateKey(date)}
-                  onClick={(event) => openNewEventAt(event, date)}
-                >
-                  {renderDayEntries(date)}
-                  {renderPreview(date)}
-                  {renderElapsedOverlay(date)}
-                </div>
-              ))}
-            </div>
-          </div>
+          <WeekHeader
+            title={`${formatDate(dates[0])} – ${formatDate(dates[6])}`}
+            itemCount={weekEntries.length}
+            onPrevious={() => moveWeek(-7)}
+            onNext={() => moveWeek(7)}
+            onAddItem={() => openNewComposer()}
+          >
+            {actionError && !showComposer && !showTagEditor && (
+              <p className="error action-error">{actionError}</p>
+            )}
+          </WeekHeader>
+          <WeekCalendar
+            dates={dates}
+            onDayClick={openNewEventAt}
+            renderDay={(date) => (
+              <>
+                {renderDayEntries(date)}
+                {renderPreview(date)}
+                {renderElapsedOverlay(date)}
+              </>
+            )}
+          />
         </div>
         <aside className="side-panel">
           <div className="pulse-panel">
