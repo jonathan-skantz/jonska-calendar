@@ -18,13 +18,18 @@ import {
   formatTime,
   inputDateTime,
   localDateKey,
-  localDateTime,
   minutesIntoDay,
   sameInstant,
   startOfCalendarWeek,
 } from "./lib/calendar";
 import { api } from "./lib/api";
 import { tagTextColor } from "./lib/colors";
+import {
+  buildEventPayload,
+  buildTaskPayload,
+  getEntryMinutes,
+  getTimelineEntryDate,
+} from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import "./App.css";
 
@@ -365,24 +370,10 @@ function App() {
     setInvalidFields([]);
     setActionError("");
     const form = new FormData(event.currentTarget);
-    const title = String(form.get("title") || "");
-    const description = String(form.get("description") || "") || null;
-    const url = String(form.get("url") || "") || null;
-    const start = localDateTime(form.get("starts_at"));
-    const end = localDateTime(form.get("ends_at"));
-    const deadline = localDateTime(form.get("deadline_at"));
     const payload =
       composerType === "event"
-        ? {
-            title,
-            description,
-            url,
-            kind: form.get("kind") || "informational",
-            starts_at: start,
-            ends_at: end,
-            location: form.get("location") || null,
-          }
-        : { title, description, url, deadline_at: deadline };
+        ? buildEventPayload(form)
+        : buildTaskPayload(form);
     try {
       const path = editingItem
         ? `/api/${composerType === "event" ? "events" : "tasks"}/${editingItem.id}`
@@ -499,7 +490,7 @@ function App() {
     (entry) => entry.type === "task" && !entry.is_completed,
   ).length;
   const weekEntries = entries.filter((entry) => {
-    const value = entry.type === "event" ? entry.starts_at : entry.deadline_at;
+    const value = getTimelineEntryDate(entry);
     const inWeek = dates.some((date) => dateKey(date) === localDateKey(value));
     const matchesTags =
       entry.type !== "event" ||
@@ -549,10 +540,7 @@ function App() {
     trimTop = false,
     trimBottom = false,
   ) => {
-    const start =
-      entry.type === "event"
-        ? minutesIntoDay(entry.starts_at)
-        : minutesIntoDay(entry.deadline_at);
+    const start = getEntryMinutes(entry);
     const end =
       entry.type === "event"
         ? minutesIntoDay(entry.ends_at)
@@ -637,7 +625,7 @@ function App() {
     const dayEntries = weekEntries.filter(
       (entry) =>
         localDateKey(
-          entry.type === "event" ? entry.starts_at : entry.deadline_at,
+          getTimelineEntryDate(entry),
         ) === dateKey(date),
     );
     return dayEntries.map((entry, index) => {
