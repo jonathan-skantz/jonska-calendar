@@ -1,9 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { format } from "date-fns";
-import {
-  formatDate,
-} from "./lib/calendar";
+import { formatDate } from "./lib/calendar";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
@@ -25,6 +23,7 @@ import {
   getEventPreview,
   getVisibleWeekEntries,
 } from "./features/calendar/timelineView";
+import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
 import { CalendarEntry } from "./components/CalendarEntry";
@@ -174,25 +173,6 @@ function App() {
     event: Parameters<typeof getClickedEventStart>[0],
     date: Date,
   ) => openNewComposer(getClickedEventStart(event, date));
-  const renderPreview = (date: Date) => {
-    if (!showComposer || editingItem) return null;
-    const preview = getEventPreview(draftEventStart, date);
-    return preview ? (
-      <div
-        className="grid-entry event preview"
-        style={{
-          top: preview.top,
-          height: "4rem",
-        }}
-        aria-hidden="true"
-      >
-        <strong>New event</strong>
-        <span>
-          {preview.startsAt} – {preview.endsAt}
-        </span>
-      </div>
-    ) : null;
-  };
   const renderGridEntry = (
     entry: TimelineEntry,
     trimTop = false,
@@ -227,25 +207,6 @@ function App() {
       return renderGridEntry(entry, trimTop, trimBottom);
     });
   };
-  const renderElapsedOverlay = (date: Date) => {
-    const state = getDayElapsedOverlay(date, today, (value) => format(value, "p"));
-    if (state.kind === "past") {
-      return <div className="day-elapsed-overlay past" aria-hidden="true" />;
-    }
-    if (state.kind === "none") return null;
-    return (
-      <div
-        className="day-elapsed-overlay today"
-        style={{
-          height: state.height,
-        }}
-        aria-hidden="true"
-      >
-        <span className="current-time-label">{state.label}</span>
-      </div>
-    );
-  };
-
   return (
     <main className="app-shell">
       <TopBar email={user.email} onLogout={logout} />
@@ -268,8 +229,16 @@ function App() {
             renderDay={(date) => (
               <>
                 {renderDayEntries(date)}
-                {renderPreview(date)}
-                {renderElapsedOverlay(date)}
+                <CalendarDayIndicators
+                  preview={
+                    showComposer && !editingItem
+                      ? getEventPreview(draftEventStart, date)
+                      : null
+                  }
+                  elapsed={getDayElapsedOverlay(date, today, (value) =>
+                    format(value, "p"),
+                  )}
+                />
               </>
             )}
           />

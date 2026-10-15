@@ -23,6 +23,12 @@ import {
 } from "../../lib/timeline";
 import type { TimelineEntry } from "../../types";
 
+export type EventPreview = {
+  top: string;
+  startsAt: string;
+  endsAt: string;
+};
+
 export const getCalendarDates = (weekStart: Date) =>
   Array.from({ length: WEEK_DAY_COUNT }, (_, index) =>
     addDays(weekStart, index),
@@ -65,7 +71,10 @@ export const getClickedEventStart = (
   return start;
 };
 
-export const getEventPreview = (startAt: string | null, date: Date) => {
+export const getEventPreview = (
+  startAt: string | null,
+  date: Date,
+): EventPreview | null => {
   if (!startAt || localDateKey(startAt) !== dateKey(date)) return null;
   const start = new Date(startAt);
   const end = new Date(
