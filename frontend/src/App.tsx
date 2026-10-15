@@ -36,6 +36,7 @@ import {
 } from "./lib/timeline";
 import type { AuthMode, Tag, TimelineEntry, User } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
+import { useComposer } from "./hooks/useComposer";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { AuthScreen } from "./components/AuthScreen";
@@ -64,15 +65,7 @@ function App() {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showComposer, setShowComposer] = useState(false);
   const [showTagEditor, setShowTagEditor] = useState(false);
-  const [composerType, setComposerType] = useState<"event" | "task">("event");
-  const [editingItem, setEditingItem] = useState<TimelineEntry | null>(null);
-  const [composerTagIds, setComposerTagIds] = useState<string[]>([]);
-  const [composerMainTagId, setComposerMainTagId] = useState<string | null>(
-    null,
-  );
-  const [draftEventStart, setDraftEventStart] = useState<string | null>(null);
   const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } =
     useTagVisibility();
   const today = useCurrentTime();
@@ -80,6 +73,30 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
   const [actionError, setActionError] = useState("");
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const composer = useComposer({
+    tags,
+    selectedDate,
+    onSelectedDateChange: setSelectedDate,
+    onResetErrors: () => {
+      setActionError("");
+      setInvalidFields([]);
+    },
+  });
+  const {
+    showComposer,
+    type: composerType,
+    editingItem,
+    selectedTagIds: composerTagIds,
+    mainTagId: composerMainTagId,
+    draftEventStart,
+    setType: setComposerType,
+    setDraftEventStart,
+    setSelectedTagIds: setComposerTagIds,
+    setMainTagId: setComposerMainTagId,
+    openNew: openNewComposer,
+    edit: editItem,
+    close: closeComposer,
+  } = composer;
 
   const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -134,8 +151,7 @@ function App() {
     try {
       await api(`/api/timeline/${entry.id}`, { method: "DELETE" });
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
-      setShowComposer(false);
-      setEditingItem(null);
+      closeComposer();
       setDraftEventStart(null);
     } catch (requestError) {
       setActionError(
@@ -144,34 +160,6 @@ function App() {
           : "Unable to delete item",
       );
     }
-  };
-
-  const editItem = (entry: TimelineEntry) => {
-    setEditingItem(entry);
-    setComposerType(entry.type);
-    setDraftEventStart(null);
-    setActionError("");
-    setInvalidFields([]);
-    setComposerTagIds(entry.tags?.map((tag) => tag.id) ?? []);
-    setComposerMainTagId(entry.main_tag_id ?? entry.tags?.[0]?.id ?? null);
-    setShowComposer(true);
-  };
-
-  const openNewComposer = (startAt?: Date) => {
-    setEditingItem(null);
-    setComposerType("event");
-    setComposerTagIds(
-      tags.filter((tag) => tag.is_default).map((tag) => tag.id),
-    );
-    setComposerMainTagId(
-      tags.find((tag) => tag.is_default)?.id ?? tags[0]?.id ?? null,
-    );
-    const start = startAt ?? new Date(`${selectedDate}T09:00`);
-    setSelectedDate(dateKey(start));
-    setDraftEventStart(start.toISOString());
-    setActionError("");
-    setInvalidFields([]);
-    setShowComposer(true);
   };
 
   useEffect(() => {
@@ -362,8 +350,7 @@ function App() {
           await saveEventTags(response?.id ?? "", existingTags, composerTagIds);
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
-      setShowComposer(false);
-      setEditingItem(null);
+      closeComposer();
       setActionError("");
     } catch (requestError) {
       setActionError(
@@ -613,10 +600,7 @@ function App() {
           selectedTagIds={composerTagIds}
           mainTagId={composerMainTagId}
           onSubmit={createItem}
-          onClose={() => {
-            setShowComposer(false);
-            setEditingItem(null);
-          }}
+          onClose={closeComposer}
           onTypeChange={setComposerType}
           onSelectedTagIdsChange={setComposerTagIds}
           onMainTagIdChange={setComposerMainTagId}
