@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from "react";
-import { dateKey, formatDate } from "../lib/calendar";
+import { dateKey, formatDate, formatHour } from "../lib/calendar";
 
 type WeekCalendarProps = {
   dates: Date[];
@@ -7,7 +7,11 @@ type WeekCalendarProps = {
   renderDay: (date: Date) => ReactNode;
 };
 
-export const WeekCalendar = ({ dates, onDayClick, renderDay }: WeekCalendarProps) => (
+export const WeekCalendar = ({
+  dates,
+  onDayClick,
+  renderDay,
+}: WeekCalendarProps) => (
   <div className="week-calendar" aria-label="Week calendar">
     <div className="week-day-headings">
       <span />
@@ -24,7 +28,7 @@ export const WeekCalendar = ({ dates, onDayClick, renderDay }: WeekCalendarProps
     <div className="week-grid">
       <div className="hour-labels">
         {Array.from({ length: 24 }, (_, hour) => (
-          <span key={hour}>{String(hour).padStart(2, "0")}:00</span>
+          <span key={hour}>{formatHour(hour)}</span>
         ))}
       </div>
       {dates.map((date) => (

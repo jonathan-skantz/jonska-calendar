@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { format } from "date-fns";
-import { formatDate } from "./lib/calendar";
+import { formatDate, formatTime } from "./lib/calendar";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
@@ -51,14 +50,16 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showTagEditor, setShowTagEditor] = useState(false);
-  const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } = useTagVisibility();
+  const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } =
+    useTagVisibility();
   const today = useCurrentTime();
   const { weekStart, selectedDate, setSelectedDate, moveWeek } =
     useCalendarState(today);
   const [actionError, setActionError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
   const tagMutations = useTagMutations(setActionError, removeHiddenTag);
-  const { toggleTask, deleteItem, saveItem } = useTimelineMutations(setActionError);
+  const { toggleTask, deleteItem, saveItem } =
+    useTimelineMutations(setActionError);
   const composer = useComposer({
     tags,
     selectedDate,
@@ -90,10 +91,14 @@ function App() {
   };
 
   const handleDeleteItem = async (entry: TimelineEntry) => {
-    await deleteItem(entry, () => window.confirm(`Delete “${entry.title}”?`), () => {
-      closeComposer();
-      setDraftEventStart(null);
-    });
+    await deleteItem(
+      entry,
+      () => window.confirm(`Delete “${entry.title}”?`),
+      () => {
+        closeComposer();
+        setDraftEventStart(null);
+      },
+    );
   };
 
   const deleteTag = async (tag: Tag) => {
@@ -194,11 +199,7 @@ function App() {
     const entriesWithLayout = dayEntries.map((entry, index) => {
       const previous = dayEntries[index - 1];
       const next = dayEntries[index + 1];
-      const { trimTop, trimBottom } = getEventAdjacency(
-        entry,
-        previous,
-        next,
-      );
+      const { trimTop, trimBottom } = getEventAdjacency(entry, previous, next);
       const layout = getCalendarEntryLayout(entry, today, date);
       const overlapDepth = getEventOverlapDepth(
         entry,
@@ -261,7 +262,7 @@ function App() {
                       : null
                   }
                   elapsed={getDayElapsedOverlay(date, today, (value) =>
-                    format(value, "p"),
+                    formatTime(value),
                   )}
                 />
               </>
