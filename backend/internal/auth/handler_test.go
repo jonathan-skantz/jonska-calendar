@@ -7,76 +7,17 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/alexedwards/argon2id"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jonathan-skantz/calendar/backend/db"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
 func setupTestStore(t *testing.T) *db.Store {
-
-	ctx := context.Background()
-	postgresContainer, err := postgres.Run(
-		ctx,
-		"postgres:15.3-alpine",
-		postgres.WithDatabase("testdb"),
-		postgres.WithUsername("testuser"),
-		postgres.WithPassword("testpassword"),
-	)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Cleanup(func() {
-		if err := postgresContainer.Terminate(ctx); err != nil {
-			t.Fatalf("failed to terminate container: %v", err)
-		}
-	})
-
-	connString, err := postgresContainer.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var dbPool *pgxpool.Pool
-	for range 20 {
-		dbPool, err = db.NewDBPool(ctx, connString)
-		if err == nil {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	if dbPool == nil {
-		t.Fatalf("failed to connect to test database: %v", err)
-	}
-
-	t.Cleanup(func() {
-		dbPool.Close()
-	})
-
-	for _, migrationName := range []string{"1_add_users.sql", "2_add_sessions.sql", "3_add_timeline_demo.sql", "4_add_event_sharing.sql", "5_remove_redundant_share_owner.sql", "6_add_tags.sql", "7_add_default_event_tags.sql", "8_defer_default_tag_fk.sql", "9_add_tag_colors.sql", "10_add_event_main_tags.sql"} {
-		migrationPath := filepath.Join("..", "..", "db", "migrations", migrationName)
-		migration, err := os.ReadFile(migrationPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		upMigration, _, _ := strings.Cut(string(migration), "-- +goose Down")
-		if _, err := dbPool.Exec(ctx, upMigration); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	store := db.NewStore(dbPool)
-
-	return store
+	return testutil.NewStore(t)
 }
 
 func TestRegister(t *testing.T) {

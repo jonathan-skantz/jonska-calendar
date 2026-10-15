@@ -7,63 +7,17 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jonathan-skantz/calendar/backend/db"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
 func setupTestStore(t *testing.T) (*db.Store, uuid.UUID) {
-	t.Helper()
 	ctx := context.Background()
-	container, err := postgres.Run(
-		ctx,
-		"postgres:15.3-alpine",
-		postgres.WithDatabase("testdb"),
-		postgres.WithUsername("testuser"),
-		postgres.WithPassword("testpassword"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = container.Terminate(ctx) })
-
-	connString, err := container.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var pool *pgxpool.Pool
-	for range 20 {
-		pool, err = db.NewDBPool(ctx, connString)
-		if err == nil {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	if pool == nil {
-		t.Fatalf("failed to connect to test database: %v", err)
-	}
-	t.Cleanup(pool.Close)
-
-	for _, migrationName := range []string{"1_add_users.sql", "2_add_sessions.sql", "3_add_timeline_demo.sql", "4_add_event_sharing.sql", "5_remove_redundant_share_owner.sql", "6_add_tags.sql", "7_add_default_event_tags.sql", "8_defer_default_tag_fk.sql", "9_add_tag_colors.sql", "10_add_event_main_tags.sql"} {
-		migrationPath := filepath.Join("..", "..", "db", "migrations", migrationName)
-		migration, err := os.ReadFile(migrationPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		upMigration, _, _ := strings.Cut(string(migration), "-- +goose Down")
-		if _, err := pool.Exec(ctx, upMigration); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	store := db.NewStore(pool)
+	store := testutil.NewStore(t)
 	userID, err := store.Register(ctx, "test@example.com", "hash")
 	if err != nil {
 		t.Fatal(err)
