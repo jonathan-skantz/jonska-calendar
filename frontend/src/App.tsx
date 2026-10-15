@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent, MouseEvent } from "react";
 import { addDays, format } from "date-fns";
 import {
@@ -19,11 +18,8 @@ import {
   minutesIntoDay,
   startOfCalendarWeek,
 } from "./lib/calendar";
-import { api } from "./lib/api";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
-import { getRequestErrorMessage } from "./lib/requestErrors";
-import { invalidateWorkspace } from "./lib/queryInvalidation";
 import {
   getBackToBackTrim,
   getEntryMinutes,
@@ -38,6 +34,7 @@ import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { useAuth } from "./features/auth/useAuth";
 import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
+import { useTagMutations } from "./features/tags/useTagMutations";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
 import { CalendarEntry } from "./components/CalendarEntry";
@@ -49,7 +46,6 @@ import { TopBar } from "./components/TopBar";
 import "./App.css";
 
 function App() {
-  const queryClient = useQueryClient();
   const {
     user,
     isLoading: authLoading,
@@ -65,13 +61,13 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showTagEditor, setShowTagEditor] = useState(false);
-  const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } =
-    useTagVisibility();
+  const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } = useTagVisibility();
   const today = useCurrentTime();
   const [weekStart, setWeekStart] = useState(() => startOfCalendarWeek(today));
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
   const [actionError, setActionError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
+  const tagMutations = useTagMutations(setActionError, removeHiddenTag);
   const { toggleTask, deleteItem, saveItem } = useTimelineMutations(setActionError);
   const composer = useComposer({
     tags,
@@ -132,58 +128,24 @@ function App() {
       );
   }, [composerType, draftEventStart, editingItem, showComposer]);
 
-  const updateDefaultTag = async (tagID: string) => {
-    try {
-      await api("/api/tags/default", {
-        method: "PUT",
-        body: JSON.stringify({ tag_id: tagID }),
-      });
-      await invalidateWorkspace(queryClient);
-    } catch (requestError) {
-      setActionError(getRequestErrorMessage(requestError, "Unable to set default tag"));
-    }
-  };
-
   const updateTag = async (event: FormEvent<HTMLFormElement>, tag: Tag) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") || "").trim();
     const color = String(form.get("color") || tag.color);
-    if (!name) return;
-    try {
-      await api(`/api/tags/${tag.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ name, color }),
-      });
-      await invalidateWorkspace(queryClient);
-    } catch (requestError) {
-      setActionError(getRequestErrorMessage(requestError, "Unable to update tag"));
-    }
+    await tagMutations.updateTag(tag, name, color);
   };
 
   const deleteTag = async (tag: Tag) => {
-    if (!window.confirm(`Delete tag “${tag.name}”?`)) return;
-    try {
-      await api(`/api/tags/${tag.id}`, { method: "DELETE" });
-      removeHiddenTag(tag.id);
-      await invalidateWorkspace(queryClient);
-    } catch (requestError) {
-      setActionError(getRequestErrorMessage(requestError, "Unable to delete tag"));
-    }
+    await tagMutations.deleteTag(tag, () =>
+      window.confirm(`Delete tag “${tag.name}”?`),
+    );
   };
 
   const createTag = async () => {
     const name = window.prompt("Tag name")?.trim();
     if (!name) return;
-    try {
-      await api<Tag>("/api/tags", {
-        method: "POST",
-        body: JSON.stringify({ name }),
-      });
-      await invalidateWorkspace(queryClient);
-    } catch (requestError) {
-      setActionError(getRequestErrorMessage(requestError, "Unable to create tag"));
-    }
+    await tagMutations.createTag(name);
   };
 
   const createItem = async (event: FormEvent<HTMLFormElement>) => {
@@ -431,7 +393,7 @@ function App() {
           error={actionError}
           onClose={() => setShowTagEditor(false)}
           onUpdate={updateTag}
-          onUpdateDefault={(tag) => updateDefaultTag(tag.id)}
+          onUpdateDefault={(tag) => tagMutations.updateDefaultTag(tag.id)}
           onDelete={deleteTag}
         />
       )}
