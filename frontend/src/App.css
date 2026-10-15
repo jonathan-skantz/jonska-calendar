@@ -379,6 +379,7 @@ textarea:focus {
     color: var(--ink);
     font-size: 11px;
     line-height: 1.2;
+    border-radius: 4px;
 }
 
 .grid-entry.task {
