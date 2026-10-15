@@ -1,14 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import { format } from "date-fns";
 import {
   MINIMUM_ENTRY_DURATION_MINUTES,
-  MINUTES_PER_HOUR,
-  PREVIEW_EVENT_DURATION_MINUTES,
   TASK_DISPLAY_DURATION_MINUTES,
   dateKey,
   formatDate,
-  inputDateTime,
   localDateKey,
   minutesIntoDay,
 } from "./lib/calendar";
@@ -105,28 +102,6 @@ function App() {
       setDraftEventStart(null);
     });
   };
-
-  useEffect(() => {
-    if (
-      !showComposer ||
-      editingItem ||
-      composerType !== "event" ||
-      !draftEventStart
-    )
-      return;
-    const startsInput = document.querySelector<HTMLInputElement>(
-      '.composer input[name="starts_at"]',
-    );
-    const endsInput = document.querySelector<HTMLInputElement>(
-      '.composer input[name="ends_at"]',
-    );
-    const start = new Date(draftEventStart);
-    if (startsInput) startsInput.value = inputDateTime(draftEventStart);
-    if (endsInput)
-      endsInput.value = inputDateTime(
-        new Date(start.getTime() + PREVIEW_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000).toISOString(),
-      );
-  }, [composerType, draftEventStart, editingItem, showComposer]);
 
   const updateTag = async (event: FormEvent<HTMLFormElement>, tag: Tag) => {
     event.preventDefault();

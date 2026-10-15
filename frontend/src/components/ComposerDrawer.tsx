@@ -1,5 +1,10 @@
+import { useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { inputDateTime } from "../lib/calendar";
+import {
+  inputDateTime,
+  MINUTES_PER_HOUR,
+  PREVIEW_EVENT_DURATION_MINUTES,
+} from "../lib/calendar";
 import type { ComposerFieldErrors } from "../lib/formValidation";
 import type { Tag, TimelineEntry } from "../types";
 import { EventTagPicker } from "./EventTagPicker";
@@ -34,8 +39,22 @@ export const ComposerDrawer = ({
   onTypeChange,
   onSelectedTagIdsChange,
   onMainTagIdChange,
-}: ComposerDrawerProps) => (
-  <div
+}: ComposerDrawerProps) => {
+  const startsAtInput = useRef<HTMLInputElement>(null);
+  const endsAtInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!draftEventStart || editingItem || type !== "event") return;
+    startsAtInput.current!.value = inputDateTime(draftEventStart);
+    endsAtInput.current!.value = inputDateTime(
+      new Date(
+        new Date(draftEventStart).getTime() +
+          PREVIEW_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
+      ).toISOString(),
+    );
+  }, [draftEventStart, editingItem, type]);
+
+  return <div
     className="drawer-backdrop"
     onMouseDown={(event) => event.target === event.currentTarget && onClose()}
   >
@@ -106,6 +125,7 @@ export const ComposerDrawer = ({
             <label className={fieldErrors.starts_at ? "field-invalid" : ""}>
               Starts
               <input
+                ref={startsAtInput}
                 name="starts_at"
                 type="datetime-local"
                 defaultValue={inputDateTime(editingItem?.starts_at) || `${selectedDate}T09:00`}
@@ -115,6 +135,7 @@ export const ComposerDrawer = ({
             <label className={fieldErrors.ends_at ? "field-invalid" : ""}>
               Ends
               <input
+                ref={endsAtInput}
                 name="ends_at"
                 type="datetime-local"
                 defaultValue={inputDateTime(editingItem?.ends_at) || `${selectedDate}T10:00`}
@@ -158,5 +179,5 @@ export const ComposerDrawer = ({
         </button>
       </form>
     </aside>
-  </div>
-);
+  </div>;
+};
