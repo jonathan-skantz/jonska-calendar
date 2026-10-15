@@ -25,6 +25,11 @@ import { tagTextColor } from "./lib/colors";
 import { getInvalidComposerFields } from "./lib/formValidation";
 import { getRequestErrorMessage } from "./lib/requestErrors";
 import {
+  clearWorkspace,
+  invalidateCurrentUserAndWorkspace,
+  invalidateWorkspace,
+} from "./lib/queryInvalidation";
+import {
   buildEventPayload,
   buildTaskPayload,
   getBackToBackTrim,
@@ -114,8 +119,7 @@ function App() {
           body: JSON.stringify({ email, password }),
         });
       }
-      await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+      await invalidateCurrentUserAndWorkspace(queryClient);
     } catch (requestError) {
       setError(getRequestErrorMessage(requestError, "Unable to sign in"));
     }
@@ -124,7 +128,7 @@ function App() {
   const logout = async () => {
     await api("/api/auth/logout", { method: "POST" });
     await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
-    queryClient.removeQueries({ queryKey: queryKeys.workspace });
+    clearWorkspace(queryClient);
   };
 
   const toggleTask = async (entry: TimelineEntry) => {
@@ -133,7 +137,7 @@ function App() {
         method: "PATCH",
         body: JSON.stringify({ is_completed: !entry.is_completed }),
       });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+      await invalidateWorkspace(queryClient);
     } catch (requestError) {
       setActionError(getRequestErrorMessage(requestError, "Unable to update task"));
     }
@@ -143,7 +147,7 @@ function App() {
     if (!window.confirm(`Delete “${entry.title}”?`)) return;
     try {
       await api(`/api/timeline/${entry.id}`, { method: "DELETE" });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+      await invalidateWorkspace(queryClient);
       closeComposer();
       setDraftEventStart(null);
     } catch (requestError) {
@@ -200,7 +204,7 @@ function App() {
         method: "PUT",
         body: JSON.stringify({ tag_id: tagID }),
       });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+      await invalidateWorkspace(queryClient);
     } catch (requestError) {
       setActionError(getRequestErrorMessage(requestError, "Unable to set default tag"));
     }
@@ -217,7 +221,7 @@ function App() {
         method: "PATCH",
         body: JSON.stringify({ name, color }),
       });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+      await invalidateWorkspace(queryClient);
     } catch (requestError) {
       setActionError(getRequestErrorMessage(requestError, "Unable to update tag"));
     }
@@ -228,7 +232,7 @@ function App() {
     try {
       await api(`/api/tags/${tag.id}`, { method: "DELETE" });
       removeHiddenTag(tag.id);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+      await invalidateWorkspace(queryClient);
     } catch (requestError) {
       setActionError(getRequestErrorMessage(requestError, "Unable to delete tag"));
     }
@@ -266,7 +270,7 @@ function App() {
         method: "POST",
         body: JSON.stringify({ name }),
       });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+      await invalidateWorkspace(queryClient);
     } catch (requestError) {
       setActionError(getRequestErrorMessage(requestError, "Unable to create tag"));
     }
@@ -322,7 +326,7 @@ function App() {
         if (!editingItem)
           await saveEventTags(response?.id ?? "", existingTags, composerTagIds);
       }
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+      await invalidateWorkspace(queryClient);
       closeComposer();
       setActionError("");
     } catch (requestError) {
