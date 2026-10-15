@@ -22,6 +22,7 @@ import {
 } from "./lib/calendar";
 import { api } from "./lib/api";
 import { tagTextColor } from "./lib/colors";
+import { getInvalidComposerFields } from "./lib/formValidation";
 import {
   buildEventPayload,
   buildTaskPayload,
@@ -310,48 +311,12 @@ function App() {
 
   const createItem = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const invalidNames = Array.from(event.currentTarget.elements)
-      .filter(
-        (
-          control,
-        ): control is
-          HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
-          control instanceof HTMLInputElement ||
-          control instanceof HTMLSelectElement ||
-          control instanceof HTMLTextAreaElement,
-      )
-      .filter((control) => !control.checkValidity())
-      .map((control) => control.name)
-      .filter(Boolean);
-    const startsValue = String(
-      (
-        event.currentTarget.elements.namedItem(
-          "starts_at",
-        ) as HTMLInputElement | null
-      )?.value ?? "",
+    const invalidNames = getInvalidComposerFields(
+      event.currentTarget,
+      composerType,
+      composerTagIds,
+      composerMainTagId,
     );
-    const endsValue = String(
-      (
-        event.currentTarget.elements.namedItem(
-          "ends_at",
-        ) as HTMLInputElement | null
-      )?.value ?? "",
-    );
-    if (
-      composerType === "event" &&
-      startsValue &&
-      endsValue &&
-      new Date(endsValue) <= new Date(startsValue)
-    ) {
-      invalidNames.push("starts_at", "ends_at");
-    }
-    if (composerType === "event" && composerTagIds.length === 0)
-      invalidNames.push("event-tags");
-    if (
-      composerType === "event" &&
-      (!composerMainTagId || !composerTagIds.includes(composerMainTagId))
-    )
-      invalidNames.push("main-tag");
     if (invalidNames.length > 0) {
       setInvalidFields([...new Set(invalidNames)]);
       setActionError("Please correct the highlighted fields.");
