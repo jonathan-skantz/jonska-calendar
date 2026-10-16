@@ -1,6 +1,7 @@
 export type User = {
   id: string;
   email: string;
+  display_name?: string;
 };
 
 export type Tag = {
@@ -28,6 +29,16 @@ export type TimelineEntry = {
   custom_info?: string;
   tags?: Tag[];
   main_tag_id?: string;
+};
+
+export type TransitCardNeed = "yes" | "maybe" | "no";
+
+export type TransitCardDay = {
+  date: string;
+  user_id: string;
+  display_name: string;
+  need: TransitCardNeed;
+  status: "resolved" | "conflict";
 };
 
 export type AuthMode = "login" | "register";

@@ -227,3 +227,58 @@ func TestParseRegisterRequestValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateCurrentUserDisplayName(t *testing.T) {
+	store := setupTestStore(t)
+	handler := New(store)
+
+	registerResponse := httptest.NewRecorder()
+	handler.Register(registerResponse, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`)))
+	loginResponse := httptest.NewRecorder()
+	handler.Login(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`)))
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatal("expected session cookie")
+	}
+
+	patch := func(body string) int {
+		request := httptest.NewRequest(http.MethodPatch, "/api/auth/me", bytes.NewBufferString(body))
+		request.AddCookie(cookies[0])
+		response := httptest.NewRecorder()
+		handler.UpdateCurrentUser(response, request)
+		return response.Code
+	}
+	currentDisplayName := func() *string {
+		request := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+		request.AddCookie(cookies[0])
+		response := httptest.NewRecorder()
+		handler.CurrentUser(response, request)
+		var body currentUserResponse
+		if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		return body.DisplayName
+	}
+
+	if code := patch(`{"display_name":"  Jonathan  "}`); code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, code)
+	}
+	if name := currentDisplayName(); name == nil || *name != "Jonathan" {
+		t.Fatalf("expected trimmed display name, got %v", name)
+	}
+	if code := patch(`{"display_name":"` + strings.Repeat("x", maxDisplayNameLength+1) + `"}`); code != http.StatusBadRequest {
+		t.Fatalf("expected status %d for long name, got %d", http.StatusBadRequest, code)
+	}
+	if code := patch(`{"display_name":""}`); code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, code)
+	}
+	if name := currentDisplayName(); name != nil {
+		t.Fatalf("expected cleared display name, got %q", *name)
+	}
+
+	unauthenticated := httptest.NewRecorder()
+	handler.UpdateCurrentUser(unauthenticated, httptest.NewRequest(http.MethodPatch, "/api/auth/me", bytes.NewBufferString(`{}`)))
+	if unauthenticated.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, unauthenticated.Code)
+	}
+}

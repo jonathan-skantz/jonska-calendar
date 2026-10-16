@@ -104,7 +104,6 @@ Events have an exact start date/time and end date/time in the first demo.
       attendable events. Examples include:
   - "new phone released",
   - "deadline for X announced",
-  - "I need the transit card on Monday",
   - "I will be at the office on Tuesday"
   - birthdays,
   - name days,
@@ -126,6 +125,26 @@ Events have an exact start date/time and end date/time in the first demo.
       **Future**.
 
 - [ ] The ability to prevent task completion until a starting date/time is **Future**.
+
+### Shared transit card (Demo)
+
+The family shares one physical transit card. Declarations are separate from
+events and tasks.
+
+- [x] Each user answers yes, maybe, or no for each day. Selections do not carry
+      over; a day without an answer is "not reported".
+- [x] Saving the declaration for the visible week records every remaining day:
+      days without a yes or maybe are explicitly "no", so an empty selection is
+      still a report.
+- [x] Days that have ended are read-only.
+- [x] Every week shows a "Card" row, separate from all-day events. Each day
+      shows a pill with a bus icon and the user's display name: dashed outline =
+      not reported yet, struck-through bus = not needed, green = needed, orange
+      = maybe. Days that ended without an answer have no pill. Clicking anywhere in the row opens the declaration editor.
+- [x] Users can set a display name in Settings; the email local-part is the
+      fallback.
+- [ ] Seeing other family members' declarations and conflict detection (red)
+      when several users need the card on the same day are **Future**.
 
 ## Future Features
 

@@ -66,4 +66,31 @@ describe("useAuth", () => {
     expect(result.current.error).toBe("Invalid email or password");
     queryClient.clear();
   });
+
+  it("clears workspace and transit card data on logout", async () => {
+    mockedApi.mockImplementation(async (path) => {
+      if (path === "/api/auth/me") return user;
+      return undefined;
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(["workspace"], { entries: [], tags: [] });
+    queryClient.setQueryData(["transit-card", "2026-10-19", "2026-10-25"], []);
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.user).toEqual(user));
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(queryClient.getQueryData(["workspace"])).toBeUndefined();
+    expect(
+      queryClient.getQueryData(["transit-card", "2026-10-19", "2026-10-25"]),
+    ).toBeUndefined();
+    queryClient.clear();
+  });
 });

@@ -4,6 +4,7 @@ import { api } from "../../lib/api";
 import {
   clearWorkspace,
   invalidateCurrentUserAndWorkspace,
+  invalidateTransitCard,
 } from "../../lib/queryInvalidation";
 import { getRequestErrorMessage } from "../../lib/requestErrors";
 import { queryKeys } from "../../lib/queryKeys";
@@ -48,11 +49,30 @@ export const useAuth = () => {
     clearWorkspace(queryClient);
   };
 
+  // Returns an error message, or null on success.
+  const updateDisplayName = async (displayName: string) => {
+    try {
+      await api("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ display_name: displayName }),
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
+      await invalidateTransitCard(queryClient);
+      return null;
+    } catch (requestError) {
+      return getRequestErrorMessage(
+        requestError,
+        "Unable to update display name",
+      );
+    }
+  };
+
   return {
     user: currentUserQuery.data ?? null,
     isLoading: currentUserQuery.isLoading,
     error,
     authenticate,
     logout,
+    updateDisplayName,
   };
 };

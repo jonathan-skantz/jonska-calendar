@@ -193,3 +193,67 @@
   font-size: 13px;
   line-height: 1.5;
 }
+
+.transit-card-days {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 12px;
+}
+
+.transit-card-day {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--moss-dark);
+  font-size: 13px;
+}
+
+.transit-card-choices {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: #e8eee3;
+}
+
+.transit-card-choices button {
+  border: 0;
+  padding: 5px 9px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+}
+
+.transit-card-choices button:disabled {
+  cursor: default;
+}
+
+.transit-card-choices button.selected {
+  color: #fff;
+}
+
+.transit-card-choices button.yes.selected {
+  background: var(--transit-resolved);
+}
+
+.transit-card-choices button.maybe.selected {
+  background: var(--transit-maybe);
+  color: var(--ink);
+}
+
+.transit-card-choices button.no.selected {
+  background: var(--muted);
+}
+
+.transit-card-day small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.transit-card-day.past {
+  color: var(--muted);
+}
+
+.transit-card-day.conflict small {
+  color: var(--transit-conflict);
+}

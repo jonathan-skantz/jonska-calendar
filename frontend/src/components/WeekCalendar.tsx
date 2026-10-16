@@ -7,6 +7,8 @@ type WeekCalendarProps = {
   onDayClick: (event: MouseEvent<HTMLDivElement>, date: Date) => void;
   renderDay: (date: Date) => ReactNode;
   renderAllDay: () => ReactNode;
+  transitCardPills: ReactNode;
+  onTransitCardClick?: () => void;
   hasAllDayEvents: boolean;
   timeFormat: TimeFormatPreference;
 };
@@ -16,6 +18,8 @@ export const WeekCalendar = ({
   onDayClick,
   renderDay,
   renderAllDay,
+  transitCardPills,
+  onTransitCardClick,
   hasAllDayEvents,
   timeFormat,
 }: WeekCalendarProps) => (
@@ -31,6 +35,18 @@ export const WeekCalendar = ({
           <span>{formatDate(date).split(",")[0]}</span>
         </div>
       ))}
+    </div>
+    <div className="all-day-row transit-card-row">
+      <span className="all-day-label">Card</span>
+      <button
+        type="button"
+        className="transit-card-grid"
+        aria-label="Edit transit card days"
+        disabled={!onTransitCardClick}
+        onClick={onTransitCardClick}
+      >
+        {transitCardPills}
+      </button>
     </div>
     {hasAllDayEvents && (
       <div className="all-day-row">

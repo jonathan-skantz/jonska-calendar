@@ -71,3 +71,29 @@
   padding: 11px 12px;
   font: inherit;
 }
+
+.settings-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-inline-form .settings-select-label {
+  flex-basis: 100%;
+  margin-bottom: 0;
+}
+
+.settings-inline-form input {
+  width: min(100%, 320px);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--moss-dark);
+  padding: 11px 12px;
+  font: inherit;
+}
+
+.settings-inline-form .primary-button {
+  margin: 0;
+}

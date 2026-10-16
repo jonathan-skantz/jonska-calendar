@@ -50,6 +50,7 @@ func main() {
 	mux.HandleFunc("POST /api/auth/login", handler.Login)
 	mux.HandleFunc("POST /api/auth/logout", handler.Logout)
 	mux.HandleFunc("GET /api/auth/me", handler.CurrentUser)
+	mux.HandleFunc("PATCH /api/auth/me", handler.UpdateCurrentUser)
 	mux.HandleFunc("POST /api/events", timelineHandler.CreateEvent)
 	mux.HandleFunc("PUT /api/events/{eventID}", timelineHandler.UpdateEvent)
 	mux.HandleFunc("POST /api/tasks", timelineHandler.CreateTask)
@@ -67,6 +68,8 @@ func main() {
 	mux.HandleFunc("POST /api/events/{eventID}/shares", timelineHandler.ShareEvent)
 	mux.HandleFunc("GET /api/shared-events/{shareID}", timelineHandler.GetSharedEvent)
 	mux.HandleFunc("PATCH /api/shared-events/{shareID}", timelineHandler.UpdateSharedEvent)
+	mux.HandleFunc("GET /api/transit-card/days", timelineHandler.ListTransitCardDays)
+	mux.HandleFunc("PUT /api/transit-card/days", timelineHandler.SetTransitCardDays)
 
 	server := &http.Server{
 		Addr:    ":8080",

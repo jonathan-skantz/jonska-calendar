@@ -50,9 +50,16 @@ type registerResponse struct {
 }
 
 type currentUserResponse struct {
-	ID    uuid.UUID `json:"id"`
-	Email string    `json:"email"`
+	ID          uuid.UUID `json:"id"`
+	Email       string    `json:"email"`
+	DisplayName *string   `json:"display_name,omitempty"`
 }
+
+type updateCurrentUserRequest struct {
+	DisplayName string `json:"display_name"`
+}
+
+const maxDisplayNameLength = 60
 
 func ParseRegisterRequest(body io.Reader) (*registerRequest, error) {
 	var req registerRequest
@@ -197,7 +204,34 @@ func (h *Handler) CurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(currentUserResponse{ID: user.ID, Email: user.Email})
+	_ = json.NewEncoder(w).Encode(currentUserResponse{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName})
+}
+
+func (h *Handler) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) {
+	user, err := h.UserFromRequest(r)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	var req updateCurrentUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, ErrInvalidRequestBody.Error(), http.StatusBadRequest)
+		return
+	}
+	var displayName *string
+	if name := strings.TrimSpace(req.DisplayName); name != "" {
+		if len([]rune(name)) > maxDisplayNameLength {
+			http.Error(w, "display name is too long", http.StatusBadRequest)
+			return
+		}
+		displayName = &name
+	}
+	if err := h.Store.SetDisplayName(r.Context(), user.ID, displayName); err != nil {
+		log.Printf("Failed to update display name: %v", err)
+		http.Error(w, "Failed to update user", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func sessionTokenHash(r *http.Request) ([]byte, error) {

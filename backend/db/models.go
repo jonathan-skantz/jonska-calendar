@@ -10,6 +10,15 @@ type User struct {
 	ID           uuid.UUID
 	Email        string
 	PasswordHash string
+	DisplayName  *string
+}
+
+// TransitCardDay is one reported day. Days without a row are not reported.
+type TransitCardDay struct {
+	Day         time.Time
+	UserID      uuid.UUID
+	DisplayName string
+	Need        string
 }
 
 type Event struct {

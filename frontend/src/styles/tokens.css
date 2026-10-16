@@ -1,10 +1,14 @@
 :root {
-    --ink: #27342f;
-    --muted: #7d8982;
-    --paper: #fbfaf6;
-    --line: #dfe3d8;
-    --moss: #547968;
-    --moss-dark: #385746;
-    --coral: #d8785f;
-    --yellow: #f1c968;
+  --ink: #27342f;
+  --muted: #7d8982;
+  --paper: #fbfaf6;
+  --line: #dfe3d8;
+  --moss: #547968;
+  --moss-dark: #385746;
+  --coral: #d8785f;
+  --yellow: #f1c968;
+  --transit-resolved: #3f7d4f;
+  --transit-conflict: #b8452f;
+  --transit-pending: #a3aca6;
+  --transit-maybe: #f0a04b;
 }

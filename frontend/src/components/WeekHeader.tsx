@@ -20,7 +20,11 @@ export const WeekHeader = ({
   <>
     <div className="section-heading week-heading">
       <div className="week-title">
-        <button className="week-nav" onClick={onPrevious} aria-label="Previous week">
+        <button
+          className="week-nav"
+          onClick={onPrevious}
+          aria-label="Previous week"
+        >
           ←
         </button>
         <div>

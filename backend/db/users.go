@@ -74,13 +74,13 @@ func (s *Store) FindUserBySession(ctx context.Context, tokenHash []byte) (User, 
 	err := s.db.QueryRow(
 		ctx,
 		`
-		SELECT u.id, u.email, u.password_hash
+		SELECT u.id, u.email, u.password_hash, u.display_name
 		FROM sessions AS s
 		JOIN users AS u ON u.id = s.user_id
 		WHERE s.token_hash = $1 AND s.expires_at > now()
 		`,
 		tokenHash,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash)
+	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrSessionNotFound
 	}
@@ -92,5 +92,14 @@ func (s *Store) RevokeSession(ctx context.Context, tokenHash []byte) error {
 		DELETE FROM sessions
 		WHERE token_hash = $1
 	`, tokenHash)
+	return err
+}
+
+// SetDisplayName stores a trimmed display name. A nil name clears it so that
+// readers fall back to the email local-part.
+func (s *Store) SetDisplayName(ctx context.Context, userID uuid.UUID, displayName *string) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE users SET display_name = $2 WHERE id = $1
+	`, userID, displayName)
 	return err
 }

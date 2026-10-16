@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type {
   CalendarPreferences,
   WeekStartPreference,
@@ -6,6 +7,9 @@ import { weekdayName } from "../features/calendar/calendarPreferences";
 import type { TimeFormatPreference, WeekStartsOn } from "../lib/calendar";
 
 type SettingsPageProps = {
+  displayName: string;
+  displayNamePlaceholder: string;
+  onDisplayNameSave: (value: string) => Promise<string | null>;
   preferences: CalendarPreferences;
   onTimeFormatChange: (value: TimeFormatPreference) => void;
   onWeekStartChange: (value: WeekStartPreference) => void;
@@ -13,11 +17,15 @@ type SettingsPageProps = {
 };
 
 export function SettingsPage({
+  displayName,
+  displayNamePlaceholder,
+  onDisplayNameSave,
   preferences,
   onTimeFormatChange,
   onWeekStartChange,
   onBack,
 }: SettingsPageProps) {
+  const [displayNameMessage, setDisplayNameMessage] = useState("");
   const weekOptions: { value: WeekStartPreference; label: string }[] = [
     { value: "browser", label: "Use browser setting" },
     ...([0, 1, 2, 3, 4, 5, 6] as WeekStartsOn[]).map((day) => ({
@@ -32,6 +40,44 @@ export function SettingsPage({
         ← Back to calendar
       </button>
       <h1>Settings</h1>
+
+      <section
+        className="settings-section"
+        aria-labelledby="display-name-heading"
+      >
+        <h2 id="display-name-heading">Display name</h2>
+        <p>Shown to your family, for example on transit card days.</p>
+        <form
+          className="settings-inline-form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const value = String(
+              new FormData(event.currentTarget).get("display-name") ?? "",
+            );
+            const error = await onDisplayNameSave(value);
+            setDisplayNameMessage(error ?? "Saved.");
+          }}
+        >
+          <label className="settings-select-label" htmlFor="display-name">
+            Name
+          </label>
+          <input
+            id="display-name"
+            name="display-name"
+            defaultValue={displayName}
+            placeholder={displayNamePlaceholder}
+            maxLength={60}
+          />
+          <button className="primary-button compact" type="submit">
+            Save
+          </button>
+          {displayNameMessage && (
+            <span className="form-hint" role="status">
+              {displayNameMessage}
+            </span>
+          )}
+        </form>
+      </section>
 
       <section
         className="settings-section"

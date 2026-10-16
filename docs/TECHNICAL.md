@@ -12,7 +12,8 @@ The demo is a small family calendar. It currently supports:
 - a custom seven-day, 24-hour React week grid;
 - personal tags;
 - direct event sharing between registered users;
-- recipient-local event presentation overrides and private custom info.
+- recipient-local event presentation overrides and private custom info;
+- per-day shared transit-card declarations and user display names.
 
 The product intentionally does not implement uncertain timing, recurrence, reminders, conflict detection, automatic task scheduling, external calendars, advanced sharing policies, triggers, templates, or backup/import.
 
@@ -117,6 +118,23 @@ The owner is derived through `event_shares.event_id -> events.timeline_item_id -
 
 A shared event is a projection, not a copy. The source fields are read from the owner's current event, and local override fields are applied only for the recipient. This is why the API can show both the source title and the recipient's local title.
 
+### Transit card declarations
+
+```text
+users 1 --- n transit_card_days (user_id, day DATE, need)
+```
+
+Declarations are not timeline items. A row is one user's answer for one local
+calendar date: `need` is `yes`, `maybe`, or `no`. A missing row means "not
+reported" and `no` is an explicit "not needed". Saving writes a row for every day in the submitted
+range in one statement, so an empty selection is still a report. `day` is a
+`DATE`, so time zones never shift it. The partial index on `day WHERE
+need <> 'no'` is there for future conflict detection across users; `status` is
+computed in `transitCardStatus` (`backend/internal/timeline/transit_card.go`)
+and is always `resolved` until households and conflicts exist.
+
+`users.display_name` is optional. Readers fall back to the email local-part.
+
 ## SQL Code Generation
 
 `sqlc` was evaluated for the current PostgreSQL store and is not adopted yet. It supports PostgreSQL, pgx/v5, generated typed query methods, transaction-bound query sets, and type overrides for `google/uuid`. See the [sqlc configuration guide](https://docs.sqlc.dev/en/stable/reference/config.html), [transaction guide](https://docs.sqlc.dev/en/stable/howto/transactions.html), and [type override guide](https://docs.sqlc.dev/en/stable/howto/overrides.html).
@@ -141,29 +159,32 @@ Authorization is intentionally enforced at the database query boundary as well a
 
 All API routes use JSON request and response bodies unless the response is `204 No Content`. Error responses use plain text. Authenticated routes require the HTTP-only `calendar_session` cookie.
 
-| Method and path                              | Request JSON                       | Successful response                                  |
-| -------------------------------------------- | ---------------------------------- | ---------------------------------------------------- |
-| `POST /api/auth/register`                    | `email`, `password`                | `201` with `{ "id": "<uuid>" }`                      |
-| `POST /api/auth/login`                       | `email`, `password`                | `200` with `{ "id": "<uuid>" }` and a session cookie |
-| `POST /api/auth/logout`                      | None                               | `204`; clears the session cookie                     |
-| `GET /api/auth/me`                           | None                               | `{ "id": "<uuid>", "email": "..." }`                 |
-| `GET /api/timeline`                          | None                               | Array of timeline entries                            |
-| `POST /api/events`                           | Event fields below                 | `201` with `{ "id": "<uuid>" }`                      |
-| `PUT /api/events/{eventID}`                  | Event fields below                 | `204`                                                |
-| `POST /api/tasks`                            | Task fields below                  | `201` with `{ "id": "<uuid>" }`                      |
-| `PUT /api/tasks/{taskID}`                    | Task fields below                  | `204`                                                |
-| `PATCH /api/tasks/{taskID}`                  | `is_completed`                     | `204`                                                |
-| `DELETE /api/timeline/{itemID}`              | None                               | `204`                                                |
-| `GET /api/tags`                              | None                               | Array of tags                                        |
-| `POST /api/tags`                             | `name`                             | `201` with a tag                                     |
-| `PATCH /api/tags/{tagID}`                    | `name`, `color`                    | `204`                                                |
-| `DELETE /api/tags/{tagID}`                   | None                               | `204`                                                |
-| `PUT /api/tags/default`                      | `tag_id`                           | `204`                                                |
-| `POST /api/timeline/{itemID}/tags`           | `tag_id`                           | `204`                                                |
-| `DELETE /api/timeline/{itemID}/tags/{tagID}` | None                               | `204`                                                |
-| `POST /api/events/{eventID}/shares`          | `recipient_email`                  | `201` with `{ "id": "<share-uuid>" }`                |
-| `GET /api/shared-events/{shareID}`           | None                               | Shared event response below                          |
-| `PATCH /api/shared-events/{shareID}`         | Any supplied override fields below | `204`                                                |
+| Method and path                              | Request JSON                                | Successful response                                  |
+| -------------------------------------------- | ------------------------------------------- | ---------------------------------------------------- |
+| `POST /api/auth/register`                    | `email`, `password`                         | `201` with `{ "id": "<uuid>" }`                      |
+| `POST /api/auth/login`                       | `email`, `password`                         | `200` with `{ "id": "<uuid>" }` and a session cookie |
+| `POST /api/auth/logout`                      | None                                        | `204`; clears the session cookie                     |
+| `GET /api/auth/me`                           | None                                        | `{ "id", "email" }`, plus `display_name` when set    |
+| `PATCH /api/auth/me`                         | `display_name` (empty clears it)            | `204`                                                |
+| `GET /api/timeline`                          | None                                        | Array of timeline entries                            |
+| `POST /api/events`                           | Event fields below                          | `201` with `{ "id": "<uuid>" }`                      |
+| `PUT /api/events/{eventID}`                  | Event fields below                          | `204`                                                |
+| `POST /api/tasks`                            | Task fields below                           | `201` with `{ "id": "<uuid>" }`                      |
+| `PUT /api/tasks/{taskID}`                    | Task fields below                           | `204`                                                |
+| `PATCH /api/tasks/{taskID}`                  | `is_completed`                              | `204`                                                |
+| `DELETE /api/timeline/{itemID}`              | None                                        | `204`                                                |
+| `GET /api/tags`                              | None                                        | Array of tags                                        |
+| `POST /api/tags`                             | `name`                                      | `201` with a tag                                     |
+| `PATCH /api/tags/{tagID}`                    | `name`, `color`                             | `204`                                                |
+| `DELETE /api/tags/{tagID}`                   | None                                        | `204`                                                |
+| `PUT /api/tags/default`                      | `tag_id`                                    | `204`                                                |
+| `POST /api/timeline/{itemID}/tags`           | `tag_id`                                    | `204`                                                |
+| `DELETE /api/timeline/{itemID}/tags/{tagID}` | None                                        | `204`                                                |
+| `POST /api/events/{eventID}/shares`          | `recipient_email`                           | `201` with `{ "id": "<share-uuid>" }`                |
+| `GET /api/shared-events/{shareID}`           | None                                        | Shared event response below                          |
+| `PATCH /api/shared-events/{shareID}`         | Any supplied override fields below          | `204`                                                |
+| `GET /api/transit-card/days?from=&to=`       | None                                        | Array of reported transit-card days                  |
+| `PUT /api/transit-card/days`                 | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                |
 
 Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. For all-day events, the end timestamp is exclusive and starts at midnight after the last displayed date. The `kind` value is `attendable` or `informational`. Commute durations cannot be negative. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
 
@@ -174,6 +195,8 @@ Tag colors use six hexadecimal digits with a leading `#`, such as `#547968`. The
 Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `source_title`, `custom_info`, `tags`, and `main_tag_id`. Optional response fields are omitted when empty. Timestamps use JSON time format.
 
 Shared event responses contain `share_id`, `event_id`, `original_title`, `starts_at`, `ends_at`, `is_all_day`, and `kind`. Optional fields are `original_description`, `original_url`, `original_location`, `local_title`, `local_description`, `local_url`, `local_location`, and `private_custom_info`. The patch accepts any subset of the local fields: `title`, `description`, `url`, `location`, and `custom_info`.
+
+Transit-card dates use `YYYY-MM-DD`. Ranges are inclusive and cover at most 62 days; `needed_dates` and `maybe_dates` must be inside the range, and no date may appear twice across them; every other day in the range is saved as `no`. The server does not know the user's time zone, so it rejects a `from` earlier than yesterday in UTC, and the frontend enforces the exact local day. Day responses contain `date`, `user_id`, `display_name`, `need`, and `status` (`resolved` or the reserved `conflict`). Only reported days are returned.
 
 ## Frontend Data Flow
 
@@ -198,6 +221,7 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Change event/task persistence                 | `backend/db/events.go` or `backend/db/tasks.go`                                  | migrations 1 and 3                                     |
 | Change sharing ownership or overrides         | `backend/db/sharing.go` and `backend/db/timeline.go`                             | migrations 4/5, timeline handlers                      |
 | Change tag ownership, defaults, or attachment | `backend/db/tags.go`                                                             | migrations 6-8, timeline handlers                      |
+| Change transit-card declarations              | `backend/db/transit_card.go`, `backend/internal/timeline/transit_card.go`        | migration 12, `frontend/src/features/transitCard/`     |
 | Change timeline JSON shape                    | `db.TimelineEntry` in `backend/db/models.go`                                     | frontend `TimelineEntry` type and grid rendering       |
 | Change week navigation/date math              | `frontend/src/App.tsx` date helpers and week state                               | `date-fns` imports                                     |
 | Change event block placement                  | `frontend/src/App.tsx` `renderGridEntry`                                         | `.grid-entry` in `frontend/src/App.css`                |

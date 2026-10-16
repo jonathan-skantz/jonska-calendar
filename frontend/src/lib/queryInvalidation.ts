@@ -11,5 +11,10 @@ export const invalidateCurrentUserAndWorkspace = async (
   await invalidateWorkspace(queryClient);
 };
 
-export const clearWorkspace = (queryClient: QueryClient) =>
+export const invalidateTransitCard = (queryClient: QueryClient) =>
+  queryClient.invalidateQueries({ queryKey: queryKeys.transitCard });
+
+export const clearWorkspace = (queryClient: QueryClient) => {
   queryClient.removeQueries({ queryKey: queryKeys.workspace });
+  queryClient.removeQueries({ queryKey: queryKeys.transitCard });
+};

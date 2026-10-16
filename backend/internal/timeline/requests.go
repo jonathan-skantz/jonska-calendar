@@ -74,6 +74,21 @@ type sharedEventResponse struct {
 	PrivateCustomInfo   *string   `json:"private_custom_info,omitempty"`
 }
 
+type transitCardDaysRequest struct {
+	From        string   `json:"from"`
+	To          string   `json:"to"`
+	NeededDates []string `json:"needed_dates"`
+	MaybeDates  []string `json:"maybe_dates"`
+}
+
+type transitCardDayResponse struct {
+	Date        string    `json:"date"`
+	UserID      uuid.UUID `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	Need        string    `json:"need"`
+	Status      string    `json:"status"`
+}
+
 type createResponse struct {
 	ID uuid.UUID `json:"id"`
 }

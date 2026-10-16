@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { formatDate, formatTime } from "./lib/calendar";
+import { dateKey, formatDate, formatTime } from "./lib/calendar";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
@@ -37,6 +37,16 @@ import { WeekCalendar } from "./components/WeekCalendar";
 import { WeekHeader } from "./components/WeekHeader";
 import { TopBar } from "./components/TopBar";
 import { SettingsPage } from "./components/SettingsPage";
+import { TransitCardPill } from "./components/TransitCardPill";
+import { TransitCardDrawer } from "./components/TransitCardDrawer";
+import {
+  getTransitCardDayViews,
+  getTransitCardPillVariant,
+} from "./features/transitCard/transitCardDays";
+import {
+  useSaveTransitCardDays,
+  useTransitCardDays,
+} from "./features/transitCard/useTransitCard";
 import "./App.css";
 
 function App() {
@@ -46,6 +56,7 @@ function App() {
     error,
     authenticate,
     logout,
+    updateDisplayName,
   } = useAuth();
   const workspaceQuery = useWorkspace(Boolean(user));
   const entries = workspaceQuery.data?.entries ?? [];
@@ -56,6 +67,7 @@ function App() {
   const [password, setPassword] = useState("");
   const [showTagEditor, setShowTagEditor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTransitCard, setShowTransitCard] = useState(false);
   const { preferences, updatePreferences } = useCalendarPreferences(
     user?.id ?? "",
   );
@@ -70,6 +82,13 @@ function App() {
   const tagMutations = useTagMutations(setActionError, removeHiddenTag);
   const { toggleTask, deleteItem, saveItem } =
     useTimelineMutations(setActionError);
+  const dates = getCalendarDates(weekStart);
+  const transitCardQuery = useTransitCardDays(
+    dateKey(dates[0]),
+    dateKey(dates[dates.length - 1]),
+    Boolean(user),
+  );
+  const saveTransitCardDays = useSaveTransitCardDays(setActionError);
   const composer = useComposer({
     tags,
     selectedDate,
@@ -172,12 +191,19 @@ function App() {
     );
   }
 
-  const dates = getCalendarDates(weekStart);
   const openTasks = entries.filter(
     (entry) => entry.type === "task" && !entry.is_completed,
   ).length;
   const weekEntries = getVisibleWeekEntries(entries, dates, hiddenTagIds);
+  // Until the days load, every day would look unreported, so show nothing.
+  const transitCardViews = transitCardQuery.data
+    ? getTransitCardDayViews(dates, transitCardQuery.data, today)
+    : [];
   const allDayEventSpans = getAllDayEventSpans(weekEntries, dates);
+  const openTransitCard = () => {
+    setActionError("");
+    setShowTransitCard(true);
+  };
   const openNewEventAt = (
     event: Parameters<typeof getClickedEventStart>[0],
     date: Date,
@@ -251,6 +277,19 @@ function App() {
     allDayEventSpans.map((span) => (
       <AllDayEvent key={span.entry.id} {...span} onEdit={editItem} />
     ));
+  const emailName = user.email.split("@")[0];
+  const userDisplayName = user.display_name || emailName;
+  const transitCardPills = transitCardViews.map((view, index) => {
+    const variant = getTransitCardPillVariant(view);
+    return variant ? (
+      <TransitCardPill
+        key={view.key}
+        name={view.day?.display_name ?? userDisplayName}
+        variant={variant}
+        column={index}
+      />
+    ) : null;
+  });
   return (
     <main className="app-shell">
       <TopBar
@@ -258,12 +297,16 @@ function App() {
         onOpenSettings={() => {
           setShowSettings(true);
           setShowTagEditor(false);
+          setShowTransitCard(false);
           closeComposer();
         }}
         onLogout={logout}
       />
       {showSettings ? (
         <SettingsPage
+          displayName={user.display_name ?? ""}
+          displayNamePlaceholder={emailName}
+          onDisplayNameSave={updateDisplayName}
           preferences={preferences}
           onTimeFormatChange={(timeFormat) => updatePreferences({ timeFormat })}
           onWeekStartChange={(weekStartsOn) =>
@@ -281,14 +324,21 @@ function App() {
               onNext={() => moveWeek(7)}
               onAddItem={() => openNewComposer()}
             >
-              {actionError && !showComposer && !showTagEditor && (
-                <p className="error action-error">{actionError}</p>
-              )}
+              {actionError &&
+                !showComposer &&
+                !showTagEditor &&
+                !showTransitCard && (
+                  <p className="error action-error">{actionError}</p>
+                )}
             </WeekHeader>
             <WeekCalendar
               dates={dates}
               timeFormat={preferences.timeFormat}
               hasAllDayEvents={allDayEventSpans.length > 0}
+              transitCardPills={transitCardPills}
+              onTransitCardClick={
+                transitCardQuery.data ? openTransitCard : undefined
+              }
               renderAllDay={renderAllDayEntries}
               onDayClick={openNewEventAt}
               renderDay={(date) => (
@@ -352,6 +402,17 @@ function App() {
         >
           Delete item
         </button>
+      )}
+      {showTransitCard && (
+        <TransitCardDrawer
+          views={transitCardViews}
+          error={actionError}
+          onClose={() => setShowTransitCard(false)}
+          onSave={async (submission) => {
+            if (await saveTransitCardDays(submission))
+              setShowTransitCard(false);
+          }}
+        />
       )}
       {showTagEditor && (
         <TagEditorDrawer

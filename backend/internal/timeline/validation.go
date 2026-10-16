@@ -3,6 +3,7 @@ package timeline
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -14,6 +15,16 @@ var (
 	ErrInvalidKind    = errors.New("kind must be attendable or informational")
 	ErrInvalidCommute = errors.New("commute duration cannot be negative")
 	ErrDeadlineNeeded = errors.New("deadline is required")
+
+	ErrInvalidDate             = errors.New("dates must use the YYYY-MM-DD format")
+	ErrInvalidDateRange        = errors.New("date range must cover 1 to 62 days")
+	ErrInvalidTransitCardDates = errors.New("needed and maybe dates must be unique and inside the range")
+	ErrPastTransitCardDay      = errors.New("days that have ended cannot be changed")
+)
+
+const (
+	dateLayout              = "2006-01-02"
+	maxTransitCardRangeDays = 62
 )
 
 func validateEventRequest(request eventRequest) error {
@@ -76,4 +87,69 @@ func validTagColor(color string) bool {
 		}
 	}
 	return true
+}
+
+type dateRange struct {
+	from time.Time
+	to   time.Time
+}
+
+type transitCardSubmission struct {
+	days   dateRange
+	needed []time.Time
+	maybe  []time.Time
+}
+
+func parseDateRange(from, to string) (dateRange, error) {
+	fromDate, err := time.Parse(dateLayout, from)
+	if err != nil {
+		return dateRange{}, ErrInvalidDate
+	}
+	toDate, err := time.Parse(dateLayout, to)
+	if err != nil {
+		return dateRange{}, ErrInvalidDate
+	}
+	if toDate.Before(fromDate) || toDate.Sub(fromDate) >= maxTransitCardRangeDays*24*time.Hour {
+		return dateRange{}, ErrInvalidDateRange
+	}
+	return dateRange{from: fromDate, to: toDate}, nil
+}
+
+// validateTransitCardDaysRequest takes today's UTC date as a parameter. The
+// server does not know the user's time zone, so it accepts yesterday in UTC:
+// that is still today somewhere, and the frontend enforces the exact local day.
+func validateTransitCardDaysRequest(request transitCardDaysRequest, todayUTC time.Time) (transitCardSubmission, error) {
+	days, err := parseDateRange(request.From, request.To)
+	if err != nil {
+		return transitCardSubmission{}, err
+	}
+	if days.from.Before(todayUTC.AddDate(0, 0, -1)) {
+		return transitCardSubmission{}, ErrPastTransitCardDay
+	}
+	// seen spans both lists, so a day cannot be both needed and maybe.
+	seen := map[time.Time]bool{}
+	parse := func(values []string) ([]time.Time, error) {
+		parsed := make([]time.Time, 0, len(values))
+		for _, value := range values {
+			day, err := time.Parse(dateLayout, value)
+			if err != nil {
+				return nil, ErrInvalidDate
+			}
+			if seen[day] || day.Before(days.from) || day.After(days.to) {
+				return nil, ErrInvalidTransitCardDates
+			}
+			seen[day] = true
+			parsed = append(parsed, day)
+		}
+		return parsed, nil
+	}
+	needed, err := parse(request.NeededDates)
+	if err != nil {
+		return transitCardSubmission{}, err
+	}
+	maybe, err := parse(request.MaybeDates)
+	if err != nil {
+		return transitCardSubmission{}, err
+	}
+	return transitCardSubmission{days: days, needed: needed, maybe: maybe}, nil
 }

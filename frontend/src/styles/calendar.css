@@ -167,6 +167,71 @@
   opacity: 1;
 }
 
+.transit-card-row {
+  background: #f4f6f1;
+}
+
+.transit-card-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  grid-auto-rows: 25px;
+  align-items: center;
+  min-height: 35px;
+  width: 100%;
+  border: 0;
+  padding: 5px 0;
+  background: transparent;
+  text-align: left;
+}
+
+.transit-card-grid:hover:not(:disabled) {
+  background: #eaeee6;
+}
+
+.transit-card-grid:disabled {
+  cursor: default;
+}
+
+.transit-card-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 19px;
+  min-width: 0;
+  margin: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0 8px;
+  color: #fff;
+  font-size: 10px;
+}
+
+.transit-card-pill.pending {
+  border: 1px dashed var(--transit-pending);
+  color: #5f6a64;
+}
+
+.transit-card-pill.not_needed {
+  color: #66716b;
+}
+
+.transit-card-pill.resolved {
+  background: var(--transit-resolved);
+}
+
+.transit-card-pill.conflict {
+  background: var(--transit-conflict);
+}
+
+.transit-card-pill.maybe {
+  background: var(--transit-maybe);
+  color: var(--ink);
+}
+
+.bus-icon {
+  flex: none;
+}
+
 .week-grid {
   display: grid;
   grid-template-columns: 56px repeat(7, minmax(110px, 1fr));
