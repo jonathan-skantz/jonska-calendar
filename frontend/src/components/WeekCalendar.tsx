@@ -6,6 +6,8 @@ type WeekCalendarProps = {
   dates: Date[];
   onDayClick: (event: MouseEvent<HTMLDivElement>, date: Date) => void;
   renderDay: (date: Date) => ReactNode;
+  renderAllDay: () => ReactNode;
+  hasAllDayEvents: boolean;
   timeFormat: TimeFormatPreference;
 };
 
@@ -13,6 +15,8 @@ export const WeekCalendar = ({
   dates,
   onDayClick,
   renderDay,
+  renderAllDay,
+  hasAllDayEvents,
   timeFormat,
 }: WeekCalendarProps) => (
   <div className="week-calendar" aria-label="Week calendar">
@@ -28,6 +32,12 @@ export const WeekCalendar = ({
         </div>
       ))}
     </div>
+    {hasAllDayEvents && (
+      <div className="all-day-row">
+        <span className="all-day-label">All day</span>
+        <div className="all-day-grid">{renderAllDay()}</div>
+      </div>
+    )}
     <div className="week-grid">
       <div className="hour-labels">
         {Array.from({ length: 24 }, (_, hour) => (

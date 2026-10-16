@@ -12,6 +12,7 @@ type eventRequest struct {
 	URL                  *string   `json:"url"`
 	StartsAt             time.Time `json:"starts_at"`
 	EndsAt               time.Time `json:"ends_at"`
+	IsAllDay             bool      `json:"is_all_day"`
 	Kind                 string    `json:"kind"`
 	Location             *string   `json:"location"`
 	CommuteBeforeSeconds int       `json:"commute_before_seconds"`
@@ -64,6 +65,7 @@ type sharedEventResponse struct {
 	OriginalLocation    *string   `json:"original_location,omitempty"`
 	StartsAt            time.Time `json:"starts_at"`
 	EndsAt              time.Time `json:"ends_at"`
+	IsAllDay            bool      `json:"is_all_day"`
 	Kind                string    `json:"kind"`
 	LocalTitle          *string   `json:"local_title,omitempty"`
 	LocalDescription    *string   `json:"local_description,omitempty"`

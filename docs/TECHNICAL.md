@@ -141,39 +141,39 @@ Authorization is intentionally enforced at the database query boundary as well a
 
 All API routes use JSON request and response bodies unless the response is `204 No Content`. Error responses use plain text. Authenticated routes require the HTTP-only `calendar_session` cookie.
 
-| Method and path | Request JSON | Successful response |
-| --- | --- | --- |
-| `POST /api/auth/register` | `email`, `password` | `201` with `{ "id": "<uuid>" }` |
-| `POST /api/auth/login` | `email`, `password` | `200` with `{ "id": "<uuid>" }` and a session cookie |
-| `POST /api/auth/logout` | None | `204`; clears the session cookie |
-| `GET /api/auth/me` | None | `{ "id": "<uuid>", "email": "..." }` |
-| `GET /api/timeline` | None | Array of timeline entries |
-| `POST /api/events` | Event fields below | `201` with `{ "id": "<uuid>" }` |
-| `PUT /api/events/{eventID}` | Event fields below | `204` |
-| `POST /api/tasks` | Task fields below | `201` with `{ "id": "<uuid>" }` |
-| `PUT /api/tasks/{taskID}` | Task fields below | `204` |
-| `PATCH /api/tasks/{taskID}` | `is_completed` | `204` |
-| `DELETE /api/timeline/{itemID}` | None | `204` |
-| `GET /api/tags` | None | Array of tags |
-| `POST /api/tags` | `name` | `201` with a tag |
-| `PATCH /api/tags/{tagID}` | `name`, `color` | `204` |
-| `DELETE /api/tags/{tagID}` | None | `204` |
-| `PUT /api/tags/default` | `tag_id` | `204` |
-| `POST /api/timeline/{itemID}/tags` | `tag_id` | `204` |
-| `DELETE /api/timeline/{itemID}/tags/{tagID}` | None | `204` |
-| `POST /api/events/{eventID}/shares` | `recipient_email` | `201` with `{ "id": "<share-uuid>" }` |
-| `GET /api/shared-events/{shareID}` | None | Shared event response below |
-| `PATCH /api/shared-events/{shareID}` | Any supplied override fields below | `204` |
+| Method and path                              | Request JSON                       | Successful response                                  |
+| -------------------------------------------- | ---------------------------------- | ---------------------------------------------------- |
+| `POST /api/auth/register`                    | `email`, `password`                | `201` with `{ "id": "<uuid>" }`                      |
+| `POST /api/auth/login`                       | `email`, `password`                | `200` with `{ "id": "<uuid>" }` and a session cookie |
+| `POST /api/auth/logout`                      | None                               | `204`; clears the session cookie                     |
+| `GET /api/auth/me`                           | None                               | `{ "id": "<uuid>", "email": "..." }`                 |
+| `GET /api/timeline`                          | None                               | Array of timeline entries                            |
+| `POST /api/events`                           | Event fields below                 | `201` with `{ "id": "<uuid>" }`                      |
+| `PUT /api/events/{eventID}`                  | Event fields below                 | `204`                                                |
+| `POST /api/tasks`                            | Task fields below                  | `201` with `{ "id": "<uuid>" }`                      |
+| `PUT /api/tasks/{taskID}`                    | Task fields below                  | `204`                                                |
+| `PATCH /api/tasks/{taskID}`                  | `is_completed`                     | `204`                                                |
+| `DELETE /api/timeline/{itemID}`              | None                               | `204`                                                |
+| `GET /api/tags`                              | None                               | Array of tags                                        |
+| `POST /api/tags`                             | `name`                             | `201` with a tag                                     |
+| `PATCH /api/tags/{tagID}`                    | `name`, `color`                    | `204`                                                |
+| `DELETE /api/tags/{tagID}`                   | None                               | `204`                                                |
+| `PUT /api/tags/default`                      | `tag_id`                           | `204`                                                |
+| `POST /api/timeline/{itemID}/tags`           | `tag_id`                           | `204`                                                |
+| `DELETE /api/timeline/{itemID}/tags/{tagID}` | None                               | `204`                                                |
+| `POST /api/events/{eventID}/shares`          | `recipient_email`                  | `201` with `{ "id": "<share-uuid>" }`                |
+| `GET /api/shared-events/{shareID}`           | None                               | Shared event response below                          |
+| `PATCH /api/shared-events/{shareID}`         | Any supplied override fields below | `204`                                                |
 
-Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. The `kind` value is `attendable` or `informational`. Commute durations cannot be negative. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
+Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. For all-day events, the end timestamp is exclusive and starts at midnight after the last displayed date. The `kind` value is `attendable` or `informational`. Commute durations cannot be negative. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
 
 Task request fields are `title`, `description`, `url`, and `deadline_at`. The title and deadline are required. `deadline_at` is a timestamp.
 
 Tag colors use six hexadecimal digits with a leading `#`, such as `#547968`. The digits can use uppercase or lowercase letters. The frontend chooses black or white tag text by comparing each color's WCAG contrast ratio against both. Tag responses contain `id`, `name`, `color`, and `is_default`.
 
-Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `source_title`, `custom_info`, `tags`, and `main_tag_id`. Optional response fields are omitted when empty. Timestamps use JSON time format.
+Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `source_title`, `custom_info`, `tags`, and `main_tag_id`. Optional response fields are omitted when empty. Timestamps use JSON time format.
 
-Shared event responses contain `share_id`, `event_id`, `original_title`, `starts_at`, `ends_at`, and `kind`. Optional fields are `original_description`, `original_url`, `original_location`, `local_title`, `local_description`, `local_url`, `local_location`, and `private_custom_info`. The patch accepts any subset of the local fields: `title`, `description`, `url`, `location`, and `custom_info`.
+Shared event responses contain `share_id`, `event_id`, `original_title`, `starts_at`, `ends_at`, `is_all_day`, and `kind`. Optional fields are `original_description`, `original_url`, `original_location`, `local_title`, `local_description`, `local_url`, `local_location`, and `private_custom_info`. The patch accepts any subset of the local fields: `title`, `description`, `url`, `location`, and `custom_info`.
 
 ## Frontend Data Flow
 
@@ -190,21 +190,21 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 
 ## Where to Change Things
 
-| Need | Primary location | Related location |
-| --- | --- | --- |
-| Add or change an API route | `backend/cmd/server.go` | handler file for the domain |
-| Change auth/session behavior | `backend/internal/auth/handler.go` | `backend/db/users.go`, migration 2 |
-| Change event/task validation | `backend/internal/timeline/validation.go` | PostgreSQL constraints and feature handler/store files |
-| Change event/task persistence | `backend/db/events.go` or `backend/db/tasks.go` | migrations 1 and 3 |
-| Change sharing ownership or overrides | `backend/db/sharing.go` and `backend/db/timeline.go` | migrations 4/5, timeline handlers |
-| Change tag ownership, defaults, or attachment | `backend/db/tags.go` | migrations 6-8, timeline handlers |
-| Change timeline JSON shape | `db.TimelineEntry` in `backend/db/models.go` | frontend `TimelineEntry` type and grid rendering |
-| Change week navigation/date math | `frontend/src/App.tsx` date helpers and week state | `date-fns` imports |
-| Change event block placement | `frontend/src/App.tsx` `renderGridEntry` | `.grid-entry` in `frontend/src/App.css` |
-| Change hour grid dimensions | `frontend/src/App.css` `.week-grid`, `.hour-labels`, `.day-column` | `renderGridEntry` positioning |
-| Change create-item fields | composer in `frontend/src/App.tsx` | backend request structs and validation |
-| Change client caching/loading | TanStack Query setup in `frontend/src/main.tsx` and workspace query in `App.tsx` | API wrapper |
-| Change colors, spacing, or layout | `frontend/src/styles/` | `frontend/src/index.css` for global rules |
+| Need                                          | Primary location                                                                 | Related location                                       |
+| --------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Add or change an API route                    | `backend/cmd/server.go`                                                          | handler file for the domain                            |
+| Change auth/session behavior                  | `backend/internal/auth/handler.go`                                               | `backend/db/users.go`, migration 2                     |
+| Change event/task validation                  | `backend/internal/timeline/validation.go`                                        | PostgreSQL constraints and feature handler/store files |
+| Change event/task persistence                 | `backend/db/events.go` or `backend/db/tasks.go`                                  | migrations 1 and 3                                     |
+| Change sharing ownership or overrides         | `backend/db/sharing.go` and `backend/db/timeline.go`                             | migrations 4/5, timeline handlers                      |
+| Change tag ownership, defaults, or attachment | `backend/db/tags.go`                                                             | migrations 6-8, timeline handlers                      |
+| Change timeline JSON shape                    | `db.TimelineEntry` in `backend/db/models.go`                                     | frontend `TimelineEntry` type and grid rendering       |
+| Change week navigation/date math              | `frontend/src/App.tsx` date helpers and week state                               | `date-fns` imports                                     |
+| Change event block placement                  | `frontend/src/App.tsx` `renderGridEntry`                                         | `.grid-entry` in `frontend/src/App.css`                |
+| Change hour grid dimensions                   | `frontend/src/App.css` `.week-grid`, `.hour-labels`, `.day-column`               | `renderGridEntry` positioning                          |
+| Change create-item fields                     | composer in `frontend/src/App.tsx`                                               | backend request structs and validation                 |
+| Change client caching/loading                 | TanStack Query setup in `frontend/src/main.tsx` and workspace query in `App.tsx` | API wrapper                                            |
+| Change colors, spacing, or layout             | `frontend/src/styles/`                                                           | `frontend/src/index.css` for global rules              |
 
 ## Maintainability Rules
 

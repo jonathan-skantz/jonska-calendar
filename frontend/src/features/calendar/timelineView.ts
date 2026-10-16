@@ -30,6 +30,15 @@ export type EventPreview = {
   endsAt: string;
 };
 
+export type AllDayEventSpan = {
+  entry: TimelineEntry;
+  startIndex: number;
+  endIndex: number;
+  lane: number;
+  continuesFromPreviousWeek: boolean;
+  continuesToNextWeek: boolean;
+};
+
 export const getCalendarDates = (weekStart: Date) =>
   Array.from({ length: WEEK_DAY_COUNT }, (_, index) =>
     addDays(weekStart, index),
@@ -78,6 +87,60 @@ export const getEntriesForDate = (entries: TimelineEntry[], date: Date) => {
       ? eventOverlapsRange(entry, rangeStart, rangeEnd)
       : localDateKey(getTimelineEntryDate(entry)) === dateKey(date),
   );
+};
+
+export const getAllDayEventSpans = (
+  entries: TimelineEntry[],
+  dates: Date[],
+): AllDayEventSpan[] => {
+  if (!dates.length) return [];
+
+  const weekStart = dateKey(dates[0]);
+  const weekEnd = dateKey(addDays(dates[dates.length - 1], 1));
+  const spans = entries
+    .filter(
+      (entry) =>
+        entry.type === "event" &&
+        entry.is_all_day &&
+        entry.starts_at &&
+        entry.ends_at,
+    )
+    .map((entry) => {
+      const startsOn = localDateKey(entry.starts_at);
+      const endsBefore = localDateKey(entry.ends_at);
+      const firstDay = dates.findIndex((date) => dateKey(date) >= startsOn);
+      const afterLastDay = dates.findIndex(
+        (date) => dateKey(date) >= endsBefore,
+      );
+      return {
+        entry,
+        startIndex: firstDay < 0 ? dates.length - 1 : firstDay,
+        endIndex: afterLastDay < 0 ? dates.length - 1 : afterLastDay - 1,
+        continuesFromPreviousWeek: startsOn < weekStart,
+        continuesToNextWeek: endsBefore > weekEnd,
+      };
+    })
+    .filter((span) => span.startIndex <= span.endIndex)
+    .sort(
+      (left, right) =>
+        left.startIndex - right.startIndex || right.endIndex - left.endIndex,
+    );
+
+  const laneSpans: { startIndex: number; endIndex: number }[][] = [];
+  return spans.map((span) => {
+    let lane = laneSpans.findIndex((items) =>
+      items.every(
+        (item) =>
+          span.endIndex < item.startIndex || span.startIndex > item.endIndex,
+      ),
+    );
+    if (lane < 0) {
+      lane = laneSpans.length;
+      laneSpans.push([]);
+    }
+    laneSpans[lane].push(span);
+    return { ...span, lane };
+  });
 };
 
 export const getClickedEventStart = (

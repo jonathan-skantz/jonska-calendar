@@ -14,6 +14,7 @@ export type EventPayload = {
   kind: "attendable" | "informational";
   starts_at: string | undefined;
   ends_at: string | undefined;
+  is_all_day: boolean;
   location: FormDataEntryValue | null;
 };
 
@@ -49,7 +50,10 @@ export const getEventTagChanges = (previous: Tag[], nextTagIds: string[]) => {
 export type TimelineItemRequest = {
   path: string;
   method: "POST" | "PUT";
-  body: EventPayload | TaskPayload | (EventPayload & { main_tag_id: string | null });
+  body:
+    | EventPayload
+    | TaskPayload
+    | (EventPayload & { main_tag_id: string | null });
 };
 
 export type ElapsedOverlayState =
@@ -67,7 +71,8 @@ export const getElapsedOverlayState = (
   if (dayKey < todayKey) return { kind: "past" };
   if (dayKey !== todayKey) return { kind: "none" };
 
-  const currentMinutes = today.getHours() * MINUTES_PER_HOUR + today.getMinutes();
+  const currentMinutes =
+    today.getHours() * MINUTES_PER_HOUR + today.getMinutes();
   if (currentMinutes === 0) return { kind: "none" };
   return {
     kind: "today",
@@ -100,15 +105,30 @@ export const isEventVisible = (entry: TimelineEntry, hiddenTagIds: string[]) =>
   entry.type !== "event" ||
   !entry.tags?.some((tag) => hiddenTagIds.includes(tag.id));
 
-export const buildEventPayload = (form: FormData): EventPayload => ({
-  title: String(form.get("title") || ""),
-  description: String(form.get("description") || "") || null,
-  url: String(form.get("url") || "") || null,
-  kind: form.get("kind") === "attendable" ? "attendable" : "informational",
-  starts_at: localDateTime(form.get("starts_at")),
-  ends_at: localDateTime(form.get("ends_at")),
-  location: String(form.get("location") || "") || null,
-});
+const localDayStart = (value: FormDataEntryValue | null, nextDay = false) => {
+  if (typeof value !== "string" || !value) return undefined;
+  const date = new Date(`${value.slice(0, 10)}T00:00`);
+  if (nextDay) date.setDate(date.getDate() + 1);
+  return date.toISOString();
+};
+
+export const buildEventPayload = (form: FormData): EventPayload => {
+  const isAllDay = form.get("is_all_day") === "true";
+  return {
+    title: String(form.get("title") || ""),
+    description: String(form.get("description") || "") || null,
+    url: String(form.get("url") || "") || null,
+    kind: form.get("kind") === "attendable" ? "attendable" : "informational",
+    starts_at: isAllDay
+      ? localDayStart(form.get("starts_at"))
+      : localDateTime(form.get("starts_at")),
+    ends_at: isAllDay
+      ? localDayStart(form.get("ends_at"), true)
+      : localDateTime(form.get("ends_at")),
+    is_all_day: isAllDay,
+    location: String(form.get("location") || "") || null,
+  };
+};
 
 export const buildTaskPayload = (form: FormData): TaskPayload => ({
   title: String(form.get("title") || ""),

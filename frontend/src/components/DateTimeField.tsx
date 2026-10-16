@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getEffectiveTimeFormat,
   type TimeFormatPreference,
@@ -12,6 +12,7 @@ type DateTimeFieldProps = {
   invalid?: boolean;
   describedBy?: string;
   required?: boolean;
+  dateOnly?: boolean;
 };
 
 const splitValue = (value: string) => {
@@ -28,11 +29,13 @@ export function DateTimeField({
   invalid,
   describedBy,
   required,
+  dateOnly = false,
 }: DateTimeFieldProps) {
   const initial = splitValue(defaultValue);
   const [date, setDate] = useState(initial.date);
   const [hourOfDay, setHourOfDay] = useState(initial.hour);
   const [minute, setMinute] = useState(initial.minute);
+  const wasDateOnly = useRef(dateOnly);
   const format = getEffectiveTimeFormat(preference);
   const period = hourOfDay >= 12 ? "PM" : "AM";
   const displayedHour = format === "12-hour" ? hourOfDay % 12 || 12 : hourOfDay;
@@ -40,19 +43,8 @@ export function DateTimeField({
     format === "12-hour"
       ? Array.from({ length: 12 }, (_, index) => index + 1)
       : Array.from({ length: 24 }, (_, index) => index);
-
-  return (
-    <div className="datetime-field">
-      <input
-        aria-label={`${label} date`}
-        aria-invalid={invalid}
-        aria-describedby={describedBy}
-        type="date"
-        data-field={name}
-        value={date}
-        required={required}
-        onChange={(event) => setDate(event.target.value)}
-      />
+  const timeControls = dateOnly ? null : (
+    <>
       <select
         aria-label={`${label} hour`}
         aria-invalid={invalid}
@@ -104,6 +96,31 @@ export function DateTimeField({
           <option>PM</option>
         </select>
       )}
+    </>
+  );
+
+  useEffect(() => {
+    if (wasDateOnly.current && !dateOnly) {
+      const isEnd = name === "ends_at";
+      setHourOfDay(isEnd ? 23 : 0);
+      setMinute(isEnd ? "59" : "00");
+    }
+    wasDateOnly.current = dateOnly;
+  }, [dateOnly, name]);
+
+  return (
+    <div className="datetime-field">
+      <input
+        aria-label={`${label} date`}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
+        type="date"
+        data-field={name}
+        value={date}
+        required={required}
+        onChange={(event) => setDate(event.target.value)}
+      />
+      {timeControls}
       <input
         type="hidden"
         name={name}

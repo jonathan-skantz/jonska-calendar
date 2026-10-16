@@ -25,6 +25,7 @@ var migrationNames = []string{
 	"8_defer_default_tag_fk.sql",
 	"9_add_tag_colors.sql",
 	"10_add_event_main_tags.sql",
+	"11_add_all_day_events.sql",
 }
 
 func NewStore(t *testing.T) *db.Store {

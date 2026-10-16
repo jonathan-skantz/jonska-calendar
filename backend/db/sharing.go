@@ -29,7 +29,7 @@ func (s *Store) FindSharedEvent(ctx context.Context, recipientID, shareID uuid.U
 		SELECT
 			share.id, share.event_id, share.recipient_user_id,
 			item.title, item.description, item.url, event.location,
-			event.starts_at, event.ends_at, event.kind,
+			event.starts_at, event.ends_at, event.is_all_day, event.kind,
 			override.title, override.description, override.url,
 			override.location, override.custom_info
 		FROM event_shares AS share
@@ -40,7 +40,7 @@ func (s *Store) FindSharedEvent(ctx context.Context, recipientID, shareID uuid.U
 	`, shareID, recipientID).Scan(
 		&event.ShareID, &event.EventID, &event.RecipientUserID,
 		&event.OriginalTitle, &event.OriginalDescription, &event.OriginalURL,
-		&event.OriginalLocation, &event.StartsAt, &event.EndsAt, &event.Kind,
+		&event.OriginalLocation, &event.StartsAt, &event.EndsAt, &event.IsAllDay, &event.Kind,
 		&event.LocalTitle, &event.LocalDescription, &event.LocalURL,
 		&event.LocalLocation, &event.PrivateCustomInfo,
 	)

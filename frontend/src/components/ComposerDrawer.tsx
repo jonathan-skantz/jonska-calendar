@@ -1,4 +1,5 @@
-import { addMinutes } from "date-fns";
+import { addMinutes, subDays } from "date-fns";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   DEFAULT_EVENT_DURATION_MINUTES,
@@ -45,12 +46,15 @@ export const ComposerDrawer = ({
   onSelectedTagIdsChange,
   onMainTagIdChange,
 }: ComposerDrawerProps) => {
+  const [isAllDay, setIsAllDay] = useState(Boolean(editingItem?.is_all_day));
   const defaultEventStart =
     inputDateTime(editingItem?.starts_at) ||
     inputDateTime(draftEventStart ?? undefined) ||
     `${selectedDate}T09:00`;
   const defaultEventEnd =
-    inputDateTime(editingItem?.ends_at) ||
+    (editingItem?.is_all_day && editingItem.ends_at
+      ? inputDateTime(subDays(new Date(editingItem.ends_at), 1).toISOString())
+      : inputDateTime(editingItem?.ends_at)) ||
     inputDateTime(
       addMinutes(
         new Date(defaultEventStart),
@@ -156,6 +160,15 @@ export const ComposerDrawer = ({
                   <option value="attendable">Attendable</option>
                 </select>
               </label>
+              <label className="all-day-toggle">
+                <input
+                  type="checkbox"
+                  checked={isAllDay}
+                  onChange={(event) => setIsAllDay(event.target.checked)}
+                />
+                All day
+              </label>
+              <input type="hidden" name="is_all_day" value={String(isAllDay)} />
               <label className={fieldErrors.starts_at ? "field-invalid" : ""}>
                 Starts
                 <DateTimeField
@@ -169,20 +182,22 @@ export const ComposerDrawer = ({
                   }
                   defaultValue={defaultEventStart}
                   preference={timeFormat}
+                  dateOnly={isAllDay}
                   required
                 />
               </label>
               <label className={fieldErrors.ends_at ? "field-invalid" : ""}>
-                Ends
+                {isAllDay ? "Last day" : "Ends"}
                 <DateTimeField
                   name="ends_at"
-                  label="Ends"
+                  label={isAllDay ? "Last day" : "Ends"}
                   invalid={Boolean(fieldErrors.ends_at)}
                   describedBy={
                     fieldErrors.ends_at && error ? "composer-error" : undefined
                   }
                   defaultValue={defaultEventEnd}
                   preference={timeFormat}
+                  dateOnly={isAllDay}
                   required
                 />
               </label>

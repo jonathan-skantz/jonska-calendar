@@ -56,11 +56,17 @@ export const getComposerFieldErrors = (
     (form.elements.namedItem("ends_at") as HTMLInputElement | null)?.value ??
       "",
   );
+  const isAllDay =
+    (form.elements.namedItem("is_all_day") as HTMLInputElement | null)
+      ?.value === "true";
+  const invalidEventRange = isAllDay
+    ? endsValue.slice(0, 10) < startsValue.slice(0, 10)
+    : new Date(endsValue) <= new Date(startsValue);
   if (
     composerType === "event" &&
     startsValue &&
     endsValue &&
-    new Date(endsValue) <= new Date(startsValue)
+    invalidEventRange
   ) {
     invalidNames.push("starts_at", "ends_at");
   }

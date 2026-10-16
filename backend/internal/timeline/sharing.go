@@ -118,6 +118,7 @@ func toSharedEventResponse(event db.SharedEvent) sharedEventResponse {
 		OriginalLocation:    event.OriginalLocation,
 		StartsAt:            event.StartsAt,
 		EndsAt:              event.EndsAt,
+		IsAllDay:            event.IsAllDay,
 		Kind:                event.Kind,
 		LocalTitle:          event.LocalTitle,
 		LocalDescription:    event.LocalDescription,

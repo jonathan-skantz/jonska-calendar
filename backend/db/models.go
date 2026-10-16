@@ -19,6 +19,7 @@ type Event struct {
 	URL                  *string
 	StartsAt             time.Time
 	EndsAt               time.Time
+	IsAllDay             bool
 	Kind                 string
 	Location             *string
 	CommuteBeforeSeconds int
@@ -55,6 +56,7 @@ type SharedEvent struct {
 	OriginalLocation    *string
 	StartsAt            time.Time
 	EndsAt              time.Time
+	IsAllDay            bool
 	Kind                string
 	LocalTitle          *string
 	LocalDescription    *string
@@ -71,6 +73,7 @@ type TimelineEntry struct {
 	URL                  *string    `json:"url,omitempty"`
 	StartsAt             *time.Time `json:"starts_at,omitempty"`
 	EndsAt               *time.Time `json:"ends_at,omitempty"`
+	IsAllDay             bool       `json:"is_all_day,omitempty"`
 	DeadlineAt           *time.Time `json:"deadline_at,omitempty"`
 	Kind                 *string    `json:"kind,omitempty"`
 	Location             *string    `json:"location,omitempty"`

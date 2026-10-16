@@ -23,12 +23,14 @@ import {
   getEventAdjacency,
   getEventOverlapDepth,
   getEventPreview,
+  getAllDayEventSpans,
   getVisibleWeekEntries,
 } from "./features/calendar/timelineView";
 import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
 import { CalendarEntry } from "./components/CalendarEntry";
+import { AllDayEvent } from "./components/AllDayEvent";
 import { Sidebar } from "./components/Sidebar";
 import { TagEditorDrawer } from "./components/TagEditorDrawer";
 import { WeekCalendar } from "./components/WeekCalendar";
@@ -175,6 +177,7 @@ function App() {
     (entry) => entry.type === "task" && !entry.is_completed,
   ).length;
   const weekEntries = getVisibleWeekEntries(entries, dates, hiddenTagIds);
+  const allDayEventSpans = getAllDayEventSpans(weekEntries, dates);
   const openNewEventAt = (
     event: Parameters<typeof getClickedEventStart>[0],
     date: Date,
@@ -204,7 +207,9 @@ function App() {
     );
   };
   const renderDayEntries = (date: Date) => {
-    const dayEntries = getEntriesForDate(weekEntries, date);
+    const dayEntries = getEntriesForDate(weekEntries, date).filter(
+      (entry) => entry.type !== "event" || !entry.is_all_day,
+    );
     const entriesWithLayout = dayEntries.map((entry, index) => {
       const previous = dayEntries[index - 1];
       const next = dayEntries[index + 1];
@@ -242,6 +247,10 @@ function App() {
       );
     });
   };
+  const renderAllDayEntries = () =>
+    allDayEventSpans.map((span) => (
+      <AllDayEvent key={span.entry.id} {...span} onEdit={editItem} />
+    ));
   return (
     <main className="app-shell">
       <TopBar
@@ -279,6 +288,8 @@ function App() {
             <WeekCalendar
               dates={dates}
               timeFormat={preferences.timeFormat}
+              hasAllDayEvents={allDayEventSpans.length > 0}
+              renderAllDay={renderAllDayEntries}
               onDayClick={openNewEventAt}
               renderDay={(date) => (
                 <>

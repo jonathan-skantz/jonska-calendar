@@ -69,7 +69,7 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 	entries := make([]TimelineEntry, 0)
 	eventRows, err := s.db.Query(ctx, `
 		SELECT item.id, item.title, item.description, item.url,
-			event.starts_at, event.ends_at, event.kind, event.location,
+			event.starts_at, event.ends_at, event.is_all_day, event.kind, event.location,
 			event.commute_before_seconds, event.commute_after_seconds, event.main_tag_id
 		FROM timeline_items AS item
 		JOIN events AS event ON event.timeline_item_id = item.id
@@ -83,7 +83,7 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 		entry.Type = "event"
 		if err := eventRows.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
-			&entry.StartsAt, &entry.EndsAt, &entry.Kind, &entry.Location,
+			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
 			&entry.CommuteBeforeSeconds, &entry.CommuteAfterSeconds,
 			&entry.MainTagID,
 		); err != nil {
@@ -135,7 +135,7 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 			COALESCE(override.title, item.title),
 			COALESCE(override.description, item.description),
 			COALESCE(override.url, item.url),
-			event.starts_at, event.ends_at, event.kind,
+			event.starts_at, event.ends_at, event.is_all_day, event.kind,
 			COALESCE(override.location, event.location),
 			event.commute_before_seconds, event.commute_after_seconds,
 			item.title, override.custom_info, event.main_tag_id
@@ -157,7 +157,7 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 		entry.IsShared = true
 		if err := rows.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
-			&entry.StartsAt, &entry.EndsAt, &entry.Kind, &entry.Location,
+			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
 			&entry.CommuteBeforeSeconds, &entry.CommuteAfterSeconds,
 			&entry.SourceTitle, &entry.CustomInfo, &entry.MainTagID,
 		); err != nil {
