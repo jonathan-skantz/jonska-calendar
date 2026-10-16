@@ -20,12 +20,15 @@ import {
   getClickedEventStart,
   getDayElapsedOverlay,
   getEntriesForDate,
+  getCommuteSegments,
+  eventBodyOverlapsDate,
   getEventAdjacency,
   getEventOverlapDepth,
   getEventPreview,
   getAllDayEventSpans,
   getVisibleWeekEntries,
 } from "./features/calendar/timelineView";
+import type { CommuteSegment } from "./features/calendar/timelineView";
 import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
@@ -214,6 +217,8 @@ function App() {
     trimTop = false,
     trimBottom = false,
     overlapDepth = 0,
+    commuteSegments: CommuteSegment[] = [],
+    showBody = true,
   ) => {
     return (
       <CalendarEntry
@@ -227,6 +232,8 @@ function App() {
         timeFormat={preferences.timeFormat}
         continuesFromPreviousDay={layout.continuesFromPreviousDay}
         continuesToNextDay={layout.continuesToNextDay}
+        commuteSegments={commuteSegments}
+        showBody={showBody}
         onEdit={editItem}
         onToggleTask={toggleTask}
       />
@@ -253,6 +260,8 @@ function App() {
           trimTop,
           trimBottom,
           overlapDepth,
+          getCommuteSegments(entry, date),
+          eventBodyOverlapsDate(entry, date),
         ),
       };
     });
@@ -377,6 +386,7 @@ function App() {
       )}
       {showComposer && (
         <ComposerDrawer
+          key={`${editingItem?.id ?? "new"}-${composerType}`}
           type={composerType}
           editingItem={editingItem}
           selectedDate={selectedDate}

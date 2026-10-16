@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getCalendarEntryLayout, getEntriesForDate } from "./timelineView";
+import {
+  eventBodyOverlapsDate,
+  getCalendarEntryLayout,
+  getCommuteSegments,
+  getEntriesForDate,
+  getEventOverlapDepth,
+} from "./timelineView";
 import type { TimelineEntry } from "../../types";
 
 const event = (overrides: Partial<TimelineEntry> = {}): TimelineEntry => ({
@@ -66,5 +72,119 @@ describe("calendar entries by date", () => {
     expect(
       getEntriesForDate([event(), task, otherDay], new Date(2026, 9, 15)),
     ).toEqual([event(), task]);
+  });
+});
+
+describe("commute segments", () => {
+  const commuting = event({
+    kind: "attendable",
+    starts_at: "2026-10-15T18:00:00",
+    ends_at: "2026-10-15T19:30:00",
+    commute_before_seconds: 20 * 60,
+    commute_after_seconds: 15 * 60,
+  });
+
+  it("returns nothing without commute", () => {
+    expect(getCommuteSegments(event(), new Date(2026, 9, 15))).toEqual([]);
+  });
+
+  it("places commute before and after the event", () => {
+    expect(getCommuteSegments(commuting, new Date(2026, 9, 15))).toEqual([
+      {
+        position: "before",
+        minutes: 20,
+        startMinutes: 1060,
+        durationMinutes: 20,
+      },
+      {
+        position: "after",
+        minutes: 15,
+        startMinutes: 1170,
+        durationMinutes: 15,
+      },
+    ]);
+  });
+
+  it("clips commute that crosses midnight to each day", () => {
+    const earlyEvent = event({
+      kind: "attendable",
+      starts_at: "2026-10-16T00:10:00",
+      ends_at: "2026-10-16T01:00:00",
+      commute_before_seconds: 30 * 60,
+    });
+    const previousDay = new Date(2026, 9, 15);
+
+    expect(getCommuteSegments(earlyEvent, previousDay)).toEqual([
+      {
+        position: "before",
+        minutes: 30,
+        startMinutes: 1420,
+        durationMinutes: 20,
+      },
+    ]);
+    expect(getCommuteSegments(earlyEvent, new Date(2026, 9, 16))).toEqual([
+      { position: "before", minutes: 30, startMinutes: 0, durationMinutes: 10 },
+    ]);
+    expect(getEntriesForDate([earlyEvent], previousDay)).toEqual([earlyEvent]);
+    expect(eventBodyOverlapsDate(earlyEvent, previousDay)).toBe(false);
+  });
+
+  it("counts commute as occupied time when overlapping", () => {
+    const earlier = event({ id: "earlier", ends_at: "2026-10-15T17:50:00" });
+    expect(getEventOverlapDepth(commuting, [earlier])).toBe(1);
+    expect(
+      getEventOverlapDepth({ ...commuting, commute_before_seconds: 0 }, [
+        earlier,
+      ]),
+    ).toBe(0);
+    expect(
+      getEventOverlapDepth(commuting, [
+        event({ id: "before", ends_at: "2026-10-15T17:40:00" }),
+      ]),
+    ).toBe(0);
+  });
+
+  it("ignores commute on informational and all-day events", () => {
+    const day = new Date(2026, 9, 15);
+    expect(
+      getCommuteSegments({ ...commuting, kind: "informational" }, day),
+    ).toEqual([]);
+    expect(getCommuteSegments({ ...commuting, is_all_day: true }, day)).toEqual(
+      [],
+    );
+  });
+
+  it("is not elapsed until the commute after has ended", () => {
+    const date = new Date(2026, 9, 15);
+    expect(
+      getCalendarEntryLayout(commuting, new Date(2026, 9, 15, 19, 40), date)
+        .fullyElapsed,
+    ).toBe(false);
+    expect(
+      getCalendarEntryLayout(commuting, new Date(2026, 9, 15, 19, 45), date)
+        .fullyElapsed,
+    ).toBe(true);
+  });
+
+  it("orders a day by where each entry visually starts", () => {
+    const short = event({
+      id: "short",
+      starts_at: "2026-10-15T10:00:00",
+      ends_at: "2026-10-15T10:30:00",
+    });
+    const longCommute = event({
+      id: "long-commute",
+      kind: "attendable",
+      starts_at: "2026-10-15T11:00:00",
+      ends_at: "2026-10-15T12:00:00",
+      commute_before_seconds: 90 * 60,
+    });
+    const ordered = getEntriesForDate(
+      [short, longCommute],
+      new Date(2026, 9, 15),
+    );
+    expect(ordered.map((entry) => entry.id)).toEqual(["long-commute", "short"]);
+    expect(getEventOverlapDepth(ordered[0], [])).toBe(0);
+    expect(getEventOverlapDepth(ordered[1], ordered.slice(0, 1))).toBe(1);
   });
 });

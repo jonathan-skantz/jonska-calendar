@@ -8,6 +8,8 @@ export type ComposerField =
   | "starts_at"
   | "ends_at"
   | "location"
+  | "commute_before_minutes"
+  | "commute_after_minutes"
   | "deadline_at"
   | "event-tags"
   | "main-tag";
@@ -23,6 +25,8 @@ const isComposerField = (name: string): name is ComposerField =>
     "starts_at",
     "ends_at",
     "location",
+    "commute_before_minutes",
+    "commute_after_minutes",
     "deadline_at",
     "event-tags",
     "main-tag",

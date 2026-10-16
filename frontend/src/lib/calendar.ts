@@ -3,6 +3,8 @@ import { format, getHours, getMinutes, startOfWeek } from "date-fns";
 export const WEEK_DAY_COUNT = 7;
 export const HOURS_PER_DAY = 24;
 export const MINUTES_PER_HOUR = 60;
+export const SECONDS_PER_MINUTE = 60;
+export const MAX_COMMUTE_MINUTES = 24 * 60;
 export const CALENDAR_GRID_SCALE = 2;
 export const TASK_DISPLAY_DURATION_MINUTES = 45;
 export const MINIMUM_ENTRY_DURATION_MINUTES = 90;
@@ -102,9 +104,9 @@ export const localDateTime = (value: FormDataEntryValue | null) => {
 export const localDateKey = (value?: string) =>
   value ? dateKey(new Date(value)) : "";
 
-export const minutesIntoDay = (value?: string) => {
+export const minutesIntoDay = (value?: string | Date) => {
   if (!value) return 0;
-  const date = new Date(value);
+  const date = value instanceof Date ? value : new Date(value);
   return getHours(date) * MINUTES_PER_HOUR + getMinutes(date);
 };
 

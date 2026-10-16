@@ -13,7 +13,7 @@ var (
 	ErrTitleRequired  = errors.New("title cannot be empty")
 	ErrInvalidTimes   = errors.New("end time must be after start time")
 	ErrInvalidKind    = errors.New("kind must be attendable or informational")
-	ErrInvalidCommute = errors.New("commute duration cannot be negative")
+	ErrInvalidCommute = errors.New("commute must be whole minutes up to 24 hours and is only allowed on timed attendable events")
 	ErrDeadlineNeeded = errors.New("deadline is required")
 
 	ErrInvalidDate             = errors.New("dates must use the YYYY-MM-DD format")
@@ -25,7 +25,12 @@ var (
 const (
 	dateLayout              = "2006-01-02"
 	maxTransitCardRangeDays = 62
+	maxCommuteSeconds       = 24 * 60 * 60
 )
+
+func validCommuteSeconds(seconds int) bool {
+	return seconds >= 0 && seconds <= maxCommuteSeconds && seconds%60 == 0
+}
 
 func validateEventRequest(request eventRequest) error {
 	if request.Title == "" {
@@ -37,7 +42,11 @@ func validateEventRequest(request eventRequest) error {
 	if !request.EndsAt.After(request.StartsAt) {
 		return ErrInvalidTimes
 	}
-	if request.CommuteBeforeSeconds < 0 || request.CommuteAfterSeconds < 0 {
+	if !validCommuteSeconds(request.CommuteBeforeSeconds) || !validCommuteSeconds(request.CommuteAfterSeconds) {
+		return ErrInvalidCommute
+	}
+	hasCommute := request.CommuteBeforeSeconds > 0 || request.CommuteAfterSeconds > 0
+	if hasCommute && (request.Kind != "attendable" || request.IsAllDay) {
 		return ErrInvalidCommute
 	}
 	return nil

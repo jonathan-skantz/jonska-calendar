@@ -94,6 +94,25 @@ func TestCreateEventValidatesInput(t *testing.T) {
 	}
 }
 
+func TestCreateEventRejectsCommuteOutsideTimedAttendableEvents(t *testing.T) {
+	handler := New(nil, func(*http.Request) (uuid.UUID, error) { return uuid.New(), nil })
+	for name, body := range map[string]string{
+		"informational":  `{"title":"Info","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"informational","commute_before_seconds":600}`,
+		"all-day":        `{"title":"Trip","starts_at":"2026-10-09T00:00:00Z","ends_at":"2026-10-10T00:00:00Z","is_all_day":true,"kind":"attendable","commute_after_seconds":600}`,
+		"negative":       `{"title":"Meet","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"attendable","commute_before_seconds":-60}`,
+		"partial minute": `{"title":"Meet","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"attendable","commute_before_seconds":90}`,
+		"over a day":     `{"title":"Meet","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"attendable","commute_after_seconds":6000000000}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			handler.CreateEvent(response, httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(body)))
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("expected status %d, got %d", http.StatusBadRequest, response.Code)
+			}
+		})
+	}
+}
+
 func TestCreateEventAndTask(t *testing.T) {
 	store, userID := setupTestStore(t)
 	handler := New(store, func(*http.Request) (uuid.UUID, error) { return userID, nil })
@@ -501,8 +520,10 @@ func TestShareEventAndUpdateLocalAppearance(t *testing.T) {
 		"url":"https://example.com/original",
 		"starts_at":"2026-10-09T18:00:00Z",
 		"ends_at":"2026-10-09T19:00:00Z",
-		"kind":"informational",
-		"location":"Original location"
+		"kind":"attendable",
+		"location":"Original location",
+		"commute_before_seconds":1200,
+		"commute_after_seconds":900
 	}`))
 	eventResponse := httptest.NewRecorder()
 	ownerHandler.CreateEvent(eventResponse, eventRequest)
@@ -612,6 +633,9 @@ func TestShareEventAndUpdateLocalAppearance(t *testing.T) {
 	}
 	if timeline[0].SourceTitle == nil || *timeline[0].SourceTitle != "Original title" {
 		t.Fatalf("timeline did not preserve source title: %+v", timeline[0])
+	}
+	if timeline[0].CommuteBeforeSeconds != 0 || timeline[0].CommuteAfterSeconds != 0 {
+		t.Fatalf("recipient timeline exposed owner commute: %+v", timeline[0])
 	}
 
 	ownerGetRequest := httptest.NewRequest(http.MethodGet, "/api/shared-events/"+share.ID.String(), nil)

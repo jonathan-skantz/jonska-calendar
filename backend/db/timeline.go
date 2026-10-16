@@ -137,7 +137,7 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 			COALESCE(override.url, item.url),
 			event.starts_at, event.ends_at, event.is_all_day, event.kind,
 			COALESCE(override.location, event.location),
-			event.commute_before_seconds, event.commute_after_seconds,
+			-- Commute is the owner's personal travel, not part of the shared projection.
 			item.title, override.custom_info, event.main_tag_id
 		FROM event_shares AS share
 		JOIN timeline_items AS item ON item.id = share.event_id
@@ -158,7 +158,6 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 		if err := rows.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
-			&entry.CommuteBeforeSeconds, &entry.CommuteAfterSeconds,
 			&entry.SourceTitle, &entry.CustomInfo, &entry.MainTagID,
 		); err != nil {
 			return nil, err

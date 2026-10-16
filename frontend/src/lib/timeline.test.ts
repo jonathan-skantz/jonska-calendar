@@ -6,6 +6,7 @@ import {
   getDefaultEventTagSelection,
   getMainTag,
   isEventVisible,
+  buildEventPayload,
   buildTimelineItemRequest,
 } from "./timeline";
 import type { TimelineEntry } from "../types";
@@ -88,8 +89,34 @@ describe("timeline behavior", () => {
     ).toMatchObject({ path: "/api/tasks/task-1", method: "PUT" });
   });
 
+  it("sends commute seconds only for timed attendable events", () => {
+    const form = new FormData();
+    form.set("title", "Football");
+    form.set("kind", "attendable");
+    form.set("starts_at", "2026-10-15T18:00");
+    form.set("ends_at", "2026-10-15T19:30");
+    form.set("commute_before_minutes", "20");
+    form.set("commute_after_minutes", "");
+    expect(buildEventPayload(form)).toMatchObject({
+      commute_before_seconds: 1200,
+      commute_after_seconds: 0,
+    });
+
+    form.set("commute_before_minutes", "7.6");
+    expect(buildEventPayload(form).commute_before_seconds).toBe(480);
+
+    form.set("kind", "informational");
+    expect(buildEventPayload(form).commute_before_seconds).toBe(0);
+
+    form.set("kind", "attendable");
+    form.set("is_all_day", "true");
+    expect(buildEventPayload(form).commute_before_seconds).toBe(0);
+  });
+
   it("shows tasks regardless of hidden event tags and hides events with a hidden tag", () => {
-    expect(isEventVisible(event({ tags: [tag("work")] }), ["work"])).toBe(false);
+    expect(isEventVisible(event({ tags: [tag("work")] }), ["work"])).toBe(
+      false,
+    );
     expect(isEventVisible(event({ tags: [tag("work")] }), ["home"])).toBe(true);
     expect(isEventVisible({ ...event(), type: "task" }, ["work"])).toBe(true);
   });
@@ -123,17 +150,21 @@ describe("timeline behavior", () => {
   it("returns past, current, and future elapsed overlay states", () => {
     const today = new Date(2026, 9, 15, 9, 30);
     const label = (value: Date) => `${value.getHours()}:${value.getMinutes()}`;
-    expect(getElapsedOverlayState(new Date(2026, 9, 14), today, label)).toEqual({
-      kind: "past",
-    });
-    expect(getElapsedOverlayState(new Date(2026, 9, 15), today, label)).toEqual({
-      kind: "today",
-      height: "19rem",
-      label: "9:30",
-    });
-    expect(
-      getElapsedOverlayState(new Date(2026, 9, 16), today, label),
-    ).toEqual({ kind: "none" });
+    expect(getElapsedOverlayState(new Date(2026, 9, 14), today, label)).toEqual(
+      {
+        kind: "past",
+      },
+    );
+    expect(getElapsedOverlayState(new Date(2026, 9, 15), today, label)).toEqual(
+      {
+        kind: "today",
+        height: "19rem",
+        label: "9:30",
+      },
+    );
+    expect(getElapsedOverlayState(new Date(2026, 9, 16), today, label)).toEqual(
+      { kind: "none" },
+    );
     expect(
       getElapsedOverlayState(
         new Date(2026, 9, 15),

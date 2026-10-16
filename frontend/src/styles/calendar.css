@@ -388,6 +388,58 @@
   border: 0;
 }
 
+.grid-entry.event.has-commute-before {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.grid-entry.event.has-commute-after {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Commute takes up calendar space but must not read as the event itself:
+   hatched, tinted with the main tag color, and dashed on its outer edges. */
+.commute-band {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 1;
+  display: flex;
+  overflow: hidden;
+  padding: 2px 6px;
+  border: 1px dashed var(--commute-color);
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--commute-color) 30%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.commute-band.before {
+  align-items: flex-end;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+
+.commute-band.after {
+  align-items: flex-start;
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+}
+
+.commute-band span {
+  padding: 0 3px;
+  background: var(--paper);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
 .grid-entry.event.overlapping-later-event {
   border: 1px solid white;
 }

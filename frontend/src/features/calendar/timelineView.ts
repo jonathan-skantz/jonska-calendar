@@ -7,17 +7,19 @@ import {
   LAST_EVENT_START_HOUR,
   MINIMUM_ENTRY_DURATION_MINUTES,
   MINUTES_PER_HOUR,
+  SECONDS_PER_MINUTE,
   TASK_DISPLAY_DURATION_MINUTES,
   WEEK_DAY_COUNT,
   dateKey,
   formatTime,
   localDateKey,
   minutesIntoDay,
-  sameInstant,
 } from "../../lib/calendar";
 import {
+  getCommuteSeconds,
   getElapsedOverlayState,
   getEntryMinutes,
+  getOccupiedRange,
   getTimelineEntryDate,
   isEventVisible,
 } from "../../lib/timeline";
@@ -28,6 +30,13 @@ export type EventPreview = {
   top: string;
   startsAt: string;
   endsAt: string;
+};
+
+export type CommuteSegment = {
+  position: "before" | "after";
+  minutes: number;
+  startMinutes: number;
+  durationMinutes: number;
 };
 
 export type AllDayEventSpan = {
@@ -53,9 +62,8 @@ const eventOverlapsRange = (
     return false;
   }
 
-  const startsAt = new Date(entry.starts_at);
-  const endsAt = new Date(entry.ends_at);
-  return startsAt < rangeEnd && endsAt > rangeStart;
+  const { start, end } = getOccupiedRange(entry);
+  return start < rangeEnd && end > rangeStart;
 };
 
 export const getVisibleWeekEntries = (
@@ -79,14 +87,23 @@ export const getVisibleWeekEntries = (
   });
 };
 
+const layoutStartTime = (entry: TimelineEntry) =>
+  entry.type === "event"
+    ? getOccupiedRange(entry).start.getTime()
+    : new Date(getTimelineEntryDate(entry) ?? 0).getTime();
+
+// Ordered by where each entry visually starts, commute included, because
+// overlap depth and adjacency compare each entry with its neighbours.
 export const getEntriesForDate = (entries: TimelineEntry[], date: Date) => {
   const rangeStart = startOfDay(date);
   const rangeEnd = addDays(rangeStart, 1);
-  return entries.filter((entry) =>
-    entry.type === "event"
-      ? eventOverlapsRange(entry, rangeStart, rangeEnd)
-      : localDateKey(getTimelineEntryDate(entry)) === dateKey(date),
-  );
+  return entries
+    .filter((entry) =>
+      entry.type === "event"
+        ? eventOverlapsRange(entry, rangeStart, rangeEnd)
+        : localDateKey(getTimelineEntryDate(entry)) === dateKey(date),
+    )
+    .sort((left, right) => layoutStartTime(left) - layoutStartTime(right));
 };
 
 export const getAllDayEventSpans = (
@@ -186,6 +203,10 @@ export const getDayElapsedOverlay = (
   formatLabel: (value: Date) => string,
 ) => getElapsedOverlayState(date, today, formatLabel);
 
+const occupiedEdgesTouch = (earlier: TimelineEntry, later: TimelineEntry) =>
+  getOccupiedRange(earlier).end.getTime() ===
+  getOccupiedRange(later).start.getTime();
+
 export const getEventAdjacency = (
   entry: TimelineEntry,
   previous?: TimelineEntry,
@@ -194,11 +215,11 @@ export const getEventAdjacency = (
   trimTop:
     entry.type === "event" &&
     previous?.type === "event" &&
-    sameInstant(previous.ends_at, entry.starts_at),
+    occupiedEdgesTouch(previous, entry),
   trimBottom:
     entry.type === "event" &&
     next?.type === "event" &&
-    sameInstant(entry.ends_at, next.starts_at),
+    occupiedEdgesTouch(entry, next),
 });
 
 export const getEventOverlapDepth = (
@@ -207,13 +228,75 @@ export const getEventOverlapDepth = (
 ) => {
   if (entry.type !== "event" || !entry.starts_at) return 0;
 
-  const startsAt = new Date(entry.starts_at).getTime();
+  const startsAt = getOccupiedRange(entry).start;
   return earlierEntries.filter(
     (earlierEntry) =>
       earlierEntry.type === "event" &&
       earlierEntry.ends_at &&
-      new Date(earlierEntry.ends_at).getTime() > startsAt,
+      getOccupiedRange(earlierEntry).end > startsAt,
   ).length;
+};
+
+const clipToDay = (start: Date, end: Date, date: Date) => {
+  const dayStart = startOfDay(date);
+  const dayEnd = addDays(dayStart, 1);
+  const segmentStart = start > dayStart ? start : dayStart;
+  const segmentEnd = end < dayEnd ? end : dayEnd;
+  if (segmentStart >= segmentEnd) return null;
+
+  const segmentStartMinutes = minutesIntoDay(segmentStart);
+  const segmentEndMinutes =
+    segmentEnd.getTime() === dayEnd.getTime()
+      ? HOURS_PER_DAY * MINUTES_PER_HOUR
+      : minutesIntoDay(segmentEnd);
+  return {
+    startMinutes: segmentStartMinutes,
+    durationMinutes: segmentEndMinutes - segmentStartMinutes,
+    continuesFromPreviousDay: start < dayStart,
+    continuesToNextDay: end > dayEnd,
+  };
+};
+
+export const eventBodyOverlapsDate = (entry: TimelineEntry, date: Date) => {
+  if (entry.type !== "event") return true;
+  if (!entry.starts_at || !entry.ends_at) return false;
+  const dayStart = startOfDay(date);
+  return (
+    new Date(entry.starts_at) < addDays(dayStart, 1) &&
+    new Date(entry.ends_at) > dayStart
+  );
+};
+
+export const getCommuteSegments = (
+  entry: TimelineEntry,
+  date: Date,
+): CommuteSegment[] => {
+  if (entry.type !== "event" || !entry.starts_at || !entry.ends_at) return [];
+
+  const startsAt = new Date(entry.starts_at);
+  const endsAt = new Date(entry.ends_at);
+  const { start, end } = getOccupiedRange(entry);
+  const commute = getCommuteSeconds(entry);
+  const segments: CommuteSegment[] = [];
+  const before = clipToDay(start, startsAt, date);
+  if (before && commute.before) {
+    segments.push({
+      position: "before",
+      minutes: Math.round(commute.before / SECONDS_PER_MINUTE),
+      startMinutes: before.startMinutes,
+      durationMinutes: before.durationMinutes,
+    });
+  }
+  const after = clipToDay(endsAt, end, date);
+  if (after && commute.after) {
+    segments.push({
+      position: "after",
+      minutes: Math.round(commute.after / SECONDS_PER_MINUTE),
+      startMinutes: after.startMinutes,
+      durationMinutes: after.durationMinutes,
+    });
+  }
+  return segments;
 };
 
 export const getCalendarEntryLayout = (
@@ -222,11 +305,10 @@ export const getCalendarEntryLayout = (
   date = new Date(getTimelineEntryDate(entry) ?? now),
 ) => {
   const startMinutes = getEntryMinutes(entry);
+  // An event is only done once the commute home is done too.
   const fullyElapsed =
     entry.type === "event" &&
-    Boolean(
-      entry.ends_at && new Date(entry.ends_at).getTime() <= now.getTime(),
-    );
+    Boolean(entry.ends_at && getOccupiedRange(entry).end <= now);
 
   if (entry.type === "event") {
     if (!entry.starts_at || !entry.ends_at) {
@@ -239,31 +321,12 @@ export const getCalendarEntryLayout = (
       };
     }
 
-    const dayStart = startOfDay(date);
-    const dayEnd = addDays(dayStart, 1);
-    const eventStart = new Date(entry.starts_at);
-    const eventEnd = new Date(entry.ends_at);
-    const segmentStart = eventStart > dayStart ? eventStart : dayStart;
-    const segmentEnd = eventEnd < dayEnd ? eventEnd : dayEnd;
-
-    if (segmentStart < segmentEnd) {
-      const segmentStartMinutes =
-        segmentStart.getTime() === dayStart.getTime()
-          ? 0
-          : segmentStart.getHours() * MINUTES_PER_HOUR +
-            segmentStart.getMinutes();
-      const segmentEndMinutes =
-        segmentEnd.getTime() === dayEnd.getTime()
-          ? HOURS_PER_DAY * MINUTES_PER_HOUR
-          : segmentEnd.getHours() * MINUTES_PER_HOUR + segmentEnd.getMinutes();
-      return {
-        startMinutes: segmentStartMinutes,
-        durationMinutes: segmentEndMinutes - segmentStartMinutes,
-        fullyElapsed,
-        continuesFromPreviousDay: eventStart < dayStart,
-        continuesToNextDay: eventEnd > dayEnd,
-      };
-    }
+    const segment = clipToDay(
+      new Date(entry.starts_at),
+      new Date(entry.ends_at),
+      date,
+    );
+    if (segment) return { ...segment, fullyElapsed };
 
     return {
       startMinutes,

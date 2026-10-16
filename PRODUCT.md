@@ -85,7 +85,7 @@ Events have an exact start date/time and end date/time in the first demo.
 
 - [x] Can have either physical or online location.
 
-- [ ] An attendable event can include commute time before and after the event. The
+- [x] An attendable event can include commute time before and after the event. The
       commute occupies calendar space, but must be visually distinct from the event
       itself so it is obvious that the event has not started during the commute.
 

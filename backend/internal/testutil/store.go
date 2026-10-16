@@ -28,6 +28,7 @@ var migrationNames = []string{
 	"11_add_all_day_events.sql",
 	"12_add_transit_card_days.sql",
 	"13_add_user_display_name.sql",
+	"14_restrict_event_commute.sql",
 }
 
 func NewStore(t *testing.T) *db.Store {

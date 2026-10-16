@@ -186,7 +186,7 @@ All API routes use JSON request and response bodies unless the response is `204 
 | `GET /api/transit-card/days?from=&to=`       | None                                        | Array of reported transit-card days                  |
 | `PUT /api/transit-card/days`                 | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                |
 
-Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. For all-day events, the end timestamp is exclusive and starts at midnight after the last displayed date. The `kind` value is `attendable` or `informational`. Commute durations cannot be negative. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
+Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. For all-day events, the end timestamp is exclusive and starts at midnight after the last displayed date. The `kind` value is `attendable` or `informational`. Commute durations are seconds in whole minutes, from 0 up to 24 hours, and must be 0 unless the event is a timed (not all-day) `attendable` event. Migration 14 enforces the same rules in the database. The week grid draws commute as hatched bands next to the event block. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
 
 Task request fields are `title`, `description`, `url`, and `deadline_at`. The title and deadline are required. `deadline_at` is a timestamp.
 
@@ -209,7 +209,7 @@ The frontend uses:
 
 The week grid is not a pre-built calendar component. It derives each item's vertical position from minutes after local midnight and renders static blocks. Dragging is intentionally absent. An item's position changes only after saving an edited event through the API.
 
-The workspace query returns both owned and shared timeline entries. Shared entries already contain effective local presentation values and source metadata, so the UI does not need to reconstruct sharing rules.
+The workspace query returns both owned and shared timeline entries. Shared entries already contain effective local presentation values and source metadata, so the UI does not need to reconstruct sharing rules. Shared entries never include the owner's commute durations, because commute is the owner's personal travel.
 
 ## Where to Change Things
 

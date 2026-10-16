@@ -3,6 +3,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   DEFAULT_EVENT_DURATION_MINUTES,
+  MAX_COMMUTE_MINUTES,
+  SECONDS_PER_MINUTE,
   inputDateTime,
   type TimeFormatPreference,
 } from "../lib/calendar";
@@ -47,6 +49,16 @@ export const ComposerDrawer = ({
   onMainTagIdChange,
 }: ComposerDrawerProps) => {
   const [isAllDay, setIsAllDay] = useState(Boolean(editingItem?.is_all_day));
+  const [kind, setKind] = useState(editingItem?.kind ?? "informational");
+  const allowsCommute = kind === "attendable" && !isAllDay;
+  const commuteMinutes = (seconds?: number) =>
+    seconds ? String(Math.round(seconds / SECONDS_PER_MINUTE)) : "";
+  // Kept in state so values survive while the fields are hidden by a kind or
+  // all-day toggle.
+  const [commute, setCommute] = useState({
+    commute_before_minutes: commuteMinutes(editingItem?.commute_before_seconds),
+    commute_after_minutes: commuteMinutes(editingItem?.commute_after_seconds),
+  });
   const defaultEventStart =
     inputDateTime(editingItem?.starts_at) ||
     inputDateTime(draftEventStart ?? undefined) ||
@@ -154,7 +166,14 @@ export const ComposerDrawer = ({
                   aria-describedby={
                     fieldErrors.kind && error ? "composer-error" : undefined
                   }
-                  defaultValue={editingItem?.kind ?? "informational"}
+                  value={kind}
+                  onChange={(event) =>
+                    setKind(
+                      event.target.value === "attendable"
+                        ? "attendable"
+                        : "informational",
+                    )
+                  }
                 >
                   <option value="informational">Informational</option>
                   <option value="attendable">Attendable</option>
@@ -213,6 +232,44 @@ export const ComposerDrawer = ({
                   placeholder="Home, online, or somewhere else"
                 />
               </label>
+              {allowsCommute && (
+                <div className="commute-fields">
+                  {(
+                    [
+                      ["commute_before_minutes", "Commute before (min)"],
+                      ["commute_after_minutes", "Commute after (min)"],
+                    ] as const
+                  ).map(([name, label]) => (
+                    <label
+                      key={name}
+                      className={fieldErrors[name] ? "field-invalid" : ""}
+                    >
+                      {label}
+                      <input
+                        name={name}
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={MAX_COMMUTE_MINUTES}
+                        step={1}
+                        aria-invalid={Boolean(fieldErrors[name])}
+                        aria-describedby={
+                          fieldErrors[name] && error
+                            ? "composer-error"
+                            : undefined
+                        }
+                        value={commute[name]}
+                        onChange={(event) =>
+                          setCommute((current) => ({
+                            ...current,
+                            [name]: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
               <EventTagPicker
                 tags={tags}
                 selectedTagIds={selectedTagIds}

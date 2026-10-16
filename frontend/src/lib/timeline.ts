@@ -1,6 +1,7 @@
 import {
   CALENDAR_GRID_SCALE,
   MINUTES_PER_HOUR,
+  SECONDS_PER_MINUTE,
   dateKey,
   localDateTime,
   minutesIntoDay,
@@ -16,6 +17,8 @@ export type EventPayload = {
   ends_at: string | undefined;
   is_all_day: boolean;
   location: FormDataEntryValue | null;
+  commute_before_seconds: number;
+  commute_after_seconds: number;
 };
 
 export type TaskPayload = {
@@ -112,13 +115,23 @@ const localDayStart = (value: FormDataEntryValue | null, nextDay = false) => {
   return date.toISOString();
 };
 
+// The backend stores commute in whole minutes.
+const commuteSeconds = (value: FormDataEntryValue | null) => {
+  const minutes = Math.round(Number(value || 0));
+  return Number.isFinite(minutes) && minutes > 0
+    ? minutes * SECONDS_PER_MINUTE
+    : 0;
+};
+
 export const buildEventPayload = (form: FormData): EventPayload => {
   const isAllDay = form.get("is_all_day") === "true";
+  const isAttendable = form.get("kind") === "attendable";
+  const allowsCommute = isAttendable && !isAllDay;
   return {
     title: String(form.get("title") || ""),
     description: String(form.get("description") || "") || null,
     url: String(form.get("url") || "") || null,
-    kind: form.get("kind") === "attendable" ? "attendable" : "informational",
+    kind: isAttendable ? "attendable" : "informational",
     starts_at: isAllDay
       ? localDayStart(form.get("starts_at"))
       : localDateTime(form.get("starts_at")),
@@ -127,7 +140,41 @@ export const buildEventPayload = (form: FormData): EventPayload => {
       : localDateTime(form.get("ends_at")),
     is_all_day: isAllDay,
     location: String(form.get("location") || "") || null,
+    commute_before_seconds: allowsCommute
+      ? commuteSeconds(form.get("commute_before_minutes"))
+      : 0,
+    commute_after_seconds: allowsCommute
+      ? commuteSeconds(form.get("commute_after_minutes"))
+      : 0,
   };
+};
+
+// Commute only applies to timed attendable events; ignore it on anything else.
+export const getCommuteSeconds = (entry: TimelineEntry) =>
+  entry.type === "event" && entry.kind === "attendable" && !entry.is_all_day
+    ? {
+        before: entry.commute_before_seconds ?? 0,
+        after: entry.commute_after_seconds ?? 0,
+      }
+    : { before: 0, after: 0 };
+
+const occupiedRanges = new WeakMap<TimelineEntry, { start: Date; end: Date }>();
+
+// The span an event blocks on the calendar, including commute on both sides.
+// Cached per entry object because overlap checks compare every pair in a day.
+export const getOccupiedRange = (entry: TimelineEntry) => {
+  const cached = occupiedRanges.get(entry);
+  if (cached) return cached;
+
+  const { before, after } = getCommuteSeconds(entry);
+  const start = new Date(entry.starts_at ?? 0);
+  const end = new Date(entry.ends_at ?? 0);
+  const range = {
+    start: new Date(start.getTime() - before * 1000),
+    end: new Date(end.getTime() + after * 1000),
+  };
+  occupiedRanges.set(entry, range);
+  return range;
 };
 
 export const buildTaskPayload = (form: FormData): TaskPayload => ({

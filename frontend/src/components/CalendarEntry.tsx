@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   CALENDAR_GRID_SCALE,
   EVENT_OVERLAP_INSET_PIXELS,
@@ -9,6 +10,7 @@ import {
 import type { TimeFormatPreference } from "../lib/calendar";
 import { tagTextColor } from "../lib/colors";
 import { getMainTag, getOrderedStripTags } from "../lib/timeline";
+import type { CommuteSegment } from "../features/calendar/timelineView";
 import type { TimelineEntry } from "../types";
 
 type CalendarEntryProps = {
@@ -20,6 +22,8 @@ type CalendarEntryProps = {
   overlapDepth: number;
   continuesFromPreviousDay: boolean;
   continuesToNextDay: boolean;
+  commuteSegments: CommuteSegment[];
+  showBody: boolean;
   timeFormat: TimeFormatPreference;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
@@ -27,6 +31,10 @@ type CalendarEntryProps = {
 
 const CONTINUATION_MARKER_HEIGHT = 6;
 const CONTINUATION_MARKER_SPACING = 12;
+const COMMUTE_LABEL_MIN_MINUTES = 15;
+
+const gridOffset = (minutes: number) =>
+  `${(minutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`;
 
 const ContinuationMarkers = ({
   position,
@@ -57,6 +65,8 @@ export const CalendarEntry = ({
   overlapDepth,
   continuesFromPreviousDay,
   continuesToNextDay,
+  commuteSegments,
+  showBody,
   timeFormat,
   onEdit,
   onToggleTask,
@@ -83,12 +93,24 @@ export const CalendarEntry = ({
   const overlapInset = hasEarlierOverlap
     ? `${3 + overlapDepth * EVENT_OVERLAP_INSET_PIXELS}px`
     : undefined;
+  const commuteBefore = commuteSegments.find(
+    (segment) => segment.position === "before",
+  );
+  const commuteAfter = commuteSegments.find(
+    (segment) => segment.position === "after",
+  );
+  // The separator from an adjacent event belongs to the outermost block,
+  // which is the commute band when there is one.
   const topInset =
-    (trimTop ? EVENT_SEPARATOR_PIXELS : 0) +
+    (trimTop && !commuteBefore ? EVENT_SEPARATOR_PIXELS : 0) +
     (continuesFromPreviousDay ? CONTINUATION_MARKER_HEIGHT : 0);
   const bottomInset =
-    (trimBottom ? EVENT_SEPARATOR_PIXELS : 0) +
+    (trimBottom && !commuteAfter ? EVENT_SEPARATOR_PIXELS : 0) +
     (continuesToNextDay ? CONTINUATION_MARKER_HEIGHT : 0);
+  const commuteColor = mainTag?.color ?? "var(--yellow)";
+  const openEditor = () => {
+    if (!entry.is_shared) onEdit(entry);
+  };
 
   useEffect(() => {
     const entryElement = entryRef.current;
@@ -111,66 +133,117 @@ export const CalendarEntry = ({
     return () => observer.disconnect();
   }, [continuesFromPreviousDay, continuesToNextDay]);
 
+  const renderCommuteBand = (segment: CommuteSegment) => {
+    const trim =
+      segment.position === "before"
+        ? trimTop
+          ? EVENT_SEPARATOR_PIXELS
+          : 0
+        : trimBottom
+          ? EVENT_SEPARATOR_PIXELS
+          : 0;
+    const description = `Commute ${segment.minutes} min ${segment.position} ${entry.title}`;
+    return (
+      <div
+        key={segment.position}
+        className={`commute-band ${segment.position} ${hasEarlierOverlap ? "overlapping-later-event" : ""}`}
+        role="img"
+        aria-label={description}
+        title={description}
+        style={
+          {
+            "--commute-color": commuteColor,
+            top: gridOffset(segment.startMinutes),
+            height: `calc(${gridOffset(segment.durationMinutes)} - ${trim}px)`,
+            left: overlapInset,
+            right: overlapInset,
+            zIndex: hasEarlierOverlap ? 2 : undefined,
+            transform:
+              segment.position === "before" && trim
+                ? `translateY(${trim}px)`
+                : undefined,
+          } as CSSProperties
+        }
+        onClick={(event) => {
+          event.stopPropagation();
+          openEditor();
+        }}
+      >
+        {segment.durationMinutes >= COMMUTE_LABEL_MIN_MINUTES && (
+          <span aria-hidden="true">
+            {segment.position === "before" ? "⇢" : "⇠"} {segment.minutes} min
+          </span>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <article
-      ref={entryRef}
-      className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""}`}
-      style={{
-        top: `${(startMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
-        height: `calc(${(durationMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem - ${topInset + bottomInset}px)`,
-        left: overlapInset,
-        right: overlapInset,
-        zIndex: hasEarlierOverlap ? 2 : undefined,
-        transform: topInset ? `translateY(${topInset}px)` : undefined,
-        ...(entry.type === "event" && mainTag
-          ? {
-              backgroundColor: mainTag.color,
-              color: tagTextColor(mainTag.color),
-              backgroundImage: `linear-gradient(to right, ${stripStops.join(", ")})`,
-              backgroundSize: "100% 3px",
-              backgroundPosition: "top",
-              backgroundRepeat: "no-repeat",
-            }
-          : {}),
-      }}
-      onClick={(event) => {
-        event.stopPropagation();
-        if (!entry.is_shared) onEdit(entry);
-      }}
-    >
-      {continuesFromPreviousDay && (
-        <ContinuationMarkers
-          position="top"
-          count={continuationMarkerCount}
-          color={mainTag?.color ?? "var(--yellow)"}
-        />
+    <>
+      {commuteBefore && renderCommuteBand(commuteBefore)}
+      {showBody && (
+        <article
+          ref={entryRef}
+          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${commuteAfter ? "has-commute-after" : ""}`}
+          style={{
+            top: gridOffset(startMinutes),
+            height: `calc(${gridOffset(durationMinutes)} - ${topInset + bottomInset}px)`,
+            left: overlapInset,
+            right: overlapInset,
+            zIndex: hasEarlierOverlap ? 2 : undefined,
+            transform: topInset ? `translateY(${topInset}px)` : undefined,
+            ...(entry.type === "event" && mainTag
+              ? {
+                  backgroundColor: mainTag.color,
+                  color: tagTextColor(mainTag.color),
+                  backgroundImage: `linear-gradient(to right, ${stripStops.join(", ")})`,
+                  backgroundSize: "100% 3px",
+                  backgroundPosition: "top",
+                  backgroundRepeat: "no-repeat",
+                }
+              : {}),
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            openEditor();
+          }}
+        >
+          {continuesFromPreviousDay && (
+            <ContinuationMarkers
+              position="top"
+              count={continuationMarkerCount}
+              color={mainTag?.color ?? "var(--yellow)"}
+            />
+          )}
+          <strong>{entry.title}</strong>
+          <span>
+            {entry.type === "event"
+              ? [entry.starts_at, entry.ends_at]
+                  .filter(Boolean)
+                  .map((time) => formatTime(time, { preference: timeFormat }))
+                  .join(" – ")
+              : "Task"}
+          </span>
+          {entry.location && <span>{entry.location}</span>}
+          {continuesToNextDay && (
+            <ContinuationMarkers
+              position="bottom"
+              count={continuationMarkerCount}
+              color={mainTag?.color ?? "var(--yellow)"}
+            />
+          )}
+          {entry.type === "task" && (
+            <input
+              type="checkbox"
+              checked={entry.is_completed}
+              onClick={(event) => event.stopPropagation()}
+              onChange={() => onToggleTask(entry)}
+              aria-label={`Complete ${entry.title}`}
+            />
+          )}
+        </article>
       )}
-      <strong>{entry.title}</strong>
-      <span>
-        {entry.type === "event"
-          ? [entry.starts_at, entry.ends_at]
-              .filter(Boolean)
-              .map((time) => formatTime(time, { preference: timeFormat }))
-              .join(" – ")
-          : "Task"}
-      </span>
-      {entry.location && <span>{entry.location}</span>}
-      {continuesToNextDay && (
-        <ContinuationMarkers
-          position="bottom"
-          count={continuationMarkerCount}
-          color={mainTag?.color ?? "var(--yellow)"}
-        />
-      )}
-      {entry.type === "task" && (
-        <input
-          type="checkbox"
-          checked={entry.is_completed}
-          onClick={(event) => event.stopPropagation()}
-          onChange={() => onToggleTask(entry)}
-          aria-label={`Complete ${entry.title}`}
-        />
-      )}
-    </article>
+      {commuteAfter && renderCommuteBand(commuteAfter)}
+    </>
   );
 };

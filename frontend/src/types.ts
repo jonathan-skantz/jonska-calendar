@@ -23,6 +23,8 @@ export type TimelineEntry = {
   deadline_at?: string;
   kind?: "attendable" | "informational";
   location?: string;
+  commute_before_seconds?: number;
+  commute_after_seconds?: number;
   is_completed: boolean;
   is_shared?: boolean;
   source_title?: string;
