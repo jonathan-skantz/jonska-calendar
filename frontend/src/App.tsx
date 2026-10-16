@@ -323,6 +323,7 @@ function App() {
           tags={tags}
           selectedTagIds={composerTagIds}
           mainTagId={composerMainTagId}
+          timeFormat={preferences.timeFormat}
           fieldErrors={fieldErrors}
           error={actionError}
           onSubmit={createItem}

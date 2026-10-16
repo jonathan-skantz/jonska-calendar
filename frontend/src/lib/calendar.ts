@@ -19,6 +19,16 @@ export type TimeFormatOptions = {
   locale?: string;
   preference?: TimeFormatPreference;
 };
+
+export const getEffectiveTimeFormat = (
+  preference: TimeFormatPreference,
+): Exclude<TimeFormatPreference, "browser"> => {
+  if (preference !== "browser") return preference;
+  const hourCycle = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+  }).resolvedOptions().hourCycle;
+  return hourCycle === "h11" || hourCycle === "h12" ? "12-hour" : "24-hour";
+};
 type LocaleWithWeekInfo = Intl.Locale & {
   getWeekInfo?: () => LocaleWeekInfo;
   weekInfo?: LocaleWeekInfo;

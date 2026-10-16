@@ -1,161 +1,181 @@
 .tag-editor-trigger {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: -22px;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -22px;
 }
 
 .tag-editor-list {
-    display: grid;
-    gap: 24px;
+  display: grid;
+  gap: 24px;
 }
 
 .tag-editor-entry {
-    gap: 12px;
-    padding-bottom: 22px;
-    border-bottom: 1px solid var(--line);
+  gap: 12px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
 }
 
 .tag-color-input {
-    width: 100%;
-    height: 42px;
-    padding: 3px;
+  width: 100%;
+  height: 42px;
+  padding: 3px;
 }
 
 .tag-editor-actions {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .tag-editor-actions .primary-button {
-    margin: 0;
-    padding: 10px 14px;
+  margin: 0;
+  padding: 10px 14px;
 }
 
 .tag-picker {
-    display: grid;
-    gap: 6px;
-    border: 1px solid var(--line);
-    padding: 10px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  padding: 10px;
 }
 
 .tag-picker legend {
-    padding: 0 4px;
-    color: var(--muted);
-    font: 10px 'DM Mono', monospace;
-    text-transform: uppercase;
+  padding: 0 4px;
+  color: var(--muted);
+  font:
+    10px "DM Mono",
+    monospace;
+  text-transform: uppercase;
 }
 
 .tag-picker label {
-    display: flex;
-    align-items: center;
-    gap: 7px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .tag-option {
-    display: grid;
-    grid-template-columns: 42px 1fr;
-    align-items: center;
-    gap: 8px;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 8px;
 }
 
 .icon-button {
-    border: 0;
-    background: transparent;
-    color: var(--muted);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
 }
 
 .drawer-delete-action {
-    position: fixed;
-    right: 34px;
-    bottom: 24px;
-    z-index: 21;
+  position: fixed;
+  right: 34px;
+  bottom: 24px;
+  z-index: 21;
 }
 
 .main-tag-button {
-    border: 0;
-    background: transparent;
-    color: var(--moss-dark);
-    padding: 3px 0;
-    font: 10px 'DM Mono', monospace;
-    text-transform: lowercase;
+  border: 0;
+  background: transparent;
+  color: var(--moss-dark);
+  padding: 3px 0;
+  font:
+    10px "DM Mono",
+    monospace;
+  text-transform: lowercase;
 }
 
 .main-tag-button:hover,
 .main-tag-button.active {
-    background: #e8eee3;
-    color: var(--moss-dark);
-    text-decoration: underline;
+  background: #e8eee3;
+  color: var(--moss-dark);
+  text-decoration: underline;
 }
 
 .danger-button {
-    border: 1px solid #d8785f;
-    background: transparent;
-    color: #b24e42;
-    padding: 10px 14px;
+  border: 1px solid #d8785f;
+  background: transparent;
+  color: #b24e42;
+  padding: 10px 14px;
 }
 
 .danger-button:hover {
-    background: #f8e9e4;
+  background: #f8e9e4;
 }
 
 .drawer-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(39, 52, 47, .12);
-    z-index: 2;
+  position: fixed;
+  inset: 0;
+  background: rgba(39, 52, 47, 0.12);
+  z-index: 2;
 }
 
 .composer {
-    width: min(420px, 92vw);
-    padding: 30px;
-    background: var(--paper);
-    box-shadow: -12px 0 35px rgba(39, 52, 47, .16);
+  width: min(420px, 92vw);
+  padding: 30px;
+  background: var(--paper);
+  box-shadow: -12px 0 35px rgba(39, 52, 47, 0.16);
 }
 
 .composer.drawer {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    overflow-y: auto;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
 }
 
 .composer.drawer:not(.tag-editor) {
-    padding-top: 30px;
+  padding-top: 30px;
+}
+
+.datetime-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.datetime-field input[type="date"] {
+  flex: 1;
+  min-width: 0;
+  padding-inline: 8px;
+}
+
+.datetime-field select {
+  padding-inline: 7px;
 }
 
 .modal-heading {
-    display: flex;
-    justify-content: space-between;
+  display: flex;
+  justify-content: space-between;
 }
 
 .segmented {
-    text-align: center;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    padding: 4px;
-    margin-bottom: 24px;
-    background: #e8eee3;
+  text-align: center;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 24px;
+  background: #e8eee3;
 }
 
 .segmented button {
-    border: 0;
-    padding: 9px;
-    color: var(--muted);
-    background: transparent;
+  border: 0;
+  padding: 9px;
+  color: var(--muted);
+  background: transparent;
 }
 
 .segmented button.selected {
-    color: var(--ink);
-    background: var(--paper);
-    box-shadow: 0 1px 4px rgba(39, 52, 47, .08);
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow: 0 1px 4px rgba(39, 52, 47, 0.08);
 }
 
 .form-hint {
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.5;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }

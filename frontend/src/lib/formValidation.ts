@@ -36,20 +36,25 @@ export const getComposerFieldErrors = (
 ) => {
   const invalidNames = Array.from(form.elements)
     .filter(
-      (control): control is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
+      (
+        control,
+      ): control is
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
         control instanceof HTMLInputElement ||
         control instanceof HTMLSelectElement ||
         control instanceof HTMLTextAreaElement,
     )
     .filter((control) => !control.checkValidity())
-    .map((control) => control.name)
+    .map((control) => control.dataset.field || control.name)
     .filter(Boolean);
 
   const startsValue = String(
-    (form.elements.namedItem("starts_at") as HTMLInputElement | null)?.value ?? "",
+    (form.elements.namedItem("starts_at") as HTMLInputElement | null)?.value ??
+      "",
   );
   const endsValue = String(
-    (form.elements.namedItem("ends_at") as HTMLInputElement | null)?.value ?? "",
+    (form.elements.namedItem("ends_at") as HTMLInputElement | null)?.value ??
+      "",
   );
   if (
     composerType === "event" &&

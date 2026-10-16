@@ -13,6 +13,7 @@ describe("ComposerDrawer validation state", () => {
         tags={[]}
         selectedTagIds={[]}
         mainTagId={null}
+        timeFormat="browser"
         fieldErrors={{ title: true, starts_at: true, ends_at: true }}
         error="Please correct the highlighted fields."
         onSubmit={vi.fn()}
@@ -23,11 +24,29 @@ describe("ComposerDrawer validation state", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Title").getAttribute("aria-invalid")).toBe("true");
-    expect(screen.getByRole("alert").textContent).toBe("Please correct the highlighted fields.");
-    expect(screen.getByLabelText("Title").getAttribute("aria-describedby")).toBe("composer-error");
-    expect(screen.getByLabelText("Starts").getAttribute("aria-invalid")).toBe("true");
-    expect(screen.getByLabelText("Ends").getAttribute("aria-invalid")).toBe("true");
-    expect(screen.getByLabelText("Description").getAttribute("aria-invalid")).toBe("false");
+    expect(screen.getByLabelText("Title").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Please correct the highlighted fields.",
+    );
+    expect(
+      screen.getByLabelText("Title").getAttribute("aria-describedby"),
+    ).toBe("composer-error");
+    expect(
+      screen.getByLabelText("Starts date").getAttribute("aria-invalid"),
+    ).toBe("true");
+    expect(
+      screen.getByLabelText("Starts hour").getAttribute("aria-invalid"),
+    ).toBe("true");
+    expect(
+      screen.getByLabelText("Starts minute").getAttribute("aria-describedby"),
+    ).toBe("composer-error");
+    expect(
+      screen.getByLabelText("Ends date").getAttribute("aria-invalid"),
+    ).toBe("true");
+    expect(
+      screen.getByLabelText("Description").getAttribute("aria-invalid"),
+    ).toBe("false");
   });
 });
