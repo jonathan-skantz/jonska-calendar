@@ -48,7 +48,7 @@ The frontend is a separate development server. Vite proxies `/api` to the Go ser
 - [backend/internal/timeline/](../backend/internal/timeline/)
   - `handler.go` contains shared handler setup and timeline operations. `requests.go` defines API payloads and responses. Feature files contain event, task, tag, and sharing endpoints. `validation.go` contains request validation.
 - [backend/internal/weather/](../backend/internal/weather/)
-  - `client.go` fetches hourly forecasts from Open-Meteo. `conditions.go` reduces them to each day's conditions. `handler.go` serves `GET /api/weather` from the shared forecast cache.
+  - `client.go` fetches hourly forecasts and daily sun times from Open-Meteo. `conditions.go` reduces them to each day's conditions and `HH:MM` sunrise/sunset. `handler.go` serves `GET /api/weather` from the shared forecast cache.
 - [backend/db/](../backend/db/)
   - `store.go` owns the PostgreSQL pool reference and setup. `users.go`, `events.go`, `tasks.go`, `tags.go`, `sharing.go`, and `timeline.go` group queries by feature. `models.go` and `errors.go` define store types and sentinel errors.
 - [backend/db/migrations](../backend/db/migrations)
@@ -156,13 +156,15 @@ conflict.
 ### Weather forecast cache
 
 ```text
-weather_forecasts (latitude NUMERIC(4,1), longitude NUMERIC(4,1), fetched_at, hourly JSONB)
+weather_forecasts (latitude NUMERIC(4,1), longitude NUMERIC(4,1), fetched_at, hourly JSONB, daily JSONB)
 ```
 
 This is a shared cache, not user data: it has no `user_id`. Coordinates are
 rounded to 0.1 degrees (about 10 km), so all users in a cell share one row and
 exact positions are never stored. `hourly` holds the raw Open-Meteo codes, so
-the condition rule can change without refetching. A row older than 3 hours is
+the condition rule can change without refetching. `daily` holds local sunrise
+and sunset times (migration 23); a row where it is NULL predates that column
+and is treated as stale. A row older than 3 hours is
 refreshed on the next request; if the refresh fails the stale row is served.
 Concurrent requests for one cell share a single upstream call (`singleflight`,
 per process).
@@ -224,7 +226,7 @@ All API routes use JSON request and response bodies unless the response is `204 
 | `POST /api/reminders/{reminderID}/notified`     | None                                        | `204`; keeps the first delivery time                 |
 | `GET /api/transit-card/days?from=&to=`          | None                                        | Array of reported transit-card days                  |
 | `PUT /api/transit-card/days`                    | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                |
-| `GET /api/weather?lat=&lon=`                    | None                                        | Array of `{date, conditions}`; `503` no data         |
+| `GET /api/weather?lat=&lon=`                    | None                                        | `{date, conditions, sunrise?, sunset?}[]`; `503`     |
 | `GET /api/household`                            | None                                        | Household or `null`                                  |
 | `POST /api/household`                           | `name`, `transit_card_count`                | `201`; `409` if already in a household               |
 | `PATCH /api/household`                          | `name`, `transit_card_count`                | `204`; `404` without a household                     |
@@ -270,7 +272,7 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Change tag ownership, defaults, or attachment | `backend/db/tags.go`                                                                                                  | migrations 6-8, timeline handlers                      |
 | Change event reminders                        | `backend/db/reminders.go`, `backend/internal/timeline/reminders.go`                                                   | migration 21                                           |
 | Change transit-card declarations              | `backend/db/transit_card.go`, `backend/internal/timeline/transit_card.go`                                             | migration 12, `frontend/src/features/transitCard/`     |
-| Change weather icons or caching               | `backend/internal/weather/`                                                                                           | migration 22, `frontend/src/features/weather/`         |
+| Change weather icons or caching               | `backend/internal/weather/`                                                                                           | migrations 22-23, `frontend/src/features/weather/`     |
 | Change households or card conflicts           | `backend/db/households.go`, `backend/internal/timeline/household.go`                                                  | migration 15, `frontend/src/features/household/`       |
 | Change timeline JSON shape                    | `db.TimelineEntry` in `backend/db/models.go`                                                                          | frontend `TimelineEntry` type and grid rendering       |
 | Change week navigation/date math              | `frontend/src/App.tsx` date helpers and week state                                                                    | `date-fns` imports                                     |

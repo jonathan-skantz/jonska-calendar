@@ -333,6 +333,59 @@
   bottom: -3px;
 }
 
+.sun-indicators {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Night shading sits under every timeline entry. */
+.sun-indicators.night-layer {
+  z-index: 0;
+}
+
+/* Sun lines sit above entries, previews and the past-day overlay. */
+.sun-indicators.line-layer {
+  z-index: 4;
+}
+
+.night-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(30, 40, 70, 0.07);
+}
+
+.sun-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--yellow);
+}
+
+.sun-line-label {
+  position: absolute;
+  left: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--muted);
+  font:
+    9px "DM Mono",
+    monospace;
+  transform: translateY(-50%);
+  /* Centered on the 2px line rather than its top edge. */
+  margin-top: -1px;
+}
+
+.sun-line-label .sun {
+  color: #e2a93b;
+}
+
 .continuation-markers {
   position: absolute;
   height: 6px;

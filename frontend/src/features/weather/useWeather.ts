@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryKeys";
-import type { WeatherCondition, WeatherDay } from "../../types";
+import type { WeatherDay } from "../../types";
 
 type Position = { lat: number; lon: number };
 
@@ -80,8 +80,8 @@ export const useWeather = (enabled: boolean) => {
 
   return useMemo(
     () =>
-      new Map<string, WeatherCondition[]>(
-        (query.data ?? []).map((day) => [day.date, day.conditions]),
+      new Map<string, WeatherDay>(
+        (query.data ?? []).map((day) => [day.date, day]),
       ),
     [query.data],
   );

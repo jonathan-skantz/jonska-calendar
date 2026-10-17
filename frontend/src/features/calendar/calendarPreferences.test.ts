@@ -21,12 +21,33 @@ describe("calendar preferences", () => {
       parseCalendarPreferences(
         JSON.stringify({ timeFormat: "24-hour", weekStartsOn: 6 }),
       ),
-    ).toEqual({ timeFormat: "24-hour", weekStartsOn: 6 });
+    ).toEqual({
+      ...DEFAULT_CALENDAR_PREFERENCES,
+      timeFormat: "24-hour",
+      weekStartsOn: 6,
+    });
     expect(
       parseCalendarPreferences(
         JSON.stringify({ timeFormat: "invalid", weekStartsOn: 9 }),
       ),
     ).toEqual(DEFAULT_CALENDAR_PREFERENCES);
+  });
+
+  it("keeps saved sun toggles and defaults them to on", () => {
+    expect(
+      parseCalendarPreferences(
+        JSON.stringify({
+          showSunrise: false,
+          showSunset: "no",
+          showNight: false,
+        }),
+      ),
+    ).toEqual({
+      ...DEFAULT_CALENDAR_PREFERENCES,
+      showSunrise: false,
+      showSunset: true,
+      showNight: false,
+    });
   });
 
   it("resolves browser week settings and localizes weekday names", () => {

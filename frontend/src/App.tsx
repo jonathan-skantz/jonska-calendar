@@ -68,6 +68,8 @@ import {
   useTransitCardDays,
 } from "./features/transitCard/useTransitCard";
 import { useWeather } from "./features/weather/useWeather";
+import { getSunIndicators } from "./features/weather/sunTimes";
+import { SunIndicators } from "./features/calendar/SunIndicators";
 import {
   useReminderMutations,
   useReminders,
@@ -442,6 +444,7 @@ function App() {
           onWeekStartChange={(weekStartsOn) =>
             updatePreferences({ weekStartsOn })
           }
+          onSunDisplayChange={updatePreferences}
           onBack={() => setShowSettings(false)}
         >
           <HouseholdSettings
@@ -483,6 +486,17 @@ function App() {
               onDayClick={openNewEventAt}
               renderDay={(date) => (
                 <>
+                  <SunIndicators
+                    {...getSunIndicators(
+                      date,
+                      weatherByDay.get(dateKey(date)),
+                      preferences,
+                      (value) =>
+                        formatTime(value, {
+                          preference: preferences.timeFormat,
+                        }),
+                    )}
+                  />
                   {renderDayEntries(date)}
                   <CalendarDayIndicators
                     preview={

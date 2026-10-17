@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import type {
   CalendarPreferences,
+  SunDisplayPreferences,
   WeekStartPreference,
 } from "../features/calendar/calendarPreferences";
 import { weekdayName } from "../features/calendar/calendarPreferences";
@@ -14,6 +15,7 @@ type SettingsPageProps = {
   preferences: CalendarPreferences;
   onTimeFormatChange: (value: TimeFormatPreference) => void;
   onWeekStartChange: (value: WeekStartPreference) => void;
+  onSunDisplayChange: (update: Partial<SunDisplayPreferences>) => void;
   onBack: () => void;
   children?: ReactNode;
 };
@@ -25,6 +27,7 @@ export function SettingsPage({
   preferences,
   onTimeFormatChange,
   onWeekStartChange,
+  onSunDisplayChange,
   onBack,
   children,
 }: SettingsPageProps) {
@@ -140,6 +143,31 @@ export function SettingsPage({
             </option>
           ))}
         </select>
+      </section>
+
+      <section className="settings-section" aria-labelledby="sun-heading">
+        <h2 id="sun-heading">Sun and night</h2>
+        <p>Uses the forecast for your current location.</p>
+        <div className="settings-options">
+          {(
+            [
+              ["showSunrise", "Show sunrise"],
+              ["showSunset", "Show sunset"],
+              ["showNight", "Shade night"],
+            ] as [keyof SunDisplayPreferences, string][]
+          ).map(([key, label]) => (
+            <label className="settings-option" key={key}>
+              <input
+                type="checkbox"
+                checked={preferences[key]}
+                onChange={(event) =>
+                  onSunDisplayChange({ [key]: event.target.checked })
+                }
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
       </section>
     </main>
   );

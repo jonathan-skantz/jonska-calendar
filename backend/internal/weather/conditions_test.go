@@ -41,7 +41,7 @@ func TestDailyConditions(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			days := DailyConditions(hourlyDay("2026-10-17", test.entries...))
+			days := dailyConditions(hourlyDay("2026-10-17", test.entries...))
 			if len(days) != 1 || days[0].Date != "2026-10-17" {
 				t.Fatalf("expected one day 2026-10-17, got %+v", days)
 			}
@@ -60,7 +60,7 @@ func TestDailyConditionsSplitsDaysAndSkipsMissingCodes(t *testing.T) {
 	hourly.WeatherCode = append(hourly.WeatherCode, next.WeatherCode...)
 	hourly.IsDay = append(hourly.IsDay, next.IsDay...)
 
-	days := DailyConditions(hourly)
+	days := dailyConditions(hourly)
 	want := []Day{{Date: "2026-10-17", Conditions: []Condition{Clear}}, {Date: "2026-10-18", Conditions: []Condition{Rain}}}
 	if len(days) != len(want) {
 		t.Fatalf("expected %v, got %v", want, days)
@@ -69,5 +69,30 @@ func TestDailyConditionsSplitsDaysAndSkipsMissingCodes(t *testing.T) {
 		if days[i].Date != want[i].Date || !slices.Equal(days[i].Conditions, want[i].Conditions) {
 			t.Fatalf("expected %v, got %v", want, days)
 		}
+	}
+}
+
+func TestForecastDaysMergesSunTimes(t *testing.T) {
+	text := func(value string) *string { return &value }
+	forecast := Forecast{
+		Hourly: hourlyDay("2026-10-17", [3]int{10, 0, 1}, [3]int{11, 0, 1}),
+		Daily: Daily{
+			Time:    []string{"2026-10-17", "2026-12-20"},
+			Sunrise: []*string{text("2026-10-17T07:42"), nil},
+			// A sunset on the following day means the sun never set on 12-20.
+			Sunset: []*string{text("2026-10-17T17:31"), text("2026-12-21T00:00")},
+		},
+	}
+
+	days := ForecastDays(forecast)
+	if len(days) != 2 {
+		t.Fatalf("expected two days, got %+v", days)
+	}
+	first, polar := days[0], days[1]
+	if first.Date != "2026-10-17" || *first.Sunrise != "07:42" || *first.Sunset != "17:31" || !slices.Equal(first.Conditions, []Condition{Clear}) {
+		t.Fatalf("unexpected first day %+v", first)
+	}
+	if polar.Date != "2026-12-20" || polar.Sunrise != nil || polar.Sunset != nil || len(polar.Conditions) != 0 {
+		t.Fatalf("unexpected polar day %+v", polar)
 	}
 }

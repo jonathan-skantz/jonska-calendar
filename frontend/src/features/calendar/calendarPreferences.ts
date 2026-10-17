@@ -3,7 +3,13 @@ import type { TimeFormatPreference, WeekStartsOn } from "../../lib/calendar";
 
 export type WeekStartPreference = "browser" | WeekStartsOn;
 
-export type CalendarPreferences = {
+export type SunDisplayPreferences = {
+  showSunrise: boolean;
+  showSunset: boolean;
+  showNight: boolean;
+};
+
+export type CalendarPreferences = SunDisplayPreferences & {
   timeFormat: TimeFormatPreference;
   weekStartsOn: WeekStartPreference;
 };
@@ -11,7 +17,13 @@ export type CalendarPreferences = {
 export const DEFAULT_CALENDAR_PREFERENCES: CalendarPreferences = {
   timeFormat: "browser",
   weekStartsOn: "browser",
+  showSunrise: true,
+  showSunset: true,
+  showNight: true,
 };
+
+const booleanOr = (value: unknown, fallback: boolean) =>
+  typeof value === "boolean" ? value : fallback;
 
 const isTimeFormatPreference = (
   value: unknown,
@@ -41,6 +53,9 @@ export const parseCalendarPreferences = (
       weekStartsOn: isWeekStartPreference(preferences.weekStartsOn)
         ? preferences.weekStartsOn
         : "browser",
+      showSunrise: booleanOr(preferences.showSunrise, true),
+      showSunset: booleanOr(preferences.showSunset, true),
+      showNight: booleanOr(preferences.showNight, true),
     };
   } catch {
     return DEFAULT_CALENDAR_PREFERENCES;

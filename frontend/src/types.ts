@@ -105,4 +105,7 @@ export type WeatherCondition =
 export type WeatherDay = {
   date: string;
   conditions: WeatherCondition[];
+  // Local "HH:MM"; absent when the sun does not rise or set that day.
+  sunrise?: string;
+  sunset?: string;
 };

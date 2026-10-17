@@ -15,7 +15,7 @@ const CLOUD = "M4.5 12.5a3 3 0 0 1-.4-6 4 4 0 0 1 7.7-.7 3.3 3.3 0 0 1 .2 6.7Z";
 const SMALL_CLOUD =
   "M4 10.5a2.3 2.3 0 0 1-.3-4.6 3.1 3.1 0 0 1 5.9-.5 2.6 2.6 0 0 1 .1 5.1Z";
 
-const Sun = ({ cx, cy, r }: { cx: number; cy: number; r: number }) => (
+export const Sun = ({ cx, cy, r }: { cx: number; cy: number; r: number }) => (
   <g className="sun">
     <circle cx={cx} cy={cy} r={r} fill="currentColor" />
     {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (

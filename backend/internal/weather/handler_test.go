@@ -1,6 +1,7 @@
 package weather
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,10 +11,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
-const upstreamBody = `{"hourly":{"time":["2026-10-17T10:00","2026-10-17T11:00"],"weather_code":[0,0],"is_day":[1,1]}}`
+const upstreamBody = `{
+	"hourly":{"time":["2026-10-17T10:00","2026-10-17T11:00"],"weather_code":[0,0],"is_day":[1,1]},
+	"daily":{"time":["2026-10-17"],"sunrise":["2026-10-17T07:42"],"sunset":["2026-10-17T17:31"]}
+}`
 
 type fakeUpstream struct {
 	calls   atomic.Int32
@@ -76,7 +81,8 @@ func TestForecastSharesCacheAndRefreshes(t *testing.T) {
 		if err := json.NewDecoder(response.Body).Decode(&days); err != nil {
 			t.Fatal(err)
 		}
-		if len(days) != 1 || days[0].Date != "2026-10-17" || len(days[0].Conditions) != 1 || days[0].Conditions[0] != Clear {
+		if len(days) != 1 || days[0].Date != "2026-10-17" || len(days[0].Conditions) != 1 || days[0].Conditions[0] != Clear ||
+			days[0].Sunrise == nil || *days[0].Sunrise != "07:42" || days[0].Sunset == nil || *days[0].Sunset != "17:31" {
 			t.Fatalf("unexpected days %+v", days)
 		}
 	}
@@ -99,5 +105,29 @@ func TestForecastSharesCacheAndRefreshes(t *testing.T) {
 	}
 	if code := get(handler, "lat=10&lon=10").Code; code != http.StatusServiceUnavailable {
 		t.Fatalf("expected status %d for an uncached cell, got %d", http.StatusServiceUnavailable, code)
+	}
+}
+
+func TestForecastRefetchesRowsWithoutSunTimes(t *testing.T) {
+	store := testutil.NewStore(t)
+	upstream := newFakeUpstream(t)
+	handler := New(store, authenticated, &Client{BaseURL: upstream.server.URL, HTTP: upstream.server.Client()})
+	now := time.Date(2026, 10, 17, 8, 0, 0, 0, time.UTC)
+	handler.now = func() time.Time { return now }
+
+	// A fresh row cached before migration 23 has no daily column value.
+	legacy := db.WeatherForecast{FetchedAt: now, Hourly: json.RawMessage(`{"time":[],"weather_code":[],"is_day":[]}`)}
+	if err := store.UpsertWeatherForecast(context.Background(), 59.3, 18.1, legacy); err != nil {
+		t.Fatal(err)
+	}
+	if code := get(handler, "lat=59.3&lon=18.1").Code; code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, code)
+	}
+	if calls := upstream.calls.Load(); calls != 1 {
+		t.Fatalf("expected a refetch for a row without sun times, got %d calls", calls)
+	}
+	cached, err := store.GetWeatherForecast(context.Background(), 59.3, 18.1)
+	if err != nil || cached.Daily == nil {
+		t.Fatalf("expected the refetched row to store sun times, got %+v, %v", cached, err)
 	}
 }

@@ -1,6 +1,9 @@
 package weather
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 type Condition string
 
@@ -20,9 +23,13 @@ var conditionOrder = []Condition{Clear, PartlyCloudy, Cloudy, Fog, Rain, Snow, T
 
 const maxConditionsPerDay = 3
 
+// Sunrise and Sunset are local "HH:MM" and are omitted when the sun does not
+// rise or set that day.
 type Day struct {
 	Date       string      `json:"date"`
 	Conditions []Condition `json:"conditions"`
+	Sunrise    *string     `json:"sunrise,omitempty"`
+	Sunset     *string     `json:"sunset,omitempty"`
 }
 
 // conditionForCode maps a WMO weather code to a display condition.
@@ -55,9 +62,47 @@ func minimumHours(condition Condition) int {
 	return 2
 }
 
-// DailyConditions reduces hourly codes to the distinct conditions seen during
+// ForecastDays combines each local day's conditions with its sun times. Days
+// are returned in chronological order.
+func ForecastDays(forecast Forecast) []Day {
+	days := dailyConditions(forecast.Hourly)
+	byDate := map[string]int{}
+	for i, day := range days {
+		byDate[day.Date] = i
+	}
+	daily := forecast.Daily
+	for i, date := range daily.Time {
+		sunrise, sunset := clockTime(date, daily.Sunrise[i]), clockTime(date, daily.Sunset[i])
+		index, ok := byDate[date]
+		if !ok {
+			// Polar night has no daylight hours but still belongs in the list.
+			index = len(days)
+			byDate[date] = index
+			days = append(days, Day{Date: date, Conditions: []Condition{}})
+		}
+		days[index].Sunrise, days[index].Sunset = sunrise, sunset
+	}
+	slices.SortFunc(days, func(a, b Day) int { return strings.Compare(a.Date, b.Date) })
+	return days
+}
+
+// clockTime returns the "HH:MM" part of a local timestamp on date, or nil when
+// it is missing or falls on another day (the sun did not rise or set).
+func clockTime(date string, timestamp *string) *string {
+	if timestamp == nil {
+		return nil
+	}
+	day, clock, ok := strings.Cut(*timestamp, "T")
+	if !ok || day != date || len(clock) < 5 {
+		return nil
+	}
+	clock = clock[:5]
+	return &clock
+}
+
+// dailyConditions reduces hourly codes to the distinct conditions seen during
 // daylight on each local day. Days are returned in chronological order.
-func DailyConditions(hourly Hourly) []Day {
+func dailyConditions(hourly Hourly) []Day {
 	dates := []string{}
 	hours := map[string]map[Condition]int{}
 	for i, timestamp := range hourly.Time {

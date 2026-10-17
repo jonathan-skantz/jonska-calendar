@@ -56,7 +56,7 @@ func (h *Handler) Forecast(w http.ResponseWriter, r *http.Request) {
 	// does not fail the others waiting on it.
 	key := fmt.Sprintf("%.1f,%.1f", latitude, longitude)
 	result, err, _ := h.fetches.Do(key, func() (any, error) {
-		return h.hourly(context.WithoutCancel(r.Context()), latitude, longitude)
+		return h.forecast(context.WithoutCancel(r.Context()), latitude, longitude)
 	})
 	if errors.Is(err, errUnavailable) {
 		http.Error(w, "weather is unavailable", http.StatusServiceUnavailable)
@@ -69,44 +69,57 @@ func (h *Handler) Forecast(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(DailyConditions(result.(Hourly)))
+	_ = json.NewEncoder(w).Encode(ForecastDays(result.(Forecast)))
 }
 
-// hourly returns the cached forecast for the cell, refreshing it from
-// upstream when it is older than cacheTTL. A stale forecast is still better
-// than none, so it is served when the refresh fails.
-func (h *Handler) hourly(ctx context.Context, latitude, longitude float64) (Hourly, error) {
+// forecast returns the cached forecast for the cell, refreshing it from
+// upstream when it is older than cacheTTL or predates stored sun times. A
+// stale forecast is still better than none, so it is served when the refresh
+// fails.
+func (h *Handler) forecast(ctx context.Context, latitude, longitude float64) (Forecast, error) {
 	cached, err := h.Store.GetWeatherForecast(ctx, latitude, longitude)
 	hasCached := err == nil
 	if err != nil && !errors.Is(err, db.ErrWeatherNotCached) {
-		return Hourly{}, err
+		return Forecast{}, err
 	}
-	if hasCached && h.now().Sub(cached.FetchedAt) < cacheTTL {
-		return decodeHourly(cached.Hourly)
+	if hasCached && cached.Daily != nil && h.now().Sub(cached.FetchedAt) < cacheTTL {
+		return decodeForecast(cached)
 	}
 
-	fresh, err := h.Client.Hourly(ctx, latitude, longitude)
+	fresh, err := h.Client.Forecast(ctx, latitude, longitude)
 	if err != nil {
 		log.Printf("weather: refreshing %.1f,%.1f: %v", latitude, longitude, err)
 		if hasCached {
-			return decodeHourly(cached.Hourly)
+			return decodeForecast(cached)
 		}
-		return Hourly{}, errUnavailable
+		return Forecast{}, errUnavailable
 	}
-	encoded, err := json.Marshal(fresh)
+	hourly, err := json.Marshal(fresh.Hourly)
 	if err != nil {
-		return Hourly{}, err
+		return Forecast{}, err
 	}
-	if err := h.Store.UpsertWeatherForecast(ctx, latitude, longitude, h.now(), encoded); err != nil {
-		return Hourly{}, err
+	daily, err := json.Marshal(fresh.Daily)
+	if err != nil {
+		return Forecast{}, err
+	}
+	row := db.WeatherForecast{FetchedAt: h.now(), Hourly: hourly, Daily: daily}
+	if err := h.Store.UpsertWeatherForecast(ctx, latitude, longitude, row); err != nil {
+		return Forecast{}, err
 	}
 	return fresh, nil
 }
 
-func decodeHourly(raw json.RawMessage) (Hourly, error) {
-	var hourly Hourly
-	err := json.Unmarshal(raw, &hourly)
-	return hourly, err
+func decodeForecast(row db.WeatherForecast) (Forecast, error) {
+	var forecast Forecast
+	if err := json.Unmarshal(row.Hourly, &forecast.Hourly); err != nil {
+		return Forecast{}, err
+	}
+	if row.Daily != nil {
+		if err := json.Unmarshal(row.Daily, &forecast.Daily); err != nil {
+			return Forecast{}, err
+		}
+	}
+	return forecast, nil
 }
 
 // parseCoordinates rounds to 0.1 degrees (about 10 km). That is the cache

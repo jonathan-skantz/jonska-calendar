@@ -202,6 +202,13 @@ separate from events and tasks.
       ahead), no icons are shown.
 - [x] Forecasts come from Open-Meteo and are cached on the server per area of
       about 10 km for 3 hours, shared by all users in that area.
+- [x] Each day column shows a yellow line with a sun and the local time at
+      sunrise and at sunset, and shades the night (midnight to sunrise and
+      sunset to midnight) darker. These use the same forecast and window.
+- [x] Settings has separate toggles for sunrise lines, sunset lines, and night
+      shading; all are on by default and saved per user in the browser.
+- [x] Days where the sun does not rise or set (polar day or night) show no
+      line for the missing event, and no shading when both are missing.
 
 ## Future Features
 
