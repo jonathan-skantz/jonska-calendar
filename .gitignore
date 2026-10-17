@@ -1,0 +1,2 @@
+# Local secrets such as ANTHROPIC_API_KEY. Never commit.
+.env.local

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/.env.local)",
+      "Edit(**/.env.local)",
+      "Write(**/.env.local)",
+      "Bash(*.env.local*)"
+    ]
+  }
+}
