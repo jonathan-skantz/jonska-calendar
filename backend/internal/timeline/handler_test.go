@@ -222,6 +222,85 @@ func TestGatheringIsStoredAndShared(t *testing.T) {
 	}
 }
 
+func TestCreateEventRejectsSkippedInformationalEvent(t *testing.T) {
+	handler := New(nil, func(*http.Request) (uuid.UUID, error) { return uuid.New(), nil })
+	response := httptest.NewRecorder()
+	handler.CreateEvent(response, httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(
+		`{"title":"Release","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"informational","is_skipped":true}`,
+	)))
+	if response.Code != http.StatusBadRequest || response.Body.String() != ErrInvalidSkip.Error()+"\n" {
+		t.Fatalf("expected skip error, got %d: %s", response.Code, response.Body.String())
+	}
+}
+
+func TestSkippedEventKeepsCommuteAndIsNotShared(t *testing.T) {
+	store, ownerID := setupTestStore(t)
+	ctx := context.Background()
+	recipientID, err := store.Register(ctx, "recipient@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentUser := ownerID
+	handler := New(store, func(*http.Request) (uuid.UUID, error) { return currentUser, nil })
+
+	response := httptest.NewRecorder()
+	handler.CreateEvent(response, httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(`{
+		"title":"Lecture",
+		"starts_at":"2026-10-09T10:00:00Z",
+		"ends_at":"2026-10-09T12:00:00Z",
+		"kind":"attendable",
+		"commute_before_seconds":1200
+	}`)))
+	if response.Code != http.StatusCreated {
+		t.Fatalf("create: expected status %d, got %d: %s", http.StatusCreated, response.Code, response.Body.String())
+	}
+	var created createResponse
+	if err := json.NewDecoder(response.Body).Decode(&created); err != nil {
+		t.Fatal(err)
+	}
+
+	update := httptest.NewRequest(http.MethodPut, "/api/events/"+created.ID.String(), bytes.NewBufferString(`{
+		"title":"Lecture",
+		"starts_at":"2026-10-09T10:00:00Z",
+		"ends_at":"2026-10-09T12:00:00Z",
+		"kind":"attendable",
+		"is_skipped":true,
+		"commute_before_seconds":1200
+	}`))
+	update.SetPathValue("eventID", created.ID.String())
+	response = httptest.NewRecorder()
+	handler.UpdateEvent(response, update)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("update: expected status %d, got %d: %s", http.StatusNoContent, response.Code, response.Body.String())
+	}
+
+	shareRequest := httptest.NewRequest(http.MethodPost, "/api/events/"+created.ID.String()+"/shares",
+		bytes.NewBufferString(`{"recipient_email":"recipient@example.com"}`))
+	shareRequest.SetPathValue("eventID", created.ID.String())
+	response = httptest.NewRecorder()
+	handler.ShareEvent(response, shareRequest)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("share: expected status %d, got %d: %s", http.StatusCreated, response.Code, response.Body.String())
+	}
+
+	timeline := func(userID uuid.UUID) []db.TimelineEntry {
+		currentUser = userID
+		response := httptest.NewRecorder()
+		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+		var entries []db.TimelineEntry
+		if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+			t.Fatal(err)
+		}
+		return entries
+	}
+	if owned := timeline(ownerID); len(owned) != 1 || !owned[0].IsSkipped || owned[0].CommuteBeforeSeconds != 1200 {
+		t.Fatalf("owner: unexpected entries %+v", owned)
+	}
+	if shared := timeline(recipientID); len(shared) != 1 || shared[0].IsSkipped {
+		t.Fatalf("recipient: unexpected entries %+v", shared)
+	}
+}
+
 func TestApproximateTimesAreStoredAndShared(t *testing.T) {
 	store, ownerID := setupTestStore(t)
 	ctx := context.Background()

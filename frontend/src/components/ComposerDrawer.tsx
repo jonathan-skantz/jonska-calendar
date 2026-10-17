@@ -55,7 +55,8 @@ export const ComposerDrawer = ({
   shareCount = 0,
 }: ComposerDrawerProps) => {
   const [isAllDay, setIsAllDay] = useState(Boolean(editingItem?.is_all_day));
-  const [kind, setKind] = useState(editingItem?.kind ?? "informational");
+  const [kind, setKind] = useState(editingItem?.kind ?? "attendable");
+  const [isSkipped, setIsSkipped] = useState(Boolean(editingItem?.is_skipped));
   const allowsCommute = kind === "attendable" && !isAllDay;
   const commuteMinutes = (seconds?: number) =>
     seconds ? String(Math.round(seconds / SECONDS_PER_MINUTE)) : "";
@@ -173,27 +174,43 @@ export const ComposerDrawer = ({
           </label>
           {type === "event" ? (
             <>
-              <label className={fieldErrors.kind ? "field-invalid" : ""}>
-                Kind
-                <select
-                  name="kind"
-                  aria-invalid={Boolean(fieldErrors.kind)}
-                  aria-describedby={
-                    fieldErrors.kind && error ? "composer-error" : undefined
-                  }
-                  value={kind}
-                  onChange={(event) =>
-                    setKind(
-                      event.target.value === "attendable"
-                        ? "attendable"
-                        : "informational",
-                    )
-                  }
-                >
-                  <option value="informational">Informational</option>
-                  <option value="attendable">Attendable</option>
-                </select>
-              </label>
+              {/* The UI names are "Attend" and "Heads-up"; the stored values
+                  stay attendable and informational. */}
+              <div
+                className={`segmented kind-toggle ${fieldErrors.kind ? "field-invalid" : ""}`}
+                role="group"
+                aria-label="Kind"
+              >
+                {(
+                  [
+                    ["attendable", "Attend"],
+                    ["informational", "Heads-up"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={kind === value ? "selected" : ""}
+                    aria-pressed={kind === value}
+                    onClick={() => setKind(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <input type="hidden" name="kind" value={kind} />
+              {kind === "attendable" && (
+                <label className="all-day-toggle">
+                  <input
+                    type="checkbox"
+                    name="is_skipped"
+                    value="true"
+                    checked={isSkipped}
+                    onChange={(event) => setIsSkipped(event.target.checked)}
+                  />
+                  Skipping this one (keep in calendar)
+                </label>
+              )}
               <label className="all-day-toggle">
                 <input
                   type="checkbox"

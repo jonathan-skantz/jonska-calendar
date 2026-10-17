@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  entriesOverlap,
   eventBodyOverlapsDate,
   getCalendarEntryLayout,
   getCommuteSegments,
@@ -309,5 +310,26 @@ describe("gathering", () => {
     expect(
       getGatheringSegment({ ...gathering, kind: "informational" }, day),
     ).toBeNull();
+  });
+});
+
+describe("not-busy layer", () => {
+  it("detects overlap between a busy event and a heads-up", () => {
+    const lecture = event({ id: "lecture", kind: "attendable" });
+    const release = event({
+      id: "release",
+      kind: "informational",
+      starts_at: "2026-10-15T10:30:00",
+      ends_at: "2026-10-15T11:30:00",
+    });
+    expect(entriesOverlap(lecture, release)).toBe(true);
+    expect(
+      entriesOverlap(lecture, {
+        ...release,
+        starts_at: "2026-10-15T11:00:00",
+      }),
+    ).toBe(false);
+    // Laid out on its own layer, the lecture is not indented by the heads-up.
+    expect(getEventOverlapDepth(lecture, [])).toBe(0);
   });
 });

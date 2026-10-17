@@ -541,6 +541,38 @@
   border: 1px solid white;
 }
 
+/* Heads-up and skipped events stay visible but don't take up time: an
+   outlined ghost that busy (solid) blocks draw over. Text mixes the tag with
+   ink so light tags stay readable. */
+.grid-entry.event.not-busy,
+.all-day-event.not-busy {
+  --ghost-color: var(--tag-color, var(--yellow));
+  background-color: color-mix(in srgb, var(--ghost-color) 12%, var(--paper));
+  color: color-mix(in srgb, var(--ghost-color) 65%, var(--ink));
+}
+
+.grid-entry.event.not-busy {
+  z-index: 0;
+  border: 1px solid color-mix(in srgb, var(--ghost-color) 45%, transparent);
+  border-left: 3px solid var(--ghost-color);
+}
+
+/* Normally attended, so dashed rather than solid like a heads-up. */
+.grid-entry.event.not-busy.skipped {
+  border-style: dashed;
+  border-left-style: solid;
+}
+
+.all-day-event.not-busy {
+  border-left: 3px solid var(--ghost-color);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--ghost-color) 45%, transparent);
+}
+
+.ghost-marker {
+  font-style: normal;
+}
+
 .grid-entry.completed {
   opacity: 0.55;
 }

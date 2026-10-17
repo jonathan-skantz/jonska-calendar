@@ -4,7 +4,10 @@ import {
   getElapsedOverlayState,
   getEventTagChanges,
   getDefaultEventTagSelection,
+  getCommuteSeconds,
+  getGathering,
   getMainTag,
+  isBusy,
   isEventVisible,
   buildEventPayload,
   buildTimelineItemRequest,
@@ -153,6 +156,44 @@ describe("timeline behavior", () => {
 
     form.set("is_all_day", "true");
     expect(buildEventPayload(form).end_is_approximate).toBe(false);
+  });
+
+  it("treats only attended events and tasks as busy", () => {
+    expect(isBusy(event({ kind: "attendable" }))).toBe(true);
+    expect(isBusy(event({ kind: "informational" }))).toBe(false);
+    expect(isBusy(event({ kind: "attendable", is_skipped: true }))).toBe(false);
+    expect(isBusy({ ...event(), type: "task" })).toBe(true);
+  });
+
+  it("hides commute and gathering while an event is skipped", () => {
+    const skipped = event({
+      kind: "attendable",
+      is_skipped: true,
+      commute_before_seconds: 1200,
+      gathering_seconds: 1800,
+    });
+    expect(getCommuteSeconds(skipped)).toEqual({ before: 0, after: 0 });
+    expect(getGathering(skipped).seconds).toBe(0);
+    expect(getCommuteSeconds({ ...skipped, is_skipped: false }).before).toBe(
+      1200,
+    );
+  });
+
+  it("sends skipping only for attendable events, keeping commute", () => {
+    const form = new FormData();
+    form.set("title", "Lecture");
+    form.set("kind", "attendable");
+    form.set("starts_at", "2026-10-15T10:00");
+    form.set("ends_at", "2026-10-15T12:00");
+    form.set("is_skipped", "true");
+    form.set("commute_before_minutes", "20");
+    expect(buildEventPayload(form)).toMatchObject({
+      is_skipped: true,
+      commute_before_seconds: 1200,
+    });
+
+    form.set("kind", "informational");
+    expect(buildEventPayload(form).is_skipped).toBe(false);
   });
 
   it("shows tasks regardless of hidden event tags and hides events with a hidden tag", () => {

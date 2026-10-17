@@ -73,6 +73,7 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 			event.start_is_approximate, event.end_is_approximate, event.gathering_seconds,
 			event.gathering_is_optional, event.gathering_label,
 			event.commute_before_seconds, event.commute_after_seconds, event.main_tag_id,
+			event.is_skipped,
 			(SELECT count(*) FROM event_shares AS share WHERE share.event_id = item.id)
 		FROM timeline_items AS item
 		JOIN events AS event ON event.timeline_item_id = item.id
@@ -90,7 +91,7 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 			&entry.StartIsApproximate, &entry.EndIsApproximate, &entry.GatheringSeconds,
 			&entry.GatheringIsOptional, &entry.GatheringLabel,
 			&entry.CommuteBeforeSeconds, &entry.CommuteAfterSeconds,
-			&entry.MainTagID, &entry.ShareCount,
+			&entry.MainTagID, &entry.IsSkipped, &entry.ShareCount,
 		); err != nil {
 			eventRows.Close()
 			return nil, err
@@ -137,7 +138,8 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 	rows, err := s.db.Query(ctx, `
 		-- Recipients only ever see the effective values: the owner's
 		-- per-recipient field when set, otherwise the event's own value. The
-		-- owner's original fields, tags, and commute are never projected.
+		-- owner's original fields, tags, commute, and skip decision are
+		-- never projected.
 		-- Gathering describes the event itself, so it is projected.
 		SELECT
 			share.event_id,

@@ -16,6 +16,7 @@ type eventRequest struct {
 	StartIsApproximate   bool      `json:"start_is_approximate"`
 	EndIsApproximate     bool      `json:"end_is_approximate"`
 	Kind                 string    `json:"kind"`
+	IsSkipped            bool      `json:"is_skipped"`
 	Location             *string   `json:"location"`
 	GatheringSeconds     int       `json:"gathering_seconds"`
 	GatheringIsOptional  bool      `json:"gathering_is_optional"`

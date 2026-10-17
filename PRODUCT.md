@@ -105,10 +105,22 @@ Events have a start date/time and end date/time.
   - career fair: mingle 30 mins before
   - a-kvart
 
+- [x] An attendable event can be marked as skipped (e.g. one lecture the user won't
+      go to) while staying in the calendar. It keeps its kind, commute, and
+      gathering, but no longer takes up time: it is drawn like a heads-up with a
+      ⊘ marker and a dashed outline, and its commute and gathering are hidden.
+      Skipping is the owner's own decision and is not shared.
+- [ ] Recipients marking a shared event as skipped for themselves is **Future**.
+
 #### Type 1.b: Events not to be attended (informational events, reminders, heads-ups) (Demo)
 
-- [ ] Some events may be purely informational. They should be visually distinct from
-      attendable events. Examples include:
+- [x] Some events may be purely informational. The UI calls the two kinds
+      "Attend" (the user takes part, in person, online, or at home) and
+      "Heads-up" (something to know about); new events default to Attend.
+      Heads-ups are drawn as outlined ghost blocks with an ⓘ marker, while
+      attended events are solid. Heads-ups don't take up time: attended events
+      are laid out as if they weren't there and draw on top of them. Examples
+      include:
   - "new phone released",
   - "deadline for X announced",
   - "I will be at the office on Tuesday"

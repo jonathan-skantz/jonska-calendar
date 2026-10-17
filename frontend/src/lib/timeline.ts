@@ -13,6 +13,7 @@ export type EventPayload = {
   description: string | null;
   url: string | null;
   kind: "attendable" | "informational";
+  is_skipped: boolean;
   starts_at: string | undefined;
   ends_at: string | undefined;
   is_all_day: boolean;
@@ -141,6 +142,7 @@ export const buildEventPayload = (form: FormData): EventPayload => {
     description: String(form.get("description") || "") || null,
     url: String(form.get("url") || "") || null,
     kind: isAttendable ? "attendable" : "informational",
+    is_skipped: isAttendable && form.get("is_skipped") === "true",
     starts_at: isAllDay
       ? localDayStart(form.get("starts_at"))
       : localDateTime(form.get("starts_at")),
@@ -168,11 +170,20 @@ export const buildEventPayload = (form: FormData): EventPayload => {
   };
 };
 
-const isTimedAttendable = (entry: TimelineEntry) =>
-  entry.type === "event" && entry.kind === "attendable" && !entry.is_all_day;
+// Whether an entry takes up the user's time. Heads-up (informational) events
+// and skipped events stay visible but never push busy entries aside.
+export const isBusy = (entry: TimelineEntry) =>
+  entry.type !== "event" || (entry.kind === "attendable" && !entry.is_skipped);
 
-// Commute and gathering only apply to timed attendable events; ignore them on
-// anything else.
+const isTimedAttendable = (entry: TimelineEntry) =>
+  entry.type === "event" &&
+  entry.kind === "attendable" &&
+  !entry.is_all_day &&
+  !entry.is_skipped;
+
+// Commute and gathering only apply to timed attendable events the user is
+// going to; ignore them on anything else. A skipped event keeps its stored
+// values for when the user changes their mind.
 export const getCommuteSeconds = (entry: TimelineEntry) =>
   isTimedAttendable(entry)
     ? {

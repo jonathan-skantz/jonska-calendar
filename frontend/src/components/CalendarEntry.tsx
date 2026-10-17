@@ -13,6 +13,7 @@ import {
   getGathering,
   getGatheringStart,
   getMainTag,
+  isBusy,
   getOrderedStripTags,
 } from "../lib/timeline";
 import type {
@@ -33,6 +34,8 @@ type CalendarEntryProps = {
   commuteSegments: CommuteSegment[];
   gatheringSegment?: GatheringSegment | null;
   showBody: boolean;
+  // A busy block over a not-busy ghost is inset so the ghost's edge shows.
+  overlapsGhost?: boolean;
   timeFormat: TimeFormatPreference;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
@@ -41,6 +44,7 @@ type CalendarEntryProps = {
 const CONTINUATION_MARKER_HEIGHT = 6;
 const CONTINUATION_MARKER_SPACING = 12;
 const COMMUTE_LABEL_MIN_MINUTES = 15;
+const GHOST_EDGE_PIXELS = 8;
 
 const gridOffset = (minutes: number) =>
   `${(minutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`;
@@ -77,6 +81,7 @@ export const CalendarEntry = ({
   commuteSegments,
   gatheringSegment,
   showBody,
+  overlapsGhost = false,
   timeFormat,
   onEdit,
   onToggleTask,
@@ -103,6 +108,16 @@ export const CalendarEntry = ({
   const overlapInset = hasEarlierOverlap
     ? `${3 + overlapDepth * EVENT_OVERLAP_INSET_PIXELS}px`
     : undefined;
+  const leftInset =
+    overlapInset ?? (overlapsGhost ? `${3 + GHOST_EDGE_PIXELS}px` : undefined);
+  // Heads-up and skipped events don't take up time: an outlined ghost that
+  // busy blocks draw over, marked with why it is not busy.
+  const isGhost = entry.type === "event" && !isBusy(entry);
+  const ghostMarker = !isGhost
+    ? null
+    : entry.is_skipped
+      ? { icon: "⊘", label: "Skipping" }
+      : { icon: "ⓘ", label: "Heads-up" };
   const commuteBefore = commuteSegments.find(
     (segment) => segment.position === "before",
   );
@@ -240,7 +255,7 @@ export const CalendarEntry = ({
             "--commute-color": commuteColor,
             top: gridOffset(segment.startMinutes),
             height: `calc(${gridOffset(segment.durationMinutes)} - ${trim}px)`,
-            left: overlapInset,
+            left: leftInset,
             right: overlapInset,
             zIndex: hasEarlierOverlap ? 2 : undefined,
             transform:
@@ -276,7 +291,7 @@ export const CalendarEntry = ({
           "--gathering-color": mainTag?.color ?? "var(--yellow)",
           top: gridOffset(segment.startMinutes),
           height: `calc(${gridOffset(segment.durationMinutes)} - ${outerBandTrim}px)`,
-          left: overlapInset,
+          left: leftInset,
           right: overlapInset,
           transform: outerBandTrim
             ? `translateY(${outerBandTrim}px)`
@@ -303,34 +318,40 @@ export const CalendarEntry = ({
       {showBody && (
         <article
           ref={entryRef}
-          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${optionalGathering ? "has-optional-gathering" : ""} ${commuteAfter ? "has-commute-after" : ""} ${articleFadesStart ? "approximate-start" : ""} ${endIsApproximate ? "approximate-end" : ""}`}
-          style={{
-            top: gridOffset(startMinutes),
-            height: `calc(${gridOffset(durationMinutes)} - ${topInset + bottomInset}px)`,
-            left: overlapInset,
-            right: overlapInset,
-            zIndex: hasEarlierOverlap ? 2 : undefined,
-            transform: topInset ? `translateY(${topInset}px)` : undefined,
-            paddingTop: gatheringHeight
-              ? `calc(${gatheringHeight} + 4px)`
-              : undefined,
-            ...(entry.type === "event" && mainTag
-              ? {
-                  backgroundColor: mainTag.color,
-                  color: tagTextColor(mainTag.color),
-                  backgroundImage: backgroundLayers
-                    .map((layer) => layer.image)
-                    .join(", "),
-                  backgroundSize: backgroundLayers
-                    .map((layer) => layer.size)
-                    .join(", "),
-                  backgroundPosition: backgroundLayers
-                    .map((layer) => layer.position)
-                    .join(", "),
-                  backgroundRepeat: "no-repeat",
-                }
-              : {}),
-          }}
+          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${optionalGathering ? "has-optional-gathering" : ""} ${commuteAfter ? "has-commute-after" : ""} ${articleFadesStart ? "approximate-start" : ""} ${isGhost ? `not-busy ${entry.is_skipped ? "skipped" : "heads-up"}` : ""} ${endIsApproximate ? "approximate-end" : ""}`}
+          style={
+            {
+              top: gridOffset(startMinutes),
+              height: `calc(${gridOffset(durationMinutes)} - ${topInset + bottomInset}px)`,
+              left: leftInset,
+              right: overlapInset,
+              zIndex: hasEarlierOverlap && !isGhost ? 2 : undefined,
+              transform: topInset ? `translateY(${topInset}px)` : undefined,
+              paddingTop: gatheringHeight
+                ? `calc(${gatheringHeight} + 4px)`
+                : undefined,
+              ...(entry.type === "event" && mainTag
+                ? {
+                    ...(isGhost
+                      ? { "--tag-color": mainTag.color }
+                      : {
+                          backgroundColor: mainTag.color,
+                          color: tagTextColor(mainTag.color),
+                        }),
+                    backgroundImage: backgroundLayers
+                      .map((layer) => layer.image)
+                      .join(", "),
+                    backgroundSize: backgroundLayers
+                      .map((layer) => layer.size)
+                      .join(", "),
+                    backgroundPosition: backgroundLayers
+                      .map((layer) => layer.position)
+                      .join(", "),
+                    backgroundRepeat: "no-repeat",
+                  }
+                : {}),
+            } as CSSProperties
+          }
           onClick={(event) => {
             event.stopPropagation();
             openEditor();
@@ -363,6 +384,16 @@ export const CalendarEntry = ({
             />
           )}
           <strong>
+            {ghostMarker && (
+              <i
+                className="ghost-marker"
+                role="img"
+                aria-label={ghostMarker.label}
+                title={ghostMarker.label}
+              >
+                {ghostMarker.icon}{" "}
+              </i>
+            )}
             {entry.share_count ? (
               <i
                 className="share-marker"
@@ -374,6 +405,7 @@ export const CalendarEntry = ({
             {entry.title}
           </strong>
           <span title={approximateDescription}>
+            {entry.is_skipped && "Skipping · "}
             {entry.type === "event"
               ? [
                   formatEventTime(entry.starts_at, startTimeIsApproximate, {

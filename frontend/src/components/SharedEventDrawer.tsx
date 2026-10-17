@@ -61,6 +61,8 @@ export const SharedEventDrawer = ({
       <dl>
         <dt>When</dt>
         <dd>{formatRange(entry, timeFormat)}</dd>
+        <dt>Kind</dt>
+        <dd>{entry.kind === "attendable" ? "Attend" : "Heads-up"}</dd>
         {entry.location && (
           <>
             <dt>Location</dt>

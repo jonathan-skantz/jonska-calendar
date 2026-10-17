@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { dateKey, formatDate, formatTime } from "./lib/calendar";
 import { getComposerFieldErrors } from "./lib/formValidation";
+import { isBusy } from "./lib/timeline";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
@@ -20,6 +21,7 @@ import {
   getClickedEventStart,
   getDayElapsedOverlay,
   getEntriesForDate,
+  entriesOverlap,
   getCommuteSegments,
   getGatheringSegment,
   eventBodyOverlapsDate,
@@ -258,6 +260,7 @@ function App() {
     commuteSegments: CommuteSegment[] = [],
     gatheringSegment: GatheringSegment | null = null,
     showBody = true,
+    overlapsGhost = false,
   ) => {
     return (
       <CalendarEntry
@@ -274,6 +277,7 @@ function App() {
         commuteSegments={commuteSegments}
         gatheringSegment={gatheringSegment}
         showBody={showBody}
+        overlapsGhost={overlapsGhost}
         onEdit={openEntry}
         onToggleTask={toggleTask}
       />
@@ -283,29 +287,40 @@ function App() {
     const dayEntries = getEntriesForDate(weekEntries, date).filter(
       (entry) => entry.type !== "event" || !entry.is_all_day,
     );
-    const entriesWithLayout = dayEntries.map((entry, index) => {
-      const previous = dayEntries[index - 1];
-      const next = dayEntries[index + 1];
-      const { trimTop, trimBottom } = getEventAdjacency(entry, previous, next);
-      const layout = getCalendarEntryLayout(entry, today, date);
-      const overlapDepth = getEventOverlapDepth(
-        entry,
-        dayEntries.slice(0, index),
-      );
-      return {
-        layout,
-        rendered: renderGridEntry(
+    // Busy and not-busy (heads-up, skipped) entries are laid out separately:
+    // ghosts never push busy blocks aside. Ghosts render first so busy blocks
+    // paint over them.
+    const ghosts = dayEntries.filter((entry) => !isBusy(entry));
+    const busy = dayEntries.filter(isBusy);
+    const layoutLayer = (layer: TimelineEntry[]) =>
+      layer.map((entry, index) => {
+        const previous = layer[index - 1];
+        const next = layer[index + 1];
+        const { trimTop, trimBottom } = getEventAdjacency(
           entry,
+          previous,
+          next,
+        );
+        const layout = getCalendarEntryLayout(entry, today, date);
+        const overlapDepth = getEventOverlapDepth(entry, layer.slice(0, index));
+        const overlapsGhost =
+          isBusy(entry) && ghosts.some((ghost) => entriesOverlap(entry, ghost));
+        return {
           layout,
-          trimTop,
-          trimBottom,
-          overlapDepth,
-          getCommuteSegments(entry, date),
-          getGatheringSegment(entry, date),
-          eventBodyOverlapsDate(entry, date),
-        ),
-      };
-    });
+          rendered: renderGridEntry(
+            entry,
+            layout,
+            trimTop,
+            trimBottom,
+            overlapDepth,
+            getCommuteSegments(entry, date),
+            getGatheringSegment(entry, date),
+            eventBodyOverlapsDate(entry, date),
+            overlapsGhost,
+          ),
+        };
+      });
+    const entriesWithLayout = [...layoutLayer(ghosts), ...layoutLayer(busy)];
     const elapsedEntries = entriesWithLayout.filter(
       (item) => item.layout.fullyElapsed,
     );

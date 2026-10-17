@@ -1,5 +1,6 @@
 import { tagTextColor } from "../lib/colors";
-import { getMainTag } from "../lib/timeline";
+import type { CSSProperties } from "react";
+import { getMainTag, isBusy } from "../lib/timeline";
 import type { TimelineEntry } from "../types";
 
 export function AllDayEvent({
@@ -21,6 +22,8 @@ export function AllDayEvent({
 }) {
   const tag = getMainTag(entry);
   const backgroundColor = tag?.color ?? "var(--moss-dark)";
+  // Heads-up and skipped all-day events (birthdays, holidays) are outlined.
+  const isGhost = !isBusy(entry);
   return (
     <div
       className="all-day-event-shell"
@@ -38,11 +41,15 @@ export function AllDayEvent({
       )}
       <button
         type="button"
-        className={`all-day-event ${continuesToNextWeek ? "continues-to-next-week" : ""}`}
-        style={{
-          backgroundColor,
-          ...(tag ? { color: tagTextColor(tag.color) } : {}),
-        }}
+        className={`all-day-event ${continuesToNextWeek ? "continues-to-next-week" : ""} ${isGhost ? "not-busy" : ""}`}
+        style={
+          isGhost
+            ? ({ "--tag-color": backgroundColor } as CSSProperties)
+            : {
+                backgroundColor,
+                ...(tag ? { color: tagTextColor(tag.color) } : {}),
+              }
+        }
         onClick={(event) => {
           event.stopPropagation();
           onEdit(entry);

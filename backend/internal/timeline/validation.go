@@ -16,6 +16,7 @@ var (
 	ErrTitleRequired  = errors.New("title cannot be empty")
 	ErrInvalidTimes   = errors.New("end time must be after start time")
 	ErrInvalidKind    = errors.New("kind must be attendable or informational")
+	ErrInvalidSkip    = errors.New("only attendable events can be skipped")
 	ErrInvalidCommute = errors.New("commute must be whole minutes up to 24 hours and is only allowed on timed attendable events")
 	ErrDeadlineNeeded = errors.New("deadline is required")
 
@@ -50,6 +51,9 @@ func validateEventRequest(request *eventRequest) error {
 	}
 	if request.Kind != "attendable" && request.Kind != "informational" {
 		return ErrInvalidKind
+	}
+	if request.IsSkipped && request.Kind != "attendable" {
+		return ErrInvalidSkip
 	}
 	if !request.EndsAt.After(request.StartsAt) {
 		return ErrInvalidTimes

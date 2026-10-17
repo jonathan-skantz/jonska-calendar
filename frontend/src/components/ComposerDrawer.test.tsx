@@ -75,13 +75,41 @@ describe("ComposerDrawer commute fields", () => {
       />,
     );
 
+  it("defaults to Attend and shows skipping only for Attend", () => {
+    renderComposer();
+    expect(
+      screen
+        .getByRole("button", { name: "Attend" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen.getByLabelText(/Skipping this one/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Heads-up" }));
+    expect(screen.queryByLabelText(/Skipping this one/)).toBeNull();
+  });
+
+  it("prefills skipping when editing", () => {
+    renderComposer({
+      id: "event-1",
+      type: "event",
+      title: "Lecture",
+      kind: "attendable",
+      is_skipped: true,
+      starts_at: "2026-10-15T10:00:00",
+      ends_at: "2026-10-15T12:00:00",
+      is_completed: false,
+    });
+    expect(
+      (screen.getByLabelText(/Skipping this one/) as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
   it("shows commute fields only for timed attendable events", () => {
-    const { container } = renderComposer();
+    renderComposer();
+    fireEvent.click(screen.getByRole("button", { name: "Heads-up" }));
     expect(screen.queryByLabelText("Commute before (min)")).toBeNull();
 
-    fireEvent.change(container.querySelector('select[name="kind"]')!, {
-      target: { value: "attendable" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Attend" }));
     expect(screen.getByLabelText("Commute before (min)")).toBeTruthy();
     expect(screen.getByLabelText("Commute after (min)")).toBeTruthy();
 
@@ -90,14 +118,12 @@ describe("ComposerDrawer commute fields", () => {
   });
 
   it("keeps typed commute values while the fields are hidden", () => {
-    const { container } = renderComposer();
-    const kind = container.querySelector('select[name="kind"]')!;
-    fireEvent.change(kind, { target: { value: "attendable" } });
+    renderComposer();
     fireEvent.change(screen.getByLabelText("Commute before (min)"), {
       target: { value: "20" },
     });
-    fireEvent.change(kind, { target: { value: "informational" } });
-    fireEvent.change(kind, { target: { value: "attendable" } });
+    fireEvent.click(screen.getByRole("button", { name: "Heads-up" }));
+    fireEvent.click(screen.getByRole("button", { name: "Attend" }));
     expect(
       (screen.getByLabelText("Commute before (min)") as HTMLInputElement).value,
     ).toBe("20");
@@ -156,9 +182,7 @@ describe("ComposerDrawer commute fields", () => {
     expect(
       (screen.getByLabelText("Gathering label") as HTMLInputElement).value,
     ).toBe("Mingle");
-    fireEvent.change(screen.getByLabelText("Kind"), {
-      target: { value: "informational" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Heads-up" }));
     expect(screen.queryByLabelText("Gathering before (min)")).toBeNull();
   });
 });

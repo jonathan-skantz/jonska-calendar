@@ -210,6 +210,10 @@
   box-shadow: 0 1px 4px rgba(39, 52, 47, 0.08);
 }
 
+.kind-toggle {
+  margin-bottom: 0;
+}
+
 .form-hint {
   color: var(--muted);
   font-size: 13px;

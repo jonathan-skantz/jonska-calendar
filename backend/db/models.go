@@ -44,6 +44,7 @@ type Event struct {
 	StartIsApproximate   bool
 	EndIsApproximate     bool
 	Kind                 string
+	IsSkipped            bool
 	Location             *string
 	GatheringSeconds     int
 	GatheringIsOptional  bool
@@ -100,6 +101,7 @@ type TimelineEntry struct {
 	EndIsApproximate     bool       `json:"end_is_approximate,omitempty"`
 	DeadlineAt           *time.Time `json:"deadline_at,omitempty"`
 	Kind                 *string    `json:"kind,omitempty"`
+	IsSkipped            bool       `json:"is_skipped,omitempty"`
 	Location             *string    `json:"location,omitempty"`
 	GatheringSeconds     int        `json:"gathering_seconds,omitempty"`
 	GatheringIsOptional  bool       `json:"gathering_is_optional,omitempty"`

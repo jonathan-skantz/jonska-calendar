@@ -24,6 +24,8 @@ export type TimelineEntry = {
   end_is_approximate?: boolean;
   deadline_at?: string;
   kind?: "attendable" | "informational";
+  // Only on the current user's own events; a recipient never sees it.
+  is_skipped?: boolean;
   location?: string;
   gathering_seconds?: number;
   gathering_is_optional?: boolean;

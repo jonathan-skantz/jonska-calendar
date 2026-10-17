@@ -239,6 +239,13 @@ export const getEventAdjacency = (
     occupiedEdgesTouch(entry, next),
 });
 
+export const entriesOverlap = (left: TimelineEntry, right: TimelineEntry) => {
+  if (left.type !== "event" || right.type !== "event") return false;
+  const leftRange = getOccupiedRange(left);
+  const rightRange = getOccupiedRange(right);
+  return leftRange.start < rightRange.end && rightRange.start < leftRange.end;
+};
+
 export const getEventOverlapDepth = (
   entry: TimelineEntry,
   earlierEntries: TimelineEntry[],

@@ -120,4 +120,60 @@ describe("CalendarEntry", () => {
     expect(article?.classList.contains("has-optional-gathering")).toBe(true);
     expect(article?.classList.contains("approximate-start")).toBe(false);
   });
+
+  const renderEntry = (item: TimelineEntry) =>
+    render(
+      <CalendarEntry
+        entry={item}
+        startMinutes={600}
+        durationMinutes={120}
+        trimTop={false}
+        trimBottom={false}
+        overlapDepth={0}
+        continuesFromPreviousDay={false}
+        continuesToNextDay={false}
+        commuteSegments={[]}
+        showBody
+        timeFormat="24-hour"
+        onEdit={vi.fn()}
+        onToggleTask={vi.fn()}
+      />,
+    );
+  const lecture: TimelineEntry = {
+    ...entry,
+    title: "Lecture",
+    start_is_approximate: false,
+    starts_at: "2026-10-15T10:00:00",
+    ends_at: "2026-10-15T12:00:00",
+  };
+
+  it("draws heads-up events as an outlined ghost", () => {
+    const { container } = renderEntry({ ...lecture, kind: "informational" });
+    const article = container.querySelector("article")!;
+    expect(article.className).toContain("not-busy heads-up");
+    expect(article.style.backgroundColor).toBe("");
+    expect(screen.getByRole("img", { name: "Heads-up" })).toBeTruthy();
+  });
+
+  it("marks skipped events and hides their commute", () => {
+    const { container } = renderEntry({
+      ...lecture,
+      kind: "attendable",
+      is_skipped: true,
+      commute_before_seconds: 1200,
+    });
+    expect(container.querySelector("article")!.className).toContain(
+      "not-busy skipped",
+    );
+    expect(screen.getByRole("img", { name: "Skipping" })).toBeTruthy();
+    expect(screen.getByText("Skipping · 10:00 – 12:00")).toBeTruthy();
+    expect(container.querySelector(".commute-band")).toBeNull();
+  });
+
+  it("keeps attended events solid", () => {
+    const { container } = renderEntry({ ...lecture, kind: "attendable" });
+    const article = container.querySelector("article")!;
+    expect(article.className).not.toContain("not-busy");
+    expect(article.style.backgroundColor).not.toBe("");
+  });
 });
