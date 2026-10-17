@@ -95,17 +95,35 @@ func (s *Store) UpdateEventShare(ctx context.Context, ownerID, eventID, shareID 
 	return err
 }
 
+// DeleteEventShare also deletes the recipient's own reminders for the event,
+// since they can no longer see it.
 func (s *Store) DeleteEventShare(ctx context.Context, ownerID, eventID, shareID uuid.UUID) error {
-	result, err := s.db.Exec(ctx, `
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var recipientID uuid.UUID
+	err = tx.QueryRow(ctx, `
 		DELETE FROM event_shares AS share
 		USING timeline_items AS item
 		WHERE share.id = $3
 		  AND share.event_id = $2
 		  AND item.id = share.event_id
 		  AND item.user_id = $1
-	`, ownerID, eventID, shareID)
-	if err == nil && result.RowsAffected() == 0 {
+		RETURNING share.recipient_user_id
+	`, ownerID, eventID, shareID).Scan(&recipientID)
+	if isNoRows(err) {
 		return ErrSharedEventNotFound
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM event_reminders WHERE event_id = $1 AND user_id = $2
+	`, eventID, recipientID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

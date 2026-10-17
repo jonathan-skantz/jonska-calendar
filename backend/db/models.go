@@ -88,6 +88,23 @@ type EventShare struct {
 	ShareFields
 }
 
+// Reminder carries the event fields a client needs to deliver it without
+// loading the timeline. RemindAt is the event start minus the offset.
+type Reminder struct {
+	ID             uuid.UUID  `json:"id"`
+	EventID        uuid.UUID  `json:"event_id"`
+	OffsetSeconds  int        `json:"offset_seconds"`
+	RemindAt       time.Time  `json:"remind_at"`
+	NotifiedAt     *time.Time `json:"notified_at,omitempty"`
+	EventTitle     string     `json:"event_title"`
+	EventLocation  *string    `json:"event_location,omitempty"`
+	EventStartsAt  time.Time  `json:"event_starts_at"`
+	EventEndsAt    time.Time  `json:"event_ends_at"`
+	EventIsAllDay  bool       `json:"event_is_all_day,omitempty"`
+	EventIsSkipped bool       `json:"event_is_skipped,omitempty"`
+	IsShared       bool       `json:"is_shared,omitempty"`
+}
+
 type TimelineEntry struct {
 	ID                   uuid.UUID  `json:"id"`
 	Type                 string     `json:"type"`

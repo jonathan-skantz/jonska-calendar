@@ -19,6 +19,8 @@ var (
 	ErrDefaultTagNotFound  = errors.New("default tag not found")
 	ErrHouseholdNotFound   = errors.New("household not found")
 	ErrAlreadyInHousehold  = errors.New("user already belongs to a household")
+	ErrReminderExists      = errors.New("a reminder with that offset already exists")
+	ErrReminderNotFound    = errors.New("reminder not found")
 )
 
 func isUniqueViolation(err error) bool {

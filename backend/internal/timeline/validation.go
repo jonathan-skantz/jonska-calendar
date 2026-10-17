@@ -19,6 +19,7 @@ var (
 	ErrInvalidSkip    = errors.New("only attendable events can be skipped")
 	ErrInvalidCommute = errors.New("commute must be whole minutes up to 24 hours and is only allowed on timed attendable events")
 	ErrDeadlineNeeded = errors.New("deadline is required")
+	ErrInvalidOffset  = errors.New("reminder offset must be whole minutes, from 0 up to 30 days before the event")
 
 	ErrInvalidApproximate = errors.New("approximate start or end is only allowed on timed events")
 	ErrInvalidGathering   = errors.New("gathering must be whole minutes up to 24 hours on a timed attendable event, with a label of at most 40 characters")
@@ -37,6 +38,7 @@ const (
 	maxCommuteSeconds       = 24 * 60 * 60
 	maxTransitCardCount     = 20
 	maxGatheringLabelLength = 40
+	maxReminderOffset       = 30 * 24 * 60 * 60
 )
 
 func validCommuteSeconds(seconds int) bool {
@@ -78,6 +80,13 @@ func validateEventRequest(request *eventRequest) error {
 	}
 	if request.IsAllDay && (request.StartIsApproximate || request.EndIsApproximate) {
 		return ErrInvalidApproximate
+	}
+	return nil
+}
+
+func validateReminderRequest(request reminderRequest) error {
+	if request.OffsetSeconds < 0 || request.OffsetSeconds > maxReminderOffset || request.OffsetSeconds%60 != 0 {
+		return ErrInvalidOffset
 	}
 	return nil
 }

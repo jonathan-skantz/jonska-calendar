@@ -26,6 +26,10 @@ type eventRequest struct {
 	MainTagID            uuid.UUID `json:"main_tag_id"`
 }
 
+type reminderRequest struct {
+	OffsetSeconds int `json:"offset_seconds"`
+}
+
 type taskRequest struct {
 	Title       string    `json:"title"`
 	Description *string   `json:"description"`

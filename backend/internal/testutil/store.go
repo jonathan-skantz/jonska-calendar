@@ -35,6 +35,7 @@ var migrationNames = []string{
 	"18_add_approximate_event_times.sql",
 	"19_add_event_gathering.sql",
 	"20_add_event_skipping.sql",
+	"21_add_event_reminders.sql",
 }
 
 func NewStore(t *testing.T) *db.Store {

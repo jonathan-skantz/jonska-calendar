@@ -14,7 +14,7 @@ The demo is a small family calendar. It currently supports:
 - direct event sharing between registered users, with per-recipient fields set by the owner;
 - per-day shared transit-card declarations, households with conflict detection, and user display names.
 
-The product intentionally does not implement uncertain timing, recurrence, reminders, conflict detection, automatic task scheduling, external calendars, advanced sharing policies, triggers, templates, or backup/import.
+The product intentionally does not implement recurrence, task reminders, background notification delivery, conflict detection, automatic task scheduling, external calendars, advanced sharing policies, triggers, templates, or backup/import.
 
 ## System Shape
 
@@ -116,6 +116,17 @@ The owner is derived through `event_shares.event_id -> events.timeline_item_id -
 
 A shared event is a projection, not a copy. Each field is the share's value when the owner set one, and otherwise the owner's current event value. The recipient only ever receives these effective values.
 
+### Event reminders
+
+```text
+events --- event_reminders --- user_id
+           (offset_seconds before the start, notified_at)
+```
+
+Reminders are private to the user who set them and are never shared. A user may set reminders on any event they can see: their own, or one shared with them. Every reminder query filters by `user_id`, and creating one checks access through `timeline_items.user_id` or a matching `event_shares` row. Removing a share deletes that recipient's reminders in the same transaction, and deleting the event cascades.
+
+A reminder is an offset before `starts_at`, so it moves with the event; `remind_at` is derived when listing. `notified_at` records the first delivery so other tabs and devices do not repeat it. Moving an event's start clears `notified_at` for all of its reminders. The list returns only reminders whose event has not ended; for recipients it uses their per-recipient title and location and never the owner's `is_skipped`.
+
 ### Transit card declarations
 
 ```text
@@ -191,6 +202,10 @@ All API routes use JSON request and response bodies unless the response is `204 
 | `POST /api/events/{eventID}/shares`             | `recipient_email`, optional share fields    | `201` with `{ "id": "<share-uuid>" }`                |
 | `PUT /api/events/{eventID}/shares/{shareID}`    | Share fields                                | `204`                                                |
 | `DELETE /api/events/{eventID}/shares/{shareID}` | None                                        | `204`                                                |
+| `GET /api/reminders`                            | None                                        | Array of the caller's reminders for unended events   |
+| `POST /api/events/{eventID}/reminders`          | `offset_seconds`                            | `201`; `404` event not visible; `409` same offset    |
+| `DELETE /api/reminders/{reminderID}`            | None                                        | `204`; `404` not the caller's                        |
+| `POST /api/reminders/{reminderID}/notified`     | None                                        | `204`; keeps the first delivery time                 |
 | `GET /api/transit-card/days?from=&to=`          | None                                        | Array of reported transit-card days                  |
 | `PUT /api/transit-card/days`                    | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                |
 | `GET /api/household`                            | None                                        | Household or `null`                                  |
@@ -236,6 +251,7 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Change event/task persistence                 | `backend/db/events.go` or `backend/db/tasks.go`                                                                       | migrations 1 and 3                                     |
 | Change sharing or per-recipient fields        | `backend/db/sharing.go` and `backend/db/timeline.go`                                                                  | migrations 4/5/16, `frontend/src/features/sharing/`    |
 | Change tag ownership, defaults, or attachment | `backend/db/tags.go`                                                                                                  | migrations 6-8, timeline handlers                      |
+| Change event reminders                        | `backend/db/reminders.go`, `backend/internal/timeline/reminders.go`                                                   | migration 21                                           |
 | Change transit-card declarations              | `backend/db/transit_card.go`, `backend/internal/timeline/transit_card.go`                                             | migration 12, `frontend/src/features/transitCard/`     |
 | Change households or card conflicts           | `backend/db/households.go`, `backend/internal/timeline/household.go`                                                  | migration 15, `frontend/src/features/household/`       |
 | Change timeline JSON shape                    | `db.TimelineEntry` in `backend/db/models.go`                                                                          | frontend `TimelineEntry` type and grid rendering       |
@@ -271,7 +287,7 @@ The current demo is functional, but `App.tsx` and `store.go` are becoming broad.
 The final product will eventually need explicit models for:
 
 - uncertain/date-only/recurring time;
-- reminders and notification delivery;
+- background notification delivery (web push or a phone app) and task reminders;
 - conflict detection;
 - task scheduling sessions and available-time calculation;
 - richer per-recipient sharing policies;
