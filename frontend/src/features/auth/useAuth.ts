@@ -36,8 +36,10 @@ export const useAuth = () => {
   });
   const logout = useMutation({
     mutationFn: () => api("/api/auth/logout", { method: "POST" }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
+    // Set the user directly: a refetch would fail with 401, and a failed
+    // refetch keeps the previous user.
+    onSuccess: () => {
+      queryClient.setQueryData<User | null>(queryKeys.currentUser, null);
       clearWorkspace(queryClient);
     },
   });

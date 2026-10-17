@@ -77,9 +77,14 @@ describe("useAuth", () => {
     queryClient.clear();
   });
 
-  it("clears workspace and transit card data on logout", async () => {
+  it("signs out the user and clears their data on logout", async () => {
+    let signedIn = true;
     mockedApi.mockImplementation(async (path) => {
-      if (path === "/api/auth/me") return user;
+      if (path === "/api/auth/logout") signedIn = false;
+      if (path === "/api/auth/me") {
+        if (!signedIn) throw new Error("authentication required");
+        return user;
+      }
       return undefined;
     });
     const queryClient = new QueryClient({
@@ -97,6 +102,9 @@ describe("useAuth", () => {
       await result.current.logout.mutateAsync();
     });
 
+    // A failed refetch must not leave the previous user signed in.
+    await waitFor(() => expect(result.current.user).toBeNull());
+    expect(result.current.isLoading).toBe(false);
     expect(queryClient.getQueryData(["workspace"])).toBeUndefined();
     expect(
       queryClient.getQueryData(["transit-card", "2026-10-19", "2026-10-25"]),
