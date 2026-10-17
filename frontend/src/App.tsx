@@ -67,7 +67,21 @@ import {
   useSaveTransitCardDays,
   useTransitCardDays,
 } from "./features/transitCard/useTransitCard";
+import {
+  useReminderMutations,
+  useReminders,
+} from "./features/reminders/useReminders";
+import { useReminderNotifications } from "./features/reminders/useReminderNotifications";
+import {
+  getRemindersByEvent,
+  isReminderUpcoming,
+} from "./features/reminders/reminders";
+import { RemindersDrawer } from "./components/RemindersDrawer";
+import { ReminderToasts } from "./components/ReminderToasts";
+import type { Reminder } from "./types";
 import "./App.css";
+
+const NO_REMINDERS: Reminder[] = [];
 
 function App() {
   const {
@@ -115,6 +129,26 @@ function App() {
   const [sharingEvent, setSharingEvent] = useState<TimelineEntry | null>(null);
   const [viewingSharedEvent, setViewingSharedEvent] =
     useState<TimelineEntry | null>(null);
+  const remindersQuery = useReminders(Boolean(user));
+  const reminders = remindersQuery.data ?? NO_REMINDERS;
+  const remindersByEvent = getRemindersByEvent(reminders);
+  const reminderMutations = useReminderMutations();
+  const [showReminders, setShowReminders] = useState(false);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+  const reminderNotifications = useReminderNotifications(
+    reminders,
+    reminderMutations.markNotified,
+    preferences.timeFormat,
+  );
+  const getReminderItems = (eventId: string) =>
+    (remindersByEvent.get(eventId) ?? []).map((reminder) => ({
+      id: reminder.id,
+      offsetSeconds: reminder.offset_seconds,
+    }));
+  const addReminder = async (eventId: string, offsetSeconds: number) =>
+    setReminderError(await reminderMutations.add(eventId, offsetSeconds));
+  const removeReminder = async (reminderId: string) =>
+    setReminderError(await reminderMutations.remove(reminderId));
   const eventSharesQuery = useEventShares(sharingEvent?.id ?? null);
   const shareMutations = useEventShareMutations(sharingEvent?.id ?? null);
   const composer = useComposer({
@@ -124,6 +158,7 @@ function App() {
     onResetErrors: () => {
       setActionError("");
       setFieldErrors({});
+      setReminderError(null);
     },
   });
   const {
@@ -148,8 +183,18 @@ function App() {
   };
 
   // Events shared with the user are read-only, so they open a details view.
-  const openEntry = (entry: TimelineEntry) =>
-    entry.is_shared ? setViewingSharedEvent(entry) : editItem(entry);
+  const openEntry = (entry: TimelineEntry) => {
+    setReminderError(null);
+    if (entry.is_shared) setViewingSharedEvent(entry);
+    else editItem(entry);
+  };
+  // Reminders and their notifications refer to events by id.
+  const openEventById = (eventId: string) => {
+    const entry = entries.find((candidate) => candidate.id === eventId);
+    if (!entry) return;
+    setShowReminders(false);
+    openEntry(entry);
+  };
 
   const submitAuth = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -278,6 +323,7 @@ function App() {
         gatheringSegment={gatheringSegment}
         showBody={showBody}
         overlapsGhost={overlapsGhost}
+        reminders={remindersByEvent.get(entry.id)}
         onEdit={openEntry}
         onToggleTask={toggleTask}
       />
@@ -340,7 +386,12 @@ function App() {
   };
   const renderAllDayEntries = () =>
     allDayEventSpans.map((span) => (
-      <AllDayEvent key={span.entry.id} {...span} onEdit={openEntry} />
+      <AllDayEvent
+        key={span.entry.id}
+        {...span}
+        onEdit={openEntry}
+        reminders={remindersByEvent.get(span.entry.id)}
+      />
     ));
   const emailName = user.email.split("@")[0];
   const userDisplayName = user.display_name || emailName;
@@ -359,6 +410,11 @@ function App() {
     <main className="app-shell">
       <TopBar
         email={user.email}
+        upcomingReminderCount={
+          reminders.filter((reminder) => isReminderUpcoming(reminder, today))
+            .length
+        }
+        onOpenReminders={() => setShowReminders(true)}
         onOpenSettings={() => {
           setShowSettings(true);
           setShowTagEditor(false);
@@ -475,6 +531,12 @@ function App() {
           shareCount={
             entries.find((entry) => entry.id === editingItem?.id)?.share_count
           }
+          reminders={editingItem ? getReminderItems(editingItem.id) : []}
+          reminderError={reminderError}
+          onAddReminder={(offset) =>
+            editingItem && addReminder(editingItem.id, offset)
+          }
+          onRemoveReminder={(reminder) => removeReminder(reminder.id)}
         />
       )}
       {showComposer && editingItem && (
@@ -508,8 +570,28 @@ function App() {
           entry={viewingSharedEvent}
           timeFormat={preferences.timeFormat}
           onClose={() => setViewingSharedEvent(null)}
+          reminders={getReminderItems(viewingSharedEvent.id)}
+          reminderError={reminderError}
+          onAddReminder={(offset) => addReminder(viewingSharedEvent.id, offset)}
+          onRemoveReminder={(reminder) => removeReminder(reminder.id)}
         />
       )}
+      {showReminders && (
+        <RemindersDrawer
+          reminders={reminders}
+          now={today}
+          timeFormat={preferences.timeFormat}
+          onOpenEvent={openEventById}
+          onRemove={(reminder) => removeReminder(reminder.id)}
+          onClose={() => setShowReminders(false)}
+        />
+      )}
+      <ReminderToasts
+        toasts={reminderNotifications.toasts}
+        timeFormat={preferences.timeFormat}
+        onOpenEvent={openEventById}
+        onDismiss={reminderNotifications.dismiss}
+      />
       {showTransitCard && (
         <TransitCardDrawer
           views={transitCardViews}

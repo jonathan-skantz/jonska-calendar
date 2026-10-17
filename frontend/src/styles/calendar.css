@@ -585,6 +585,11 @@
   pointer-events: none;
 }
 
+.reminder-marker {
+  font-style: normal;
+  font-size: 0.9em;
+}
+
 .grid-entry .share-marker {
   font-style: normal;
   opacity: 0.85;

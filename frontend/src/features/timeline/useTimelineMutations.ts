@@ -97,6 +97,15 @@ export const useTimelineMutations = (onError: (message: string) => void) => {
           ? tags.filter((tag) => tag.id === mainTagId)
           : tags.filter((tag) => tag.is_default);
         await saveEventTags(response?.id ?? "", initialTags, selectedTagIds);
+        // Reminders added while composing a new event need its id first.
+        await Promise.all(
+          form.getAll("reminder_offset").map((offset) =>
+            api(`/api/events/${response?.id}/reminders`, {
+              method: "POST",
+              body: JSON.stringify({ offset_seconds: Number(offset) }),
+            }),
+          ),
+        );
       }
       await invalidateWorkspace(queryClient);
       onSaved();

@@ -99,6 +99,24 @@
   font-size: 20px;
 }
 
+.reminders-button {
+  position: relative;
+}
+
+.reminder-count {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;

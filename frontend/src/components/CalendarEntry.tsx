@@ -20,7 +20,8 @@ import type {
   CommuteSegment,
   GatheringSegment,
 } from "../features/calendar/timelineView";
-import type { TimelineEntry } from "../types";
+import type { Reminder, TimelineEntry } from "../types";
+import { describeReminders } from "../features/reminders/reminders";
 
 type CalendarEntryProps = {
   entry: TimelineEntry;
@@ -36,6 +37,8 @@ type CalendarEntryProps = {
   showBody: boolean;
   // A busy block over a not-busy ghost is inset so the ghost's edge shows.
   overlapsGhost?: boolean;
+  // The current user's reminders for this event; shown only as a 🔔 marker.
+  reminders?: Reminder[];
   timeFormat: TimeFormatPreference;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
@@ -82,6 +85,7 @@ export const CalendarEntry = ({
   gatheringSegment,
   showBody,
   overlapsGhost = false,
+  reminders = [],
   timeFormat,
   onEdit,
   onToggleTask,
@@ -392,6 +396,16 @@ export const CalendarEntry = ({
                 title={ghostMarker.label}
               >
                 {ghostMarker.icon}{" "}
+              </i>
+            )}
+            {reminders.length > 0 && (
+              <i
+                className="reminder-marker"
+                role="img"
+                aria-label={describeReminders(reminders)}
+                title={describeReminders(reminders)}
+              >
+                🔔{" "}
               </i>
             )}
             {entry.share_count ? (

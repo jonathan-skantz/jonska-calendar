@@ -18,7 +18,22 @@ testable product over polish.
 - [x] events have an exact start date/time and end date/time
 - [x] events can be marked all-day and appear above the hourly calendar grid
 - [x] tasks have a deadline date/time and no scheduled start/end time
-- [ ] reminder behavior is **Future**
+- [x] events can have any number of reminders, each a time before the event
+      starts (e.g. 15 min, 1 day; for all-day events, e.g. the day before at
+      09:00). Reminders move with the event.
+  - Reminders are private: owners and recipients each set their own on any
+    event they can see, and they are never shared. Removing a share removes the
+    recipient's reminders.
+  - They are not drawn in the week view; events with reminders show a small 🔔
+    before the title. They are edited in the event's details (or the
+    read-only view of a shared event), and all of them are listed in a
+    reminders drawer from the 🔔 button in the top bar for quick removal.
+  - While the app is open, a reminder shows as a browser notification (or an
+    in-app message without permission). Reminders that came due while the app
+    was closed show once as "Missed reminder" on the next open. Each reminder
+    is delivered once across tabs and devices; moving the event re-arms it.
+  - Skipped events don't remind.
+- [ ] Task reminders are **Future**.
 
 **Tags (Demo):**
 
@@ -179,7 +194,8 @@ separate from events and tasks.
 The following product ideas are intentionally deferred from the first demo:
 
 - [ ] conflict detection and conflict resolution
-- [ ] reminders and notification delivery
+- [ ] task reminders, and reminder delivery while the app is closed (web push or
+      a phone app)
 - [ ] recurring events, including birthdays, name days, and holidays
 - [ ] external calendar integration or import
 - [ ] automatic task scheduling and scheduled task sessions

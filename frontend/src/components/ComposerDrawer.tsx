@@ -13,6 +13,9 @@ import type { ComposerFieldErrors } from "../lib/formValidation";
 import type { Tag, TimelineEntry } from "../types";
 import { EventTagPicker } from "./EventTagPicker";
 import { DateTimeField } from "./DateTimeField";
+import { ReminderEditor } from "./ReminderEditor";
+import type { ReminderItem } from "./ReminderEditor";
+import { requestNotificationPermission } from "../features/reminders/useReminders";
 
 type ComposerDrawerProps = {
   type: "event" | "task";
@@ -32,6 +35,12 @@ type ComposerDrawerProps = {
   onMainTagIdChange: (tagId: string) => void;
   // Set only when editing a saved event the user owns.
   onShare?: () => void;
+  // The saved event's reminders, changed right away. A new event queues its
+  // reminders as reminder_offset form values until it is created.
+  reminders?: ReminderItem[];
+  reminderError?: string | null;
+  onAddReminder?: (offsetSeconds: number) => void;
+  onRemoveReminder?: (reminder: ReminderItem) => void;
   shareCount?: number;
 };
 
@@ -53,9 +62,17 @@ export const ComposerDrawer = ({
   onMainTagIdChange,
   onShare,
   shareCount = 0,
+  reminders = [],
+  reminderError,
+  onAddReminder,
+  onRemoveReminder,
 }: ComposerDrawerProps) => {
   const [isAllDay, setIsAllDay] = useState(Boolean(editingItem?.is_all_day));
   const [kind, setKind] = useState(editingItem?.kind ?? "attendable");
+  const isSavedEvent = editingItem?.type === "event";
+  const [queuedReminderOffsets, setQueuedReminderOffsets] = useState<number[]>(
+    [],
+  );
   const [isSkipped, setIsSkipped] = useState(Boolean(editingItem?.is_skipped));
   const allowsCommute = kind === "attendable" && !isAllDay;
   const commuteMinutes = (seconds?: number) =>
@@ -372,6 +389,47 @@ export const ComposerDrawer = ({
                     </div>
                   )}
                 </div>
+              )}
+              {isSavedEvent ? (
+                <ReminderEditor
+                  reminders={reminders}
+                  isAllDay={isAllDay}
+                  error={reminderError}
+                  onAdd={(offset) => onAddReminder?.(offset)}
+                  onRemove={(reminder) => onRemoveReminder?.(reminder)}
+                />
+              ) : (
+                <>
+                  <ReminderEditor
+                    reminders={queuedReminderOffsets.map((offset) => ({
+                      id: String(offset),
+                      offsetSeconds: offset,
+                    }))}
+                    isAllDay={isAllDay}
+                    onAdd={(offset) => {
+                      requestNotificationPermission();
+                      setQueuedReminderOffsets((current) => [
+                        ...current,
+                        offset,
+                      ]);
+                    }}
+                    onRemove={(reminder) =>
+                      setQueuedReminderOffsets((current) =>
+                        current.filter(
+                          (offset) => offset !== reminder.offsetSeconds,
+                        ),
+                      )
+                    }
+                  />
+                  {queuedReminderOffsets.map((offset) => (
+                    <input
+                      key={offset}
+                      type="hidden"
+                      name="reminder_offset"
+                      value={offset}
+                    />
+                  ))}
+                </>
               )}
               <EventTagPicker
                 tags={tags}

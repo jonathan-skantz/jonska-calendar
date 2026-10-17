@@ -234,3 +234,82 @@ describe("ComposerDrawer approximate fields", () => {
     ).toBe(true);
   });
 });
+
+describe("ComposerDrawer reminders", () => {
+  const props = {
+    type: "event" as const,
+    selectedDate: "2026-10-15",
+    draftEventStart: null,
+    tags: [],
+    selectedTagIds: [],
+    mainTagId: null,
+    timeFormat: "browser" as const,
+    fieldErrors: {},
+    onSubmit: vi.fn(),
+    onClose: vi.fn(),
+    onTypeChange: vi.fn(),
+    onSelectedTagIdsChange: vi.fn(),
+    onMainTagIdChange: vi.fn(),
+  };
+
+  it("queues reminders on a new event as form values", () => {
+    const { container } = render(
+      <ComposerDrawer {...props} editingItem={null} />,
+    );
+    fireEvent.change(screen.getByLabelText("Add reminder"), {
+      target: { value: "900" },
+    });
+    expect(screen.getByText("15 min before")).toBeTruthy();
+    const queued = () =>
+      Array.from(
+        container.querySelectorAll<HTMLInputElement>(
+          'input[name="reminder_offset"]',
+        ),
+      ).map((input) => input.value);
+    expect(queued()).toEqual(["900"]);
+    // A preset already in use is not offered again.
+    expect(screen.queryByRole("option", { name: "15 min before" })).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove reminder 15 min before" }),
+    );
+    expect(queued()).toEqual([]);
+  });
+
+  it("changes a saved event's reminders right away", () => {
+    const onAddReminder = vi.fn();
+    const onRemoveReminder = vi.fn();
+    render(
+      <ComposerDrawer
+        {...props}
+        editingItem={{
+          id: "event-1",
+          type: "event",
+          title: "Lecture",
+          kind: "attendable",
+          starts_at: "2026-10-15T10:00:00",
+          ends_at: "2026-10-15T12:00:00",
+          is_completed: false,
+        }}
+        reminders={[{ id: "reminder-1", offsetSeconds: 86400 }]}
+        onAddReminder={onAddReminder}
+        onRemoveReminder={onRemoveReminder}
+      />,
+    );
+    fireEvent.change(
+      screen.getByLabelText("Custom reminder (minutes before)"),
+      {
+        target: { value: "45" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(onAddReminder).toHaveBeenCalledWith(2700);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove reminder 1 day before" }),
+    );
+    expect(onRemoveReminder).toHaveBeenCalledWith({
+      id: "reminder-1",
+      offsetSeconds: 86400,
+    });
+  });
+});

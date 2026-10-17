@@ -176,4 +176,38 @@ describe("CalendarEntry", () => {
     expect(article.className).not.toContain("not-busy");
     expect(article.style.backgroundColor).not.toBe("");
   });
+
+  it("marks events that have reminders", () => {
+    render(
+      <CalendarEntry
+        entry={{ ...lecture, kind: "attendable" }}
+        startMinutes={600}
+        durationMinutes={120}
+        trimTop={false}
+        trimBottom={false}
+        overlapDepth={0}
+        continuesFromPreviousDay={false}
+        continuesToNextDay={false}
+        commuteSegments={[]}
+        showBody
+        timeFormat="24-hour"
+        onEdit={vi.fn()}
+        onToggleTask={vi.fn()}
+        reminders={[
+          {
+            id: "reminder-1",
+            event_id: "event-1",
+            offset_seconds: 900,
+            remind_at: "2026-10-15T09:45:00",
+            event_title: "Lecture",
+            event_starts_at: "2026-10-15T10:00:00",
+            event_ends_at: "2026-10-15T12:00:00",
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole("img", { name: "Reminders: 15 min before" }),
+    ).toBeTruthy();
+  });
 });

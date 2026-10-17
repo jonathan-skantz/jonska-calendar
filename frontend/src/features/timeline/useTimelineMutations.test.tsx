@@ -26,7 +26,9 @@ describe("useTimelineMutations", () => {
     );
     const onError = vi.fn();
     const onSaved = vi.fn();
-    const { result } = renderHook(() => useTimelineMutations(onError), { wrapper });
+    const { result } = renderHook(() => useTimelineMutations(onError), {
+      wrapper,
+    });
     const form = new FormData();
     form.set("title", "Planning");
     form.set("kind", "informational");
@@ -55,6 +57,48 @@ describe("useTimelineMutations", () => {
     });
     expect(onSaved).toHaveBeenCalledOnce();
     expect(onError).not.toHaveBeenCalled();
+    queryClient.clear();
+  });
+
+  it("creates reminders queued on a new event after saving it", async () => {
+    mockedApi.mockImplementation(async (path) =>
+      path === "/api/events" ? { id: "event-1" } : undefined,
+    );
+    const queryClient = new QueryClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useTimelineMutations(vi.fn()), {
+      wrapper,
+    });
+    const form = new FormData();
+    form.set("title", "Lecture");
+    form.set("kind", "attendable");
+    form.set("starts_at", "2026-10-15T10:00");
+    form.set("ends_at", "2026-10-15T12:00");
+    form.append("reminder_offset", "900");
+    form.append("reminder_offset", "86400");
+
+    await act(async () => {
+      await result.current.saveItem({
+        type: "event",
+        editingItem: null,
+        form,
+        mainTagId: "work",
+        selectedTagIds: ["work"],
+        tags,
+        onSaved: vi.fn(),
+      });
+    });
+
+    expect(mockedApi).toHaveBeenCalledWith("/api/events/event-1/reminders", {
+      method: "POST",
+      body: JSON.stringify({ offset_seconds: 900 }),
+    });
+    expect(mockedApi).toHaveBeenCalledWith("/api/events/event-1/reminders", {
+      method: "POST",
+      body: JSON.stringify({ offset_seconds: 86400 }),
+    });
     queryClient.clear();
   });
 });

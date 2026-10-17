@@ -3,11 +3,18 @@ import { formatDate, formatEventTime, localDateKey } from "../lib/calendar";
 import { getGathering, getGatheringStart } from "../lib/timeline";
 import type { TimeFormatPreference } from "../lib/calendar";
 import type { TimelineEntry } from "../types";
+import { ReminderEditor } from "./ReminderEditor";
+import type { ReminderItem } from "./ReminderEditor";
 
 type SharedEventDrawerProps = {
   entry: TimelineEntry;
   timeFormat: TimeFormatPreference;
   onClose: () => void;
+  // The recipient's own reminders; the only thing they can change here.
+  reminders?: ReminderItem[];
+  reminderError?: string | null;
+  onAddReminder?: (offsetSeconds: number) => void;
+  onRemoveReminder?: (reminder: ReminderItem) => void;
 };
 
 const formatRange = (
@@ -38,11 +45,15 @@ const formatRange = (
     : `${startText} – ${formatDate(end)} ${endTime}${gathering}`;
 };
 
-// Recipients cannot change a shared event, so this view has no inputs.
+// Recipients cannot change a shared event; only their own reminders.
 export const SharedEventDrawer = ({
   entry,
   timeFormat,
   onClose,
+  reminders,
+  reminderError,
+  onAddReminder,
+  onRemoveReminder,
 }: SharedEventDrawerProps) => (
   <div
     className="drawer-backdrop"
@@ -91,6 +102,15 @@ export const SharedEventDrawer = ({
           </>
         )}
       </dl>
+      {onAddReminder && onRemoveReminder && (
+        <ReminderEditor
+          reminders={reminders ?? []}
+          isAllDay={Boolean(entry.is_all_day)}
+          error={reminderError}
+          onAdd={onAddReminder}
+          onRemove={onRemoveReminder}
+        />
+      )}
       <p className="form-hint">Only {entry.shared_by} can change this event.</p>
     </aside>
   </div>

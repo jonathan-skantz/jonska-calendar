@@ -406,3 +406,119 @@
 .shared-event-description {
   white-space: pre-wrap;
 }
+
+/* Reminders are private and never shown as calendar blocks: they are edited
+   here, listed in the reminders drawer, and delivered as notifications. */
+.reminder-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.reminder-editor-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.reminder-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reminder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.reminder-chip button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.reminder-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.reminder-add input {
+  min-width: 0;
+}
+
+.reminder-group h3 {
+  margin: 20px 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reminder-group ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reminder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reminder-row.skipped {
+  opacity: 0.6;
+}
+
+.reminder-open {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.reminder-time,
+.reminder-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.reminder-toasts {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  display: grid;
+  gap: 8px;
+  width: min(320px, calc(100vw - 32px));
+}
+
+.reminder-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 8px 4px 14px;
+  border-left: 3px solid var(--coral);
+  background: var(--paper);
+  box-shadow: 0 6px 24px rgba(39, 52, 47, 0.18);
+}

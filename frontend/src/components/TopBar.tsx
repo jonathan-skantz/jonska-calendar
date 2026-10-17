@@ -1,10 +1,18 @@
 type TopBarProps = {
   email: string;
+  upcomingReminderCount: number;
+  onOpenReminders: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
 };
 
-export function TopBar({ email, onOpenSettings, onLogout }: TopBarProps) {
+export function TopBar({
+  email,
+  upcomingReminderCount,
+  onOpenReminders,
+  onOpenSettings,
+  onLogout,
+}: TopBarProps) {
   return (
     <header className="topbar">
       <div className="brand">
@@ -12,6 +20,16 @@ export function TopBar({ email, onOpenSettings, onLogout }: TopBarProps) {
         <span>calendar / home</span>
       </div>
       <div className="topbar-actions">
+        <button
+          className="text-button reminders-button"
+          onClick={onOpenReminders}
+          aria-label={`Reminders, ${upcomingReminderCount} upcoming`}
+        >
+          🔔
+          {upcomingReminderCount > 0 && (
+            <span className="reminder-count">{upcomingReminderCount}</span>
+          )}
+        </button>
         <button className="text-button" onClick={onOpenSettings}>
           Settings
         </button>

@@ -1,8 +1,16 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./queryKeys";
 
+export const invalidateReminders = (queryClient: QueryClient) =>
+  queryClient.invalidateQueries({ queryKey: queryKeys.reminders });
+
+// Reminders carry event fields (title, times) and disappear with their event
+// or share, so any timeline change refreshes them too.
 export const invalidateWorkspace = (queryClient: QueryClient) =>
-  queryClient.invalidateQueries({ queryKey: queryKeys.workspace });
+  Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.workspace }),
+    invalidateReminders(queryClient),
+  ]);
 
 export const invalidateCurrentUserAndWorkspace = async (
   queryClient: QueryClient,
@@ -25,4 +33,5 @@ export const clearWorkspace = (queryClient: QueryClient) => {
   queryClient.removeQueries({ queryKey: queryKeys.workspace });
   queryClient.removeQueries({ queryKey: queryKeys.transitCard });
   queryClient.removeQueries({ queryKey: queryKeys.household });
+  queryClient.removeQueries({ queryKey: queryKeys.reminders });
 };

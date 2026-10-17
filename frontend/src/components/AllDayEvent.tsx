@@ -1,7 +1,8 @@
 import { tagTextColor } from "../lib/colors";
 import type { CSSProperties } from "react";
 import { getMainTag, isBusy } from "../lib/timeline";
-import type { TimelineEntry } from "../types";
+import type { Reminder, TimelineEntry } from "../types";
+import { describeReminders } from "../features/reminders/reminders";
 
 export function AllDayEvent({
   entry,
@@ -11,6 +12,7 @@ export function AllDayEvent({
   continuesFromPreviousWeek,
   continuesToNextWeek,
   onEdit,
+  reminders = [],
 }: {
   entry: TimelineEntry;
   startIndex: number;
@@ -19,6 +21,7 @@ export function AllDayEvent({
   continuesFromPreviousWeek: boolean;
   continuesToNextWeek: boolean;
   onEdit: (entry: TimelineEntry) => void;
+  reminders?: Reminder[];
 }) {
   const tag = getMainTag(entry);
   const backgroundColor = tag?.color ?? "var(--moss-dark)";
@@ -59,6 +62,16 @@ export function AllDayEvent({
         <span
           className={`all-day-title ${continuesToNextWeek ? "continues-to-next-week" : ""}`}
         >
+          {reminders.length > 0 && (
+            <i
+              className="reminder-marker"
+              role="img"
+              aria-label={describeReminders(reminders)}
+              title={describeReminders(reminders)}
+            >
+              🔔{" "}
+            </i>
+          )}
           {entry.title}
         </span>
       </button>
