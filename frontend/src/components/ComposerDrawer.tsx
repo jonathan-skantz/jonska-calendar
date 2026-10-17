@@ -60,6 +60,10 @@ export const ComposerDrawer = ({
     seconds ? String(Math.round(seconds / SECONDS_PER_MINUTE)) : "";
   // Kept in state so values survive while the fields are hidden by a kind or
   // all-day toggle.
+  const [approximate, setApproximate] = useState({
+    start_is_approximate: Boolean(editingItem?.start_is_approximate),
+    end_is_approximate: Boolean(editingItem?.end_is_approximate),
+  });
   const [commute, setCommute] = useState({
     commute_before_minutes: commuteMinutes(editingItem?.commute_before_seconds),
     commute_after_minutes: commuteMinutes(editingItem?.commute_after_seconds),
@@ -225,6 +229,32 @@ export const ComposerDrawer = ({
                   required
                 />
               </label>
+              {!isAllDay && (
+                <div className="approximate-fields">
+                  {(
+                    [
+                      ["start_is_approximate", "Approximate start"],
+                      ["end_is_approximate", "Approximate end"],
+                    ] as const
+                  ).map(([name, label]) => (
+                    <label key={name} className="all-day-toggle">
+                      <input
+                        type="checkbox"
+                        name={name}
+                        value="true"
+                        checked={approximate[name]}
+                        onChange={(event) =>
+                          setApproximate((current) => ({
+                            ...current,
+                            [name]: event.target.checked,
+                          }))
+                        }
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
               <label className={fieldErrors.location ? "field-invalid" : ""}>
                 Location
                 <input

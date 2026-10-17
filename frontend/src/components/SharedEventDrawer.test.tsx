@@ -40,4 +40,16 @@ describe("SharedEventDrawer", () => {
     // Only web links are clickable.
     expect(screen.queryByRole("link")).toBeNull();
   });
+
+  it("marks approximate edges", () => {
+    render(
+      <SharedEventDrawer
+        entry={{ ...entry, start_is_approximate: true }}
+        timeFormat="24-hour"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Tue, Oct 20 ~18:00 – 19:30")).toBeTruthy();
+  });
 });

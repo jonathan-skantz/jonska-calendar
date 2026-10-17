@@ -18,6 +18,8 @@ var (
 	ErrInvalidCommute = errors.New("commute must be whole minutes up to 24 hours and is only allowed on timed attendable events")
 	ErrDeadlineNeeded = errors.New("deadline is required")
 
+	ErrInvalidApproximate = errors.New("approximate start or end is only allowed on timed events")
+
 	ErrInvalidDate             = errors.New("dates must use the YYYY-MM-DD format")
 	ErrInvalidDateRange        = errors.New("date range must cover 1 to 62 days")
 	ErrInvalidTransitCardDates = errors.New("needed and maybe dates must be unique and inside the range")
@@ -53,6 +55,9 @@ func validateEventRequest(request eventRequest) error {
 	hasCommute := request.CommuteBeforeSeconds > 0 || request.CommuteAfterSeconds > 0
 	if hasCommute && (request.Kind != "attendable" || request.IsAllDay) {
 		return ErrInvalidCommute
+	}
+	if request.IsAllDay && (request.StartIsApproximate || request.EndIsApproximate) {
+		return ErrInvalidApproximate
 	}
 	return nil
 }

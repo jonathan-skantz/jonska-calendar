@@ -33,6 +33,8 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		StartsAt:             request.StartsAt,
 		EndsAt:               request.EndsAt,
 		IsAllDay:             request.IsAllDay,
+		StartIsApproximate:   request.StartIsApproximate,
+		EndIsApproximate:     request.EndIsApproximate,
 		Kind:                 request.Kind,
 		Location:             request.Location,
 		CommuteBeforeSeconds: request.CommuteBeforeSeconds,
@@ -74,7 +76,8 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 	if err := h.Store.UpdateEvent(r.Context(), userID, eventID, db.Event{
 		Title: request.Title, Description: request.Description, URL: request.URL,
 		StartsAt: request.StartsAt, EndsAt: request.EndsAt, Kind: request.Kind,
-		IsAllDay: request.IsAllDay,
+		IsAllDay:           request.IsAllDay,
+		StartIsApproximate: request.StartIsApproximate, EndIsApproximate: request.EndIsApproximate,
 		Location: request.Location, CommuteBeforeSeconds: request.CommuteBeforeSeconds,
 		CommuteAfterSeconds: request.CommuteAfterSeconds,
 		MainTagID:           request.MainTagID,

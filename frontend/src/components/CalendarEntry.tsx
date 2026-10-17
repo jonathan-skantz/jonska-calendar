@@ -5,7 +5,7 @@ import {
   EVENT_OVERLAP_INSET_PIXELS,
   EVENT_SEPARATOR_PIXELS,
   MINUTES_PER_HOUR,
-  formatTime,
+  formatEventTime,
 } from "../lib/calendar";
 import type { TimeFormatPreference } from "../lib/calendar";
 import { tagTextColor } from "../lib/colors";
@@ -108,6 +108,49 @@ export const CalendarEntry = ({
     (trimBottom && !commuteAfter ? EVENT_SEPARATOR_PIXELS : 0) +
     (continuesToNextDay ? CONTINUATION_MARKER_HEIGHT : 0);
   const commuteColor = mainTag?.color ?? "var(--yellow)";
+  const startIsApproximate =
+    entry.type === "event" && Boolean(entry.start_is_approximate);
+  const endIsApproximate =
+    entry.type === "event" && Boolean(entry.end_is_approximate);
+  // Approximate edges fade into the paper color. The tag strip is the first
+  // layer so it stays crisp above the fade.
+  const backgroundLayers = [
+    ...(stripStops.length
+      ? [
+          {
+            image: `linear-gradient(to right, ${stripStops.join(", ")})`,
+            size: "100% 3px",
+            position: "top",
+          },
+        ]
+      : []),
+    ...(startIsApproximate
+      ? [
+          {
+            image: "linear-gradient(to bottom, var(--paper), transparent)",
+            size: "100% var(--approximate-fade)",
+            position: "top",
+          },
+        ]
+      : []),
+    ...(endIsApproximate
+      ? [
+          {
+            image: "linear-gradient(to top, var(--paper), transparent)",
+            size: "100% var(--approximate-fade)",
+            position: "bottom",
+          },
+        ]
+      : []),
+  ];
+  const approximateDescription =
+    startIsApproximate && endIsApproximate
+      ? "Approximate start and end"
+      : startIsApproximate
+        ? "Approximate start"
+        : endIsApproximate
+          ? "Approximate end"
+          : undefined;
   // Shared entries open a read-only view; App decides which drawer to show.
   const openEditor = () => onEdit(entry);
 
@@ -183,7 +226,7 @@ export const CalendarEntry = ({
       {showBody && (
         <article
           ref={entryRef}
-          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${commuteAfter ? "has-commute-after" : ""}`}
+          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${commuteAfter ? "has-commute-after" : ""} ${startIsApproximate ? "approximate-start" : ""} ${endIsApproximate ? "approximate-end" : ""}`}
           style={{
             top: gridOffset(startMinutes),
             height: `calc(${gridOffset(durationMinutes)} - ${topInset + bottomInset}px)`,
@@ -195,9 +238,15 @@ export const CalendarEntry = ({
               ? {
                   backgroundColor: mainTag.color,
                   color: tagTextColor(mainTag.color),
-                  backgroundImage: `linear-gradient(to right, ${stripStops.join(", ")})`,
-                  backgroundSize: "100% 3px",
-                  backgroundPosition: "top",
+                  backgroundImage: backgroundLayers
+                    .map((layer) => layer.image)
+                    .join(", "),
+                  backgroundSize: backgroundLayers
+                    .map((layer) => layer.size)
+                    .join(", "),
+                  backgroundPosition: backgroundLayers
+                    .map((layer) => layer.position)
+                    .join(", "),
                   backgroundRepeat: "no-repeat",
                 }
               : {}),
@@ -225,11 +274,17 @@ export const CalendarEntry = ({
             ) : null}
             {entry.title}
           </strong>
-          <span>
+          <span title={approximateDescription}>
             {entry.type === "event"
-              ? [entry.starts_at, entry.ends_at]
+              ? [
+                  formatEventTime(entry.starts_at, startIsApproximate, {
+                    preference: timeFormat,
+                  }),
+                  formatEventTime(entry.ends_at, endIsApproximate, {
+                    preference: timeFormat,
+                  }),
+                ]
                   .filter(Boolean)
-                  .map((time) => formatTime(time, { preference: timeFormat }))
                   .join(" – ")
               : "Task"}
           </span>

@@ -16,6 +16,8 @@ export type EventPayload = {
   starts_at: string | undefined;
   ends_at: string | undefined;
   is_all_day: boolean;
+  start_is_approximate: boolean;
+  end_is_approximate: boolean;
   location: FormDataEntryValue | null;
   commute_before_seconds: number;
   commute_after_seconds: number;
@@ -139,6 +141,9 @@ export const buildEventPayload = (form: FormData): EventPayload => {
       ? localDayStart(form.get("ends_at"), true)
       : localDateTime(form.get("ends_at")),
     is_all_day: isAllDay,
+    start_is_approximate:
+      !isAllDay && form.get("start_is_approximate") === "true",
+    end_is_approximate: !isAllDay && form.get("end_is_approximate") === "true",
     location: String(form.get("location") || "") || null,
     commute_before_seconds: allowsCommute
       ? commuteSeconds(form.get("commute_before_minutes"))

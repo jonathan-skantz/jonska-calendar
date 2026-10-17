@@ -122,3 +122,51 @@ describe("ComposerDrawer commute fields", () => {
     ).toBe("");
   });
 });
+
+describe("ComposerDrawer approximate fields", () => {
+  const renderComposer = (editingItem: TimelineEntry) =>
+    render(
+      <ComposerDrawer
+        type="event"
+        editingItem={editingItem}
+        selectedDate="2026-10-15"
+        draftEventStart={null}
+        tags={[]}
+        selectedTagIds={[]}
+        mainTagId={null}
+        timeFormat="browser"
+        fieldErrors={{}}
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+        onTypeChange={vi.fn()}
+        onSelectedTagIdsChange={vi.fn()}
+        onMainTagIdChange={vi.fn()}
+      />,
+    );
+
+  it("prefills approximate edges and hides them for all-day events", () => {
+    renderComposer({
+      id: "event-1",
+      type: "event",
+      title: "Workshop",
+      starts_at: "2026-10-15T10:00:00",
+      ends_at: "2026-10-15T18:00:00",
+      end_is_approximate: true,
+      is_completed: false,
+    });
+    expect(
+      (screen.getByLabelText("Approximate start") as HTMLInputElement).checked,
+    ).toBe(false);
+    expect(
+      (screen.getByLabelText("Approximate end") as HTMLInputElement).checked,
+    ).toBe(true);
+
+    fireEvent.click(screen.getByLabelText("All day"));
+    expect(screen.queryByLabelText("Approximate end")).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("All day"));
+    expect(
+      (screen.getByLabelText("Approximate end") as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+});

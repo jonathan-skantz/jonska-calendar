@@ -85,6 +85,16 @@ export const formatTime = (
   );
 };
 
+// Approximate event edges are shown as "~10:00"; the stored time stays exact.
+export const formatEventTime = (
+  value: string | Date | undefined,
+  isApproximate: boolean | undefined,
+  options?: TimeFormatOptions,
+) => {
+  const time = formatTime(value, options);
+  return time && isApproximate ? `~${time}` : time;
+};
+
 export const formatHour = (hour: number, options?: TimeFormatOptions) =>
   formatTimeValue(new Date(2020, 0, 1, hour), options);
 export const formatDate = (value: Date) => format(value, "EEE, MMM d");

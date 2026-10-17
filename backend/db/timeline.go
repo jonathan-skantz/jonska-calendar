@@ -70,6 +70,7 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 	eventRows, err := s.db.Query(ctx, `
 		SELECT item.id, item.title, item.description, item.url,
 			event.starts_at, event.ends_at, event.is_all_day, event.kind, event.location,
+			event.start_is_approximate, event.end_is_approximate,
 			event.commute_before_seconds, event.commute_after_seconds, event.main_tag_id,
 			(SELECT count(*) FROM event_shares AS share WHERE share.event_id = item.id)
 		FROM timeline_items AS item
@@ -85,6 +86,7 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 		if err := eventRows.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
+			&entry.StartIsApproximate, &entry.EndIsApproximate,
 			&entry.CommuteBeforeSeconds, &entry.CommuteAfterSeconds,
 			&entry.MainTagID, &entry.ShareCount,
 		); err != nil {
@@ -140,6 +142,7 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 			COALESCE(share.description, item.description),
 			COALESCE(share.url, item.url),
 			event.starts_at, event.ends_at, event.is_all_day, event.kind,
+			event.start_is_approximate, event.end_is_approximate,
 			COALESCE(share.location, event.location),
 			user_display_name(owner.display_name, owner.email)
 		FROM event_shares AS share
@@ -160,7 +163,8 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 		entry.IsShared = true
 		if err := rows.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
-			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
+			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind,
+			&entry.StartIsApproximate, &entry.EndIsApproximate, &entry.Location,
 			&entry.SharedBy,
 		); err != nil {
 			return nil, err

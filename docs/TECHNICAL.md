@@ -82,7 +82,7 @@ users 1 --- n timeline_items
 
 `timeline_items.user_id` is the single source of ownership. Event and task subtype rows reference the timeline item by primary key.
 
-Events store exact `starts_at` and `ends_at`, event kind, location, and commute durations. Tasks store only `deadline_at` and `is_completed` in the demo.
+Events store exact `starts_at` and `ends_at`, whether each edge is approximate, event kind, location, and commute durations. Tasks store only `deadline_at` and `is_completed` in the demo.
 
 ### Personal tags
 
@@ -110,7 +110,7 @@ events
                        (title, description, url, location: owner-set, nullable)
 ```
 
-The event remains owned by the original user's `timeline_items` row. `event_shares` stores the recipient relationship and the owner's per-recipient values. A NULL field means the recipient sees the event's own value, so later edits to the event still reach them; times, all-day, and kind always come from the event. Recipients cannot override anything. Only the owner manages shares, and every share query checks ownership through `timeline_items.user_id`.
+The event remains owned by the original user's `timeline_items` row. `event_shares` stores the recipient relationship and the owner's per-recipient values. A NULL field means the recipient sees the event's own value, so later edits to the event still reach them; times (including approximate edges), all-day, and kind always come from the event. Recipients cannot override anything. Only the owner manages shares, and every share query checks ownership through `timeline_items.user_id`.
 
 The owner is derived through `event_shares.event_id -> events.timeline_item_id -> timeline_items.user_id`; it is deliberately not duplicated in `event_shares`.
 
@@ -199,13 +199,13 @@ All API routes use JSON request and response bodies unless the response is `204 
 | `POST /api/household/members`                   | `email`                                     | `204`; `404` unknown email; `409` already a member   |
 | `DELETE /api/household/members/me`              | None                                        | `204`; deletes the household when it becomes empty   |
 
-Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. For all-day events, the end timestamp is exclusive and starts at midnight after the last displayed date. The `kind` value is `attendable` or `informational`. Commute durations are seconds in whole minutes, from 0 up to 24 hours, and must be 0 unless the event is a timed (not all-day) `attendable` event. Migration 14 enforces the same rules in the database. The week grid draws commute as hatched bands next to the event block. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
+Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `start_is_approximate`, `end_is_approximate`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. For all-day events, the end timestamp is exclusive and starts at midnight after the last displayed date. The `kind` value is `attendable` or `informational`. Commute durations are seconds in whole minutes, from 0 up to 24 hours, and must be 0 unless the event is a timed (not all-day) `attendable` event. Migration 14 enforces the same rules in the database. The week grid draws commute as hatched bands next to the event block. `start_is_approximate` and `end_is_approximate` only affect presentation (a faded edge and a `~` time); they must be false on all-day events, which migration 18 also enforces. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
 
 Task request fields are `title`, `description`, `url`, and `deadline_at`. The title and deadline are required. `deadline_at` is a timestamp.
 
 Tag colors use six hexadecimal digits with a leading `#`, such as `#547968`. The digits can use uppercase or lowercase letters. The frontend chooses black or white tag text by comparing each color's WCAG contrast ratio against both. Tag responses contain `id`, `name`, `color`, and `is_default`.
 
-Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `shared_by`, `share_count`, `tags`, and `main_tag_id`. `shared_by` (the owner's display name) appears only on events shared with the caller, which never include tags, `main_tag_id`, or commute. `share_count` appears only on the caller's own shared events. Optional response fields are omitted when empty. Timestamps use JSON time format.
+Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `start_is_approximate`, `end_is_approximate`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `shared_by`, `share_count`, `tags`, and `main_tag_id`. `shared_by` (the owner's display name) appears only on events shared with the caller, which never include tags, `main_tag_id`, or commute. `share_count` appears only on the caller's own shared events. Optional response fields are omitted when empty. Timestamps use JSON time format.
 
 Share fields are `title`, `description`, `url`, and `location`. Each is trimmed, and an empty or missing value means "same as the event"; `PUT` replaces all four. Event share responses contain `id`, `recipient_user_id`, `recipient_email`, and `recipient_display_name`, plus the share fields that are set. Sharing an event the caller does not own, or listing, updating, or removing its shares, returns `404`. Sharing with yourself returns `400`, and sharing twice with the same user returns `409`.
 

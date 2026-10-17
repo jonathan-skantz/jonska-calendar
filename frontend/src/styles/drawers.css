@@ -160,6 +160,12 @@
   accent-color: var(--moss-dark);
 }
 
+.approximate-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
 .commute-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

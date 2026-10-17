@@ -49,9 +49,13 @@ testable product over polish.
 
 ### Timeline Item Type 1: Events
 
-Events have an exact start date/time and end date/time in the first demo.
+Events have a start date/time and end date/time.
 
-- [ ] Uncertain or approximate timing is **Future**.
+- [x] A timed event's start and/or end can be marked as approximate (e.g. "about
+      10:00 to about 18:00"). The event still occupies its stated times, but each
+      approximate edge fades out in the week view and its time is shown as `~10:00`.
+      All-day events cannot be approximate. Recipients of a shared event see the
+      same approximate edges.
 
 **Sharing events (Demo):**
 
@@ -92,9 +96,6 @@ Events have an exact start date/time and end date/time in the first demo.
   - football game: gather 30 mins before event start
   - career fair: mingle 30 mins before
   - a-kvart
-
-- [ ] Approximate or uncertain event timing is **Future** and is not required in the
-      first demo.
 
 #### Type 1.b: Events not to be attended (informational events, reminders, heads-ups) (Demo)
 
@@ -157,7 +158,6 @@ separate from events and tasks.
 
 The following product ideas are intentionally deferred from the first demo:
 
-- [ ] uncertain or approximate event timing
 - [ ] conflict detection and conflict resolution
 - [ ] reminders and notification delivery
 - [ ] gathering time as a separate schedule concept
@@ -170,5 +170,6 @@ The following product ideas are intentionally deferred from the first demo:
 - [ ] regex triggers and title/color automation
 - [ ] title templates
 - [ ] backup, import/export, and audit/history features
+- [ ] connect commute time to SL API or other transit data to show expected arrival times and delays
 
 ---

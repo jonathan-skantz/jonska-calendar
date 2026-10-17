@@ -114,6 +114,81 @@ func TestCreateEventRejectsCommuteOutsideTimedAttendableEvents(t *testing.T) {
 	}
 }
 
+func TestCreateEventRejectsApproximateAllDayEvents(t *testing.T) {
+	handler := New(nil, func(*http.Request) (uuid.UUID, error) { return uuid.New(), nil })
+	response := httptest.NewRecorder()
+	handler.CreateEvent(response, httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(
+		`{"title":"Trip","starts_at":"2026-10-09T00:00:00Z","ends_at":"2026-10-10T00:00:00Z","is_all_day":true,"kind":"attendable","end_is_approximate":true}`,
+	)))
+	if response.Code != http.StatusBadRequest || response.Body.String() != ErrInvalidApproximate.Error()+"\n" {
+		t.Fatalf("expected approximate error, got %d: %s", response.Code, response.Body.String())
+	}
+}
+
+func TestApproximateTimesAreStoredAndShared(t *testing.T) {
+	store, ownerID := setupTestStore(t)
+	ctx := context.Background()
+	recipientID, err := store.Register(ctx, "recipient@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentUser := ownerID
+	handler := New(store, func(*http.Request) (uuid.UUID, error) { return currentUser, nil })
+
+	response := httptest.NewRecorder()
+	handler.CreateEvent(response, httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(`{
+		"title":"Workshop",
+		"starts_at":"2026-10-09T10:00:00Z",
+		"ends_at":"2026-10-09T18:00:00Z",
+		"kind":"informational",
+		"start_is_approximate":true,
+		"end_is_approximate":true
+	}`)))
+	if response.Code != http.StatusCreated {
+		t.Fatalf("create: expected status %d, got %d: %s", http.StatusCreated, response.Code, response.Body.String())
+	}
+	var created createResponse
+	if err := json.NewDecoder(response.Body).Decode(&created); err != nil {
+		t.Fatal(err)
+	}
+
+	update := httptest.NewRequest(http.MethodPut, "/api/events/"+created.ID.String(), bytes.NewBufferString(`{
+		"title":"Workshop",
+		"starts_at":"2026-10-09T10:00:00Z",
+		"ends_at":"2026-10-09T18:00:00Z",
+		"kind":"informational",
+		"end_is_approximate":true
+	}`))
+	update.SetPathValue("eventID", created.ID.String())
+	response = httptest.NewRecorder()
+	handler.UpdateEvent(response, update)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("update: expected status %d, got %d: %s", http.StatusNoContent, response.Code, response.Body.String())
+	}
+
+	shareRequest := httptest.NewRequest(http.MethodPost, "/api/events/"+created.ID.String()+"/shares",
+		bytes.NewBufferString(`{"recipient_email":"recipient@example.com"}`))
+	shareRequest.SetPathValue("eventID", created.ID.String())
+	response = httptest.NewRecorder()
+	handler.ShareEvent(response, shareRequest)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("share: expected status %d, got %d: %s", http.StatusCreated, response.Code, response.Body.String())
+	}
+
+	for name, userID := range map[string]uuid.UUID{"owner": ownerID, "recipient": recipientID} {
+		currentUser = userID
+		response = httptest.NewRecorder()
+		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+		var entries []db.TimelineEntry
+		if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 || entries[0].StartIsApproximate || !entries[0].EndIsApproximate {
+			t.Fatalf("%s: unexpected approximate flags %+v", name, entries)
+		}
+	}
+}
+
 func TestCreateEventAndTask(t *testing.T) {
 	store, userID := setupTestStore(t)
 	handler := New(store, func(*http.Request) (uuid.UUID, error) { return userID, nil })

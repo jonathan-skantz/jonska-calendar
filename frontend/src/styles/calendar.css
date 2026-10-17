@@ -392,6 +392,24 @@
   border: 0;
 }
 
+/* Approximate edges fade out over --approximate-fade (about 20 minutes).
+   The text starts below the fade so it keeps full contrast. */
+.grid-entry.event {
+  --approximate-fade: 12px;
+}
+
+.grid-entry.event.approximate-start {
+  padding-top: var(--approximate-fade);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.grid-entry.event.approximate-end {
+  padding-bottom: var(--approximate-fade);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 .grid-entry.event.has-commute-before {
   border-top-left-radius: 0;
   border-top-right-radius: 0;

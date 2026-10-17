@@ -1,5 +1,5 @@
 import { subDays } from "date-fns";
-import { formatDate, formatTime, localDateKey } from "../lib/calendar";
+import { formatDate, formatEventTime, localDateKey } from "../lib/calendar";
 import type { TimeFormatPreference } from "../lib/calendar";
 import type { TimelineEntry } from "../types";
 
@@ -23,8 +23,10 @@ const formatRange = (
       ? `${formatDate(start)}, all day`
       : `${formatDate(start)} – ${formatDate(lastDay)}, all day`;
   }
-  const startText = `${formatDate(start)} ${formatTime(start, { preference })}`;
-  const endTime = formatTime(end, { preference });
+  const startText = `${formatDate(start)} ${formatEventTime(start, entry.start_is_approximate, { preference })}`;
+  const endTime = formatEventTime(end, entry.end_is_approximate, {
+    preference,
+  });
   return localDateKey(entry.starts_at) === localDateKey(entry.ends_at)
     ? `${startText} – ${endTime}`
     : `${startText} – ${formatDate(end)} ${endTime}`;

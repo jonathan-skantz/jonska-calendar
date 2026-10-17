@@ -41,6 +41,8 @@ type Event struct {
 	StartsAt             time.Time
 	EndsAt               time.Time
 	IsAllDay             bool
+	StartIsApproximate   bool
+	EndIsApproximate     bool
 	Kind                 string
 	Location             *string
 	CommuteBeforeSeconds int
@@ -91,6 +93,8 @@ type TimelineEntry struct {
 	StartsAt             *time.Time `json:"starts_at,omitempty"`
 	EndsAt               *time.Time `json:"ends_at,omitempty"`
 	IsAllDay             bool       `json:"is_all_day,omitempty"`
+	StartIsApproximate   bool       `json:"start_is_approximate,omitempty"`
+	EndIsApproximate     bool       `json:"end_is_approximate,omitempty"`
 	DeadlineAt           *time.Time `json:"deadline_at,omitempty"`
 	Kind                 *string    `json:"kind,omitempty"`
 	Location             *string    `json:"location,omitempty"`

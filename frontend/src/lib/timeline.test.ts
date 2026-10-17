@@ -113,6 +113,21 @@ describe("timeline behavior", () => {
     expect(buildEventPayload(form).commute_before_seconds).toBe(0);
   });
 
+  it("sends approximate edges only for timed events", () => {
+    const form = new FormData();
+    form.set("title", "Workshop");
+    form.set("starts_at", "2026-10-15T10:00");
+    form.set("ends_at", "2026-10-15T18:00");
+    form.set("end_is_approximate", "true");
+    expect(buildEventPayload(form)).toMatchObject({
+      start_is_approximate: false,
+      end_is_approximate: true,
+    });
+
+    form.set("is_all_day", "true");
+    expect(buildEventPayload(form).end_is_approximate).toBe(false);
+  });
+
   it("shows tasks regardless of hidden event tags and hides events with a hidden tag", () => {
     expect(isEventVisible(event({ tags: [tag("work")] }), ["work"])).toBe(
       false,

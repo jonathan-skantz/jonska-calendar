@@ -13,6 +13,8 @@ type eventRequest struct {
 	StartsAt             time.Time `json:"starts_at"`
 	EndsAt               time.Time `json:"ends_at"`
 	IsAllDay             bool      `json:"is_all_day"`
+	StartIsApproximate   bool      `json:"start_is_approximate"`
+	EndIsApproximate     bool      `json:"end_is_approximate"`
 	Kind                 string    `json:"kind"`
 	Location             *string   `json:"location"`
 	CommuteBeforeSeconds int       `json:"commute_before_seconds"`
