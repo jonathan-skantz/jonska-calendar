@@ -410,6 +410,81 @@
   border-bottom-right-radius: 0;
 }
 
+/* Gathering: solid means you must be there, dotted means you may drop in.
+   The chip names it and gives the time people gather. */
+.gathering-label {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  padding: 0 3px;
+  background: var(--paper);
+  border-radius: 2px;
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mandatory: a thin line with a notch where the event proper starts. */
+.gathering-start {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid currentColor;
+  opacity: 0.55;
+}
+
+.gathering-start::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 0;
+  border-block: 4.5px solid transparent;
+  border-left: 6px solid currentColor;
+}
+
+/* Optional: polka dots in the tag color, drawn behind other entries. */
+.gathering-band {
+  --gathering-dots: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--gathering-color) 60%, transparent) 1.5px,
+    transparent 2px
+  );
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 0;
+  border: 1px dotted var(--gathering-color);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  background-color: var(--paper);
+  background-image: var(--gathering-dots);
+  background-size: 8px 8px;
+  cursor: pointer;
+}
+
+.gathering-band.approximate-start {
+  border-top-color: transparent;
+  background-image:
+    linear-gradient(
+      to bottom,
+      var(--paper),
+      transparent var(--approximate-fade)
+    ),
+    var(--gathering-dots);
+  background-size:
+    100% 100%,
+    8px 8px;
+}
+
+.grid-entry.event.has-optional-gathering {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 .grid-entry.event.has-commute-before {
   border-top-left-radius: 0;
   border-top-right-radius: 0;

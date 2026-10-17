@@ -5,6 +5,7 @@ import {
   getCommuteSegments,
   getEntriesForDate,
   getEventOverlapDepth,
+  getGatheringSegment,
 } from "./timelineView";
 import type { TimelineEntry } from "../../types";
 
@@ -186,5 +187,127 @@ describe("commute segments", () => {
     expect(ordered.map((entry) => entry.id)).toEqual(["long-commute", "short"]);
     expect(getEventOverlapDepth(ordered[0], [])).toBe(0);
     expect(getEventOverlapDepth(ordered[1], ordered.slice(0, 1))).toBe(1);
+  });
+});
+
+describe("gathering", () => {
+  const gathering = event({
+    kind: "attendable",
+    starts_at: "2026-10-15T18:00:00",
+    ends_at: "2026-10-15T20:00:00",
+    gathering_seconds: 30 * 60,
+    commute_before_seconds: 20 * 60,
+  });
+  const day = new Date(2026, 9, 15);
+
+  it("starts the event block at gathering and commute before it", () => {
+    expect(getCalendarEntryLayout(gathering, day, day)).toMatchObject({
+      startMinutes: 1050,
+      durationMinutes: 150,
+    });
+    expect(getGatheringSegment(gathering, day)).toEqual({
+      minutes: 30,
+      isOptional: false,
+      label: undefined,
+      startMinutes: 1050,
+      durationMinutes: 30,
+      endsAtEventStart: true,
+    });
+    expect(getCommuteSegments(gathering, day)[0]).toMatchObject({
+      position: "before",
+      startMinutes: 1030,
+      durationMinutes: 20,
+    });
+  });
+
+  it("counts gathering as occupied time when overlapping", () => {
+    const earlier = event({ id: "earlier", ends_at: "2026-10-15T17:20:00" });
+    expect(getEventOverlapDepth(gathering, [earlier])).toBe(1);
+    expect(
+      getEventOverlapDepth({ ...gathering, gathering_seconds: 0 }, [earlier]),
+    ).toBe(0);
+  });
+
+  it("clips gathering that crosses midnight to each day", () => {
+    const early = event({
+      kind: "attendable",
+      starts_at: "2026-10-16T00:15:00",
+      ends_at: "2026-10-16T01:00:00",
+      gathering_seconds: 30 * 60,
+    });
+    expect(getGatheringSegment(early, day)).toEqual({
+      minutes: 30,
+      isOptional: false,
+      label: undefined,
+      startMinutes: 1425,
+      durationMinutes: 15,
+      endsAtEventStart: false,
+    });
+    expect(eventBodyOverlapsDate(early, day)).toBe(true);
+    expect(getGatheringSegment(early, new Date(2026, 9, 16))).toEqual({
+      minutes: 30,
+      isOptional: false,
+      label: undefined,
+      startMinutes: 0,
+      durationMinutes: 15,
+      endsAtEventStart: true,
+    });
+  });
+
+  describe("optional", () => {
+    const mingle = event({
+      kind: "attendable",
+      starts_at: "2026-10-15T17:30:00",
+      ends_at: "2026-10-15T20:00:00",
+      gathering_seconds: 30 * 60,
+      gathering_is_optional: true,
+      gathering_label: "Mingle",
+    });
+    const earlier = event({ id: "earlier", ends_at: "2026-10-15T17:15:00" });
+
+    it("keeps the event block at the real start and does not block time", () => {
+      expect(getCalendarEntryLayout(mingle, day, day)).toMatchObject({
+        startMinutes: 1050,
+        durationMinutes: 150,
+      });
+      expect(getGatheringSegment(mingle, day)).toMatchObject({
+        isOptional: true,
+        label: "Mingle",
+        startMinutes: 1020,
+        durationMinutes: 30,
+      });
+      expect(getEventOverlapDepth(mingle, [earlier])).toBe(0);
+    });
+
+    it("blocks time when there is a commute to it", () => {
+      const commuting = { ...mingle, commute_before_seconds: 20 * 60 };
+      expect(getCommuteSegments(commuting, day)[0]).toMatchObject({
+        position: "before",
+        startMinutes: 1000,
+        durationMinutes: 20,
+      });
+      expect(getEventOverlapDepth(commuting, [earlier])).toBe(1);
+    });
+
+    it("still shows on the previous day when it crosses midnight", () => {
+      const early = event({
+        ...mingle,
+        starts_at: "2026-10-16T00:10:00",
+        ends_at: "2026-10-16T01:00:00",
+      });
+      expect(getEntriesForDate([early], day)).toEqual([early]);
+      expect(eventBodyOverlapsDate(early, day)).toBe(false);
+      expect(getGatheringSegment(early, day)).toMatchObject({
+        startMinutes: 1420,
+        durationMinutes: 20,
+        endsAtEventStart: false,
+      });
+    });
+  });
+
+  it("ignores gathering on informational events", () => {
+    expect(
+      getGatheringSegment({ ...gathering, kind: "informational" }, day),
+    ).toBeNull();
   });
 });

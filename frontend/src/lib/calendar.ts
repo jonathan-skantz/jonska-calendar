@@ -4,6 +4,7 @@ export const WEEK_DAY_COUNT = 7;
 export const HOURS_PER_DAY = 24;
 export const MINUTES_PER_HOUR = 60;
 export const SECONDS_PER_MINUTE = 60;
+export const MAX_GATHERING_LABEL_LENGTH = 40;
 export const MAX_COMMUTE_MINUTES = 24 * 60;
 export const CALENDAR_GRID_SCALE = 2;
 export const TASK_DISPLAY_DURATION_MINUTES = 45;

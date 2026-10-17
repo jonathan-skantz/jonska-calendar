@@ -125,6 +125,103 @@ func TestCreateEventRejectsApproximateAllDayEvents(t *testing.T) {
 	}
 }
 
+func TestCreateEventRejectsGatheringOutsideTimedAttendableEvents(t *testing.T) {
+	handler := New(nil, func(*http.Request) (uuid.UUID, error) { return uuid.New(), nil })
+	for name, body := range map[string]string{
+		"informational":  `{"title":"Info","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"informational","gathering_seconds":600}`,
+		"all-day":        `{"title":"Trip","starts_at":"2026-10-09T00:00:00Z","ends_at":"2026-10-10T00:00:00Z","is_all_day":true,"kind":"attendable","gathering_seconds":600}`,
+		"negative":       `{"title":"Meet","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"attendable","gathering_seconds":-60}`,
+		"partial minute": `{"title":"Meet","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"attendable","gathering_seconds":90}`,
+		"label only":     `{"title":"Meet","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"attendable","gathering_label":"Warm-up"}`,
+		"optional only":  `{"title":"Meet","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"attendable","gathering_is_optional":true}`,
+		"long label":     `{"title":"Meet","starts_at":"2026-10-09T10:00:00Z","ends_at":"2026-10-09T11:00:00Z","kind":"attendable","gathering_seconds":600,"gathering_label":"` + strings.Repeat("å", 41) + `"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			handler.CreateEvent(response, httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(body)))
+			if response.Code != http.StatusBadRequest || response.Body.String() != ErrInvalidGathering.Error()+"\n" {
+				t.Fatalf("expected gathering error, got %d: %s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestGatheringIsStoredAndShared(t *testing.T) {
+	store, ownerID := setupTestStore(t)
+	ctx := context.Background()
+	recipientID, err := store.Register(ctx, "recipient@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentUser := ownerID
+	handler := New(store, func(*http.Request) (uuid.UUID, error) { return currentUser, nil })
+
+	response := httptest.NewRecorder()
+	handler.CreateEvent(response, httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(`{
+		"title":"Football",
+		"starts_at":"2026-10-09T18:00:00Z",
+		"ends_at":"2026-10-09T20:00:00Z",
+		"kind":"attendable",
+		"gathering_seconds":900,
+		"gathering_label":"   ",
+		"commute_before_seconds":1200
+	}`)))
+	if response.Code != http.StatusCreated {
+		t.Fatalf("create: expected status %d, got %d: %s", http.StatusCreated, response.Code, response.Body.String())
+	}
+	var created createResponse
+	if err := json.NewDecoder(response.Body).Decode(&created); err != nil {
+		t.Fatal(err)
+	}
+
+	update := httptest.NewRequest(http.MethodPut, "/api/events/"+created.ID.String(), bytes.NewBufferString(`{
+		"title":"Football",
+		"starts_at":"2026-10-09T18:00:00Z",
+		"ends_at":"2026-10-09T20:00:00Z",
+		"kind":"attendable",
+		"gathering_seconds":1800,
+		"gathering_is_optional":true,
+		"gathering_label":" Mingle ",
+		"commute_before_seconds":1200
+	}`))
+	update.SetPathValue("eventID", created.ID.String())
+	response = httptest.NewRecorder()
+	handler.UpdateEvent(response, update)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("update: expected status %d, got %d: %s", http.StatusNoContent, response.Code, response.Body.String())
+	}
+
+	shareRequest := httptest.NewRequest(http.MethodPost, "/api/events/"+created.ID.String()+"/shares",
+		bytes.NewBufferString(`{"recipient_email":"recipient@example.com"}`))
+	shareRequest.SetPathValue("eventID", created.ID.String())
+	response = httptest.NewRecorder()
+	handler.ShareEvent(response, shareRequest)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("share: expected status %d, got %d: %s", http.StatusCreated, response.Code, response.Body.String())
+	}
+
+	for name, test := range map[string]struct {
+		userID        uuid.UUID
+		commuteBefore int
+	}{
+		"owner":     {userID: ownerID, commuteBefore: 1200},
+		"recipient": {userID: recipientID, commuteBefore: 0},
+	} {
+		currentUser = test.userID
+		response = httptest.NewRecorder()
+		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+		var entries []db.TimelineEntry
+		if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 || entries[0].GatheringSeconds != 1800 || !entries[0].GatheringIsOptional ||
+			entries[0].GatheringLabel == nil || *entries[0].GatheringLabel != "Mingle" ||
+			entries[0].CommuteBeforeSeconds != test.commuteBefore {
+			t.Fatalf("%s: unexpected gathering or commute %+v", name, entries)
+		}
+	}
+}
+
 func TestApproximateTimesAreStoredAndShared(t *testing.T) {
 	store, ownerID := setupTestStore(t)
 	ctx := context.Background()

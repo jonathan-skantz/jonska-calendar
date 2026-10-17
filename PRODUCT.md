@@ -91,8 +91,16 @@ Events have a start date/time and end date/time.
       commute occupies calendar space, but must be visually distinct from the event
       itself so it is obvious that the event has not started during the commute.
 
-- [ ] Gathering time is **Future**. When supported, it must be distinct from the
-      actual event start time. Examples include:
+- [x] An attendable event can include gathering time before the event starts,
+      with an optional short label (e.g. "Warm-up", "Mingle"). Gathering is
+      distinct from the actual event start and from the hatched commute:
+  - Mandatory gathering (e.g. warm up with the team) is part of the event block,
+    with a line marking the real start. It counts as busy time.
+  - Optional gathering (e.g. mingle from 17:00) is a dotted band above the event.
+    It only counts as busy time when the event has a commute before, because
+    then the user plans to be there.
+  - Commute before comes before gathering. Gathering describes the event, so
+    recipients of a shared event see it too. Examples include:
   - football game: gather 30 mins before event start
   - career fair: mingle 30 mins before
   - a-kvart
@@ -160,7 +168,6 @@ The following product ideas are intentionally deferred from the first demo:
 
 - [ ] conflict detection and conflict resolution
 - [ ] reminders and notification delivery
-- [ ] gathering time as a separate schedule concept
 - [ ] recurring events, including birthdays, name days, and holidays
 - [ ] external calendar integration or import
 - [ ] automatic task scheduling and scheduled task sessions

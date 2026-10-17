@@ -25,6 +25,9 @@ export type TimelineEntry = {
   deadline_at?: string;
   kind?: "attendable" | "informational";
   location?: string;
+  gathering_seconds?: number;
+  gathering_is_optional?: boolean;
+  gathering_label?: string;
   commute_before_seconds?: number;
   commute_after_seconds?: number;
   is_completed: boolean;

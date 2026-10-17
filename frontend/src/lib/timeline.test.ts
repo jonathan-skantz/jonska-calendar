@@ -113,6 +113,33 @@ describe("timeline behavior", () => {
     expect(buildEventPayload(form).commute_before_seconds).toBe(0);
   });
 
+  it("sends gathering seconds only for timed attendable events", () => {
+    const form = new FormData();
+    form.set("title", "Football");
+    form.set("kind", "attendable");
+    form.set("starts_at", "2026-10-15T18:00");
+    form.set("ends_at", "2026-10-15T19:30");
+    form.set("gathering_minutes", "30");
+    form.set("gathering_is_optional", "true");
+    form.set("gathering_label", "  Mingle ");
+    expect(buildEventPayload(form)).toMatchObject({
+      gathering_seconds: 1800,
+      gathering_is_optional: true,
+      gathering_label: "Mingle",
+    });
+
+    form.set("gathering_minutes", "");
+    expect(buildEventPayload(form)).toMatchObject({
+      gathering_seconds: 0,
+      gathering_is_optional: false,
+      gathering_label: null,
+    });
+
+    form.set("gathering_minutes", "30");
+    form.set("kind", "informational");
+    expect(buildEventPayload(form).gathering_seconds).toBe(0);
+  });
+
   it("sends approximate edges only for timed events", () => {
     const form = new FormData();
     form.set("title", "Workshop");

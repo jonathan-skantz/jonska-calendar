@@ -19,6 +19,9 @@ export type EventPayload = {
   start_is_approximate: boolean;
   end_is_approximate: boolean;
   location: FormDataEntryValue | null;
+  gathering_seconds: number;
+  gathering_is_optional: boolean;
+  gathering_label: string | null;
   commute_before_seconds: number;
   commute_after_seconds: number;
 };
@@ -117,8 +120,8 @@ const localDayStart = (value: FormDataEntryValue | null, nextDay = false) => {
   return date.toISOString();
 };
 
-// The backend stores commute in whole minutes.
-const commuteSeconds = (value: FormDataEntryValue | null) => {
+// The backend stores commute and gathering in whole minutes.
+const minuteSeconds = (value: FormDataEntryValue | null) => {
   const minutes = Math.round(Number(value || 0));
   return Number.isFinite(minutes) && minutes > 0
     ? minutes * SECONDS_PER_MINUTE
@@ -128,7 +131,11 @@ const commuteSeconds = (value: FormDataEntryValue | null) => {
 export const buildEventPayload = (form: FormData): EventPayload => {
   const isAllDay = form.get("is_all_day") === "true";
   const isAttendable = form.get("kind") === "attendable";
-  const allowsCommute = isAttendable && !isAllDay;
+  // Gathering and commute only apply to timed attendable events.
+  const allowsAttendance = isAttendable && !isAllDay;
+  const gatheringSeconds = allowsAttendance
+    ? minuteSeconds(form.get("gathering_minutes"))
+    : 0;
   return {
     title: String(form.get("title") || ""),
     description: String(form.get("description") || "") || null,
@@ -145,37 +152,81 @@ export const buildEventPayload = (form: FormData): EventPayload => {
       !isAllDay && form.get("start_is_approximate") === "true",
     end_is_approximate: !isAllDay && form.get("end_is_approximate") === "true",
     location: String(form.get("location") || "") || null,
-    commute_before_seconds: allowsCommute
-      ? commuteSeconds(form.get("commute_before_minutes"))
+    gathering_seconds: gatheringSeconds,
+    gathering_is_optional:
+      gatheringSeconds > 0 && form.get("gathering_is_optional") === "true",
+    gathering_label:
+      (gatheringSeconds > 0 &&
+        String(form.get("gathering_label") || "").trim()) ||
+      null,
+    commute_before_seconds: allowsAttendance
+      ? minuteSeconds(form.get("commute_before_minutes"))
       : 0,
-    commute_after_seconds: allowsCommute
-      ? commuteSeconds(form.get("commute_after_minutes"))
+    commute_after_seconds: allowsAttendance
+      ? minuteSeconds(form.get("commute_after_minutes"))
       : 0,
   };
 };
 
-// Commute only applies to timed attendable events; ignore it on anything else.
+const isTimedAttendable = (entry: TimelineEntry) =>
+  entry.type === "event" && entry.kind === "attendable" && !entry.is_all_day;
+
+// Commute and gathering only apply to timed attendable events; ignore them on
+// anything else.
 export const getCommuteSeconds = (entry: TimelineEntry) =>
-  entry.type === "event" && entry.kind === "attendable" && !entry.is_all_day
+  isTimedAttendable(entry)
     ? {
         before: entry.commute_before_seconds ?? 0,
         after: entry.commute_after_seconds ?? 0,
       }
     : { before: 0, after: 0 };
 
+export const getGathering = (entry: TimelineEntry) => {
+  const seconds = isTimedAttendable(entry) ? (entry.gathering_seconds ?? 0) : 0;
+  return {
+    seconds,
+    isOptional: seconds > 0 && Boolean(entry.gathering_is_optional),
+    label: seconds > 0 ? entry.gathering_label : undefined,
+  };
+};
+
+const secondsBeforeStart = (entry: TimelineEntry, seconds: number) =>
+  new Date(new Date(entry.starts_at ?? 0).getTime() - seconds * 1000);
+
+// When people gather; starts_at stays the real start of the event.
+export const getGatheringStart = (entry: TimelineEntry) =>
+  secondsBeforeStart(entry, getGathering(entry).seconds);
+
+// Where the event block begins. Mandatory gathering is part of the block;
+// optional gathering is a separate band above it that may be skipped.
+export const getBodyStart = (entry: TimelineEntry) => {
+  const gathering = getGathering(entry);
+  return secondsBeforeStart(
+    entry,
+    gathering.isOptional ? 0 : gathering.seconds,
+  );
+};
+
+// The top of everything drawn for an event: commute, then any gathering.
+export const getDrawnStart = (entry: TimelineEntry) =>
+  new Date(
+    getGatheringStart(entry).getTime() - getCommuteSeconds(entry).before * 1000,
+  );
+
 const occupiedRanges = new WeakMap<TimelineEntry, { start: Date; end: Date }>();
 
-// The span an event blocks on the calendar, including commute on both sides.
-// Cached per entry object because overlap checks compare every pair in a day.
+// The span an event blocks on the calendar: mandatory gathering and commute.
+// Optional gathering only counts when there is a commute to it, because then
+// the user has planned to be there. Cached per entry object because overlap
+// checks compare every pair in a day.
 export const getOccupiedRange = (entry: TimelineEntry) => {
   const cached = occupiedRanges.get(entry);
   if (cached) return cached;
 
   const { before, after } = getCommuteSeconds(entry);
-  const start = new Date(entry.starts_at ?? 0);
   const end = new Date(entry.ends_at ?? 0);
   const range = {
-    start: new Date(start.getTime() - before * 1000),
+    start: before ? getDrawnStart(entry) : getBodyStart(entry),
     end: new Date(end.getTime() + after * 1000),
   };
   occupiedRanges.set(entry, range);

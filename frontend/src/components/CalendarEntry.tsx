@@ -9,8 +9,16 @@ import {
 } from "../lib/calendar";
 import type { TimeFormatPreference } from "../lib/calendar";
 import { tagTextColor } from "../lib/colors";
-import { getMainTag, getOrderedStripTags } from "../lib/timeline";
-import type { CommuteSegment } from "../features/calendar/timelineView";
+import {
+  getGathering,
+  getGatheringStart,
+  getMainTag,
+  getOrderedStripTags,
+} from "../lib/timeline";
+import type {
+  CommuteSegment,
+  GatheringSegment,
+} from "../features/calendar/timelineView";
 import type { TimelineEntry } from "../types";
 
 type CalendarEntryProps = {
@@ -23,6 +31,7 @@ type CalendarEntryProps = {
   continuesFromPreviousDay: boolean;
   continuesToNextDay: boolean;
   commuteSegments: CommuteSegment[];
+  gatheringSegment?: GatheringSegment | null;
   showBody: boolean;
   timeFormat: TimeFormatPreference;
   onEdit: (entry: TimelineEntry) => void;
@@ -66,6 +75,7 @@ export const CalendarEntry = ({
   continuesFromPreviousDay,
   continuesToNextDay,
   commuteSegments,
+  gatheringSegment,
   showBody,
   timeFormat,
   onEdit,
@@ -99,11 +109,18 @@ export const CalendarEntry = ({
   const commuteAfter = commuteSegments.find(
     (segment) => segment.position === "after",
   );
+  const mandatoryGathering =
+    gatheringSegment && !gatheringSegment.isOptional ? gatheringSegment : null;
+  const optionalGathering = gatheringSegment?.isOptional
+    ? gatheringSegment
+    : null;
   // The separator from an adjacent event belongs to the outermost block,
-  // which is the commute band when there is one.
+  // which is the commute band or optional gathering band when there is one.
+  const outerBandTrim = trimTop && !commuteBefore ? EVENT_SEPARATOR_PIXELS : 0;
   const topInset =
-    (trimTop && !commuteBefore ? EVENT_SEPARATOR_PIXELS : 0) +
-    (continuesFromPreviousDay ? CONTINUATION_MARKER_HEIGHT : 0);
+    (trimTop && !commuteBefore && !optionalGathering
+      ? EVENT_SEPARATOR_PIXELS
+      : 0) + (continuesFromPreviousDay ? CONTINUATION_MARKER_HEIGHT : 0);
   const bottomInset =
     (trimBottom && !commuteAfter ? EVENT_SEPARATOR_PIXELS : 0) +
     (continuesToNextDay ? CONTINUATION_MARKER_HEIGHT : 0);
@@ -112,6 +129,32 @@ export const CalendarEntry = ({
     entry.type === "event" && Boolean(entry.start_is_approximate);
   const endIsApproximate =
     entry.type === "event" && Boolean(entry.end_is_approximate);
+  // With gathering, the approximate start is when people gather; the event
+  // itself still starts exactly. The fade goes on the top-most piece.
+  const gathering = getGathering(entry);
+  const startTimeIsApproximate = startIsApproximate && gathering.seconds === 0;
+  const articleFadesStart = startIsApproximate && !optionalGathering;
+  const gatheringTime = formatEventTime(
+    getGatheringStart(entry),
+    startIsApproximate,
+    { preference: timeFormat },
+  );
+  const gatheringChip = `${gathering.label ?? "Gather"} ${gatheringTime}`;
+  const gatheringDescription = gatheringSegment
+    ? gatheringSegment.isOptional
+      ? `Optional gathering${gathering.label ? `: ${gathering.label}` : ""} from ${gatheringTime}`
+      : `${gathering.label ?? "Gathering"} from ${gatheringTime}, before ${entry.title} starts`
+    : undefined;
+  const showGatheringChip = Boolean(
+    gatheringSegment &&
+    gatheringSegment.durationMinutes >= COMMUTE_LABEL_MIN_MINUTES,
+  );
+  // Mandatory gathering is the top part of the event block, in full event
+  // color: you must be there. Its height is measured from the block top,
+  // which the separator and continuation insets push down.
+  const gatheringHeight = mandatoryGathering
+    ? `calc(${gridOffset(mandatoryGathering.startMinutes + mandatoryGathering.durationMinutes - startMinutes)} - ${topInset}px)`
+    : undefined;
   // Approximate edges fade into the paper color. The tag strip is the first
   // layer so it stays crisp above the fade.
   const backgroundLayers = [
@@ -124,7 +167,7 @@ export const CalendarEntry = ({
           },
         ]
       : []),
-    ...(startIsApproximate
+    ...(articleFadesStart
       ? [
           {
             image: "linear-gradient(to bottom, var(--paper), transparent)",
@@ -220,13 +263,47 @@ export const CalendarEntry = ({
     );
   };
 
+  // Optional gathering may be skipped, so it is a dotted band drawn behind
+  // other entries instead of part of the event block.
+  const renderOptionalGathering = (segment: GatheringSegment) => (
+    <div
+      className={`gathering-band optional ${startIsApproximate ? "approximate-start" : ""}`}
+      role="img"
+      aria-label={gatheringDescription}
+      title={gatheringDescription}
+      style={
+        {
+          "--gathering-color": mainTag?.color ?? "var(--yellow)",
+          top: gridOffset(segment.startMinutes),
+          height: `calc(${gridOffset(segment.durationMinutes)} - ${outerBandTrim}px)`,
+          left: overlapInset,
+          right: overlapInset,
+          transform: outerBandTrim
+            ? `translateY(${outerBandTrim}px)`
+            : undefined,
+        } as CSSProperties
+      }
+      onClick={(event) => {
+        event.stopPropagation();
+        openEditor();
+      }}
+    >
+      {showGatheringChip && (
+        <span className="gathering-label" aria-hidden="true">
+          {gatheringChip}
+        </span>
+      )}
+    </div>
+  );
+
   return (
     <>
       {commuteBefore && renderCommuteBand(commuteBefore)}
+      {optionalGathering && renderOptionalGathering(optionalGathering)}
       {showBody && (
         <article
           ref={entryRef}
-          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${commuteAfter ? "has-commute-after" : ""} ${startIsApproximate ? "approximate-start" : ""} ${endIsApproximate ? "approximate-end" : ""}`}
+          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${optionalGathering ? "has-optional-gathering" : ""} ${commuteAfter ? "has-commute-after" : ""} ${articleFadesStart ? "approximate-start" : ""} ${endIsApproximate ? "approximate-end" : ""}`}
           style={{
             top: gridOffset(startMinutes),
             height: `calc(${gridOffset(durationMinutes)} - ${topInset + bottomInset}px)`,
@@ -234,6 +311,9 @@ export const CalendarEntry = ({
             right: overlapInset,
             zIndex: hasEarlierOverlap ? 2 : undefined,
             transform: topInset ? `translateY(${topInset}px)` : undefined,
+            paddingTop: gatheringHeight
+              ? `calc(${gatheringHeight} + 4px)`
+              : undefined,
             ...(entry.type === "event" && mainTag
               ? {
                   backgroundColor: mainTag.color,
@@ -263,6 +343,25 @@ export const CalendarEntry = ({
               color={mainTag?.color ?? "var(--yellow)"}
             />
           )}
+          {mandatoryGathering && showGatheringChip && (
+            <span
+              className="gathering-label"
+              title={gatheringDescription}
+              aria-label={gatheringDescription}
+            >
+              {gatheringChip}
+            </span>
+          )}
+          {mandatoryGathering?.endsAtEventStart && (
+            <span
+              className="gathering-start"
+              style={{ top: gatheringHeight }}
+              role={showGatheringChip ? undefined : "img"}
+              aria-hidden={showGatheringChip || undefined}
+              aria-label={showGatheringChip ? undefined : gatheringDescription}
+              title={gatheringDescription}
+            />
+          )}
           <strong>
             {entry.share_count ? (
               <i
@@ -277,7 +376,7 @@ export const CalendarEntry = ({
           <span title={approximateDescription}>
             {entry.type === "event"
               ? [
-                  formatEventTime(entry.starts_at, startIsApproximate, {
+                  formatEventTime(entry.starts_at, startTimeIsApproximate, {
                     preference: timeFormat,
                   }),
                   formatEventTime(entry.ends_at, endIsApproximate, {

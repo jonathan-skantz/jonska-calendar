@@ -16,7 +16,11 @@ import {
   minutesIntoDay,
 } from "../../lib/calendar";
 import {
+  getBodyStart,
   getCommuteSeconds,
+  getDrawnStart,
+  getGathering,
+  getGatheringStart,
   getElapsedOverlayState,
   getEntryMinutes,
   getOccupiedRange,
@@ -37,6 +41,16 @@ export type CommuteSegment = {
   minutes: number;
   startMinutes: number;
   durationMinutes: number;
+};
+
+export type GatheringSegment = {
+  minutes: number;
+  isOptional: boolean;
+  label?: string;
+  startMinutes: number;
+  durationMinutes: number;
+  // False when the event itself starts on a later day than this segment.
+  endsAtEventStart: boolean;
 };
 
 export type AllDayEventSpan = {
@@ -62,8 +76,11 @@ const eventOverlapsRange = (
     return false;
   }
 
-  const { start, end } = getOccupiedRange(entry);
-  return start < rangeEnd && end > rangeStart;
+  // Drawn rather than occupied start, so an optional gathering band that
+  // crosses midnight still shows on the previous day.
+  return (
+    getDrawnStart(entry) < rangeEnd && getOccupiedRange(entry).end > rangeStart
+  );
 };
 
 export const getVisibleWeekEntries = (
@@ -262,7 +279,7 @@ export const eventBodyOverlapsDate = (entry: TimelineEntry, date: Date) => {
   if (!entry.starts_at || !entry.ends_at) return false;
   const dayStart = startOfDay(date);
   return (
-    new Date(entry.starts_at) < addDays(dayStart, 1) &&
+    getBodyStart(entry) < addDays(dayStart, 1) &&
     new Date(entry.ends_at) > dayStart
   );
 };
@@ -273,12 +290,16 @@ export const getCommuteSegments = (
 ): CommuteSegment[] => {
   if (entry.type !== "event" || !entry.starts_at || !entry.ends_at) return [];
 
-  const startsAt = new Date(entry.starts_at);
   const endsAt = new Date(entry.ends_at);
-  const { start, end } = getOccupiedRange(entry);
+  const { end } = getOccupiedRange(entry);
   const commute = getCommuteSeconds(entry);
   const segments: CommuteSegment[] = [];
-  const before = clipToDay(start, startsAt, date);
+  // Commute ends where the first drawn piece begins, gathering included.
+  const before = clipToDay(
+    getDrawnStart(entry),
+    getGatheringStart(entry),
+    date,
+  );
   if (before && commute.before) {
     segments.push({
       position: "before",
@@ -297,6 +318,30 @@ export const getCommuteSegments = (
     });
   }
   return segments;
+};
+
+export const getGatheringSegment = (
+  entry: TimelineEntry,
+  date: Date,
+): GatheringSegment | null => {
+  const gathering = getGathering(entry);
+  if (!gathering.seconds || !entry.starts_at) return null;
+
+  const segment = clipToDay(
+    getGatheringStart(entry),
+    new Date(entry.starts_at),
+    date,
+  );
+  return segment
+    ? {
+        minutes: Math.round(gathering.seconds / SECONDS_PER_MINUTE),
+        isOptional: gathering.isOptional,
+        label: gathering.label,
+        startMinutes: segment.startMinutes,
+        durationMinutes: segment.durationMinutes,
+        endsAtEventStart: !segment.continuesToNextDay,
+      }
+    : null;
 };
 
 export const getCalendarEntryLayout = (
@@ -322,7 +367,7 @@ export const getCalendarEntryLayout = (
     }
 
     const segment = clipToDay(
-      new Date(entry.starts_at),
+      getBodyStart(entry),
       new Date(entry.ends_at),
       date,
     );

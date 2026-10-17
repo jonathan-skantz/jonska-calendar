@@ -17,6 +17,9 @@ type eventRequest struct {
 	EndIsApproximate     bool      `json:"end_is_approximate"`
 	Kind                 string    `json:"kind"`
 	Location             *string   `json:"location"`
+	GatheringSeconds     int       `json:"gathering_seconds"`
+	GatheringIsOptional  bool      `json:"gathering_is_optional"`
+	GatheringLabel       *string   `json:"gathering_label"`
 	CommuteBeforeSeconds int       `json:"commute_before_seconds"`
 	CommuteAfterSeconds  int       `json:"commute_after_seconds"`
 	MainTagID            uuid.UUID `json:"main_tag_id"`

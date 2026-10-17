@@ -21,6 +21,7 @@ import {
   getDayElapsedOverlay,
   getEntriesForDate,
   getCommuteSegments,
+  getGatheringSegment,
   eventBodyOverlapsDate,
   getEventAdjacency,
   getEventOverlapDepth,
@@ -28,7 +29,10 @@ import {
   getAllDayEventSpans,
   getVisibleWeekEntries,
 } from "./features/calendar/timelineView";
-import type { CommuteSegment } from "./features/calendar/timelineView";
+import type {
+  CommuteSegment,
+  GatheringSegment,
+} from "./features/calendar/timelineView";
 import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
@@ -252,6 +256,7 @@ function App() {
     trimBottom = false,
     overlapDepth = 0,
     commuteSegments: CommuteSegment[] = [],
+    gatheringSegment: GatheringSegment | null = null,
     showBody = true,
   ) => {
     return (
@@ -267,6 +272,7 @@ function App() {
         continuesFromPreviousDay={layout.continuesFromPreviousDay}
         continuesToNextDay={layout.continuesToNextDay}
         commuteSegments={commuteSegments}
+        gatheringSegment={gatheringSegment}
         showBody={showBody}
         onEdit={openEntry}
         onToggleTask={toggleTask}
@@ -295,6 +301,7 @@ function App() {
           trimBottom,
           overlapDepth,
           getCommuteSegments(entry, date),
+          getGatheringSegment(entry, date),
           eventBodyOverlapsDate(entry, date),
         ),
       };

@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import {
   DEFAULT_EVENT_DURATION_MINUTES,
   MAX_COMMUTE_MINUTES,
+  MAX_GATHERING_LABEL_LENGTH,
   SECONDS_PER_MINUTE,
   inputDateTime,
   type TimeFormatPreference,
@@ -64,7 +65,12 @@ export const ComposerDrawer = ({
     start_is_approximate: Boolean(editingItem?.start_is_approximate),
     end_is_approximate: Boolean(editingItem?.end_is_approximate),
   });
+  const [gatheringDetails, setGatheringDetails] = useState({
+    gathering_is_optional: Boolean(editingItem?.gathering_is_optional),
+    gathering_label: editingItem?.gathering_label ?? "",
+  });
   const [commute, setCommute] = useState({
+    gathering_minutes: commuteMinutes(editingItem?.gathering_seconds),
     commute_before_minutes: commuteMinutes(editingItem?.commute_before_seconds),
     commute_after_minutes: commuteMinutes(editingItem?.commute_after_seconds),
   });
@@ -271,6 +277,7 @@ export const ComposerDrawer = ({
                 <div className="commute-fields">
                   {(
                     [
+                      ["gathering_minutes", "Gathering before (min)"],
                       ["commute_before_minutes", "Commute before (min)"],
                       ["commute_after_minutes", "Commute after (min)"],
                     ] as const
@@ -303,6 +310,50 @@ export const ComposerDrawer = ({
                       />
                     </label>
                   ))}
+                  {Number(commute.gathering_minutes) > 0 && (
+                    <div className="gathering-details">
+                      <label className="all-day-toggle">
+                        <input
+                          type="checkbox"
+                          name="gathering_is_optional"
+                          value="true"
+                          checked={gatheringDetails.gathering_is_optional}
+                          onChange={(event) =>
+                            setGatheringDetails((current) => ({
+                              ...current,
+                              gathering_is_optional: event.target.checked,
+                            }))
+                          }
+                        />
+                        Optional (drop-in)
+                      </label>
+                      <label
+                        className={
+                          fieldErrors.gathering_label ? "field-invalid" : ""
+                        }
+                      >
+                        Gathering label
+                        <input
+                          name="gathering_label"
+                          maxLength={MAX_GATHERING_LABEL_LENGTH}
+                          placeholder="Warm-up, Mingle…"
+                          aria-invalid={Boolean(fieldErrors.gathering_label)}
+                          aria-describedby={
+                            fieldErrors.gathering_label && error
+                              ? "composer-error"
+                              : undefined
+                          }
+                          value={gatheringDetails.gathering_label}
+                          onChange={(event) =>
+                            setGatheringDetails((current) => ({
+                              ...current,
+                              gathering_label: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
               <EventTagPicker

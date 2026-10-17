@@ -45,6 +45,9 @@ type Event struct {
 	EndIsApproximate     bool
 	Kind                 string
 	Location             *string
+	GatheringSeconds     int
+	GatheringIsOptional  bool
+	GatheringLabel       *string
 	CommuteBeforeSeconds int
 	CommuteAfterSeconds  int
 	MainTagID            uuid.UUID
@@ -98,6 +101,9 @@ type TimelineEntry struct {
 	DeadlineAt           *time.Time `json:"deadline_at,omitempty"`
 	Kind                 *string    `json:"kind,omitempty"`
 	Location             *string    `json:"location,omitempty"`
+	GatheringSeconds     int        `json:"gathering_seconds,omitempty"`
+	GatheringIsOptional  bool       `json:"gathering_is_optional,omitempty"`
+	GatheringLabel       *string    `json:"gathering_label,omitempty"`
 	CommuteBeforeSeconds int        `json:"commute_before_seconds,omitempty"`
 	CommuteAfterSeconds  int        `json:"commute_after_seconds,omitempty"`
 	IsCompleted          bool       `json:"is_completed"`

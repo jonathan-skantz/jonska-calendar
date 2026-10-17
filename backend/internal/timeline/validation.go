@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -19,6 +20,7 @@ var (
 	ErrDeadlineNeeded = errors.New("deadline is required")
 
 	ErrInvalidApproximate = errors.New("approximate start or end is only allowed on timed events")
+	ErrInvalidGathering   = errors.New("gathering must be whole minutes up to 24 hours on a timed attendable event, with a label of at most 40 characters")
 
 	ErrInvalidDate             = errors.New("dates must use the YYYY-MM-DD format")
 	ErrInvalidDateRange        = errors.New("date range must cover 1 to 62 days")
@@ -33,13 +35,16 @@ const (
 	maxTransitCardRangeDays = 62
 	maxCommuteSeconds       = 24 * 60 * 60
 	maxTransitCardCount     = 20
+	maxGatheringLabelLength = 40
 )
 
 func validCommuteSeconds(seconds int) bool {
 	return seconds >= 0 && seconds <= maxCommuteSeconds && seconds%60 == 0
 }
 
-func validateEventRequest(request eventRequest) error {
+// validateEventRequest also trims the gathering label; blank means no label.
+func validateEventRequest(request *eventRequest) error {
+	request.GatheringLabel = normalizeOptionalText(request.GatheringLabel)
 	if request.Title == "" {
 		return ErrTitleRequired
 	}
@@ -55,6 +60,17 @@ func validateEventRequest(request eventRequest) error {
 	hasCommute := request.CommuteBeforeSeconds > 0 || request.CommuteAfterSeconds > 0
 	if hasCommute && (request.Kind != "attendable" || request.IsAllDay) {
 		return ErrInvalidCommute
+	}
+	if !validCommuteSeconds(request.GatheringSeconds) ||
+		(request.GatheringSeconds > 0 && (request.Kind != "attendable" || request.IsAllDay)) {
+		return ErrInvalidGathering
+	}
+	hasGatheringDetails := request.GatheringIsOptional || request.GatheringLabel != nil
+	if hasGatheringDetails && request.GatheringSeconds == 0 {
+		return ErrInvalidGathering
+	}
+	if request.GatheringLabel != nil && utf8.RuneCountInString(*request.GatheringLabel) > maxGatheringLabelLength {
+		return ErrInvalidGathering
 	}
 	if request.IsAllDay && (request.StartIsApproximate || request.EndIsApproximate) {
 		return ErrInvalidApproximate
@@ -184,8 +200,9 @@ func validateHouseholdRequest(request *householdRequest) error {
 	return nil
 }
 
-// normalizeShareField trims a per-recipient value; blank means "same as event".
-func normalizeShareField(value *string) *string {
+// normalizeOptionalText trims an optional text value; blank means "not set".
+// For per-recipient share fields that means "same as the event".
+func normalizeOptionalText(value *string) *string {
 	if value == nil {
 		return nil
 	}
@@ -198,9 +215,9 @@ func normalizeShareField(value *string) *string {
 
 func normalizeShareFields(request shareFieldsRequest) db.ShareFields {
 	return db.ShareFields{
-		Title:       normalizeShareField(request.Title),
-		Description: normalizeShareField(request.Description),
-		URL:         normalizeShareField(request.URL),
-		Location:    normalizeShareField(request.Location),
+		Title:       normalizeOptionalText(request.Title),
+		Description: normalizeOptionalText(request.Description),
+		URL:         normalizeOptionalText(request.URL),
+		Location:    normalizeOptionalText(request.Location),
 	}
 }

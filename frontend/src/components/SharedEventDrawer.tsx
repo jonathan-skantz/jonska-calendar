@@ -1,5 +1,6 @@
 import { subDays } from "date-fns";
 import { formatDate, formatEventTime, localDateKey } from "../lib/calendar";
+import { getGathering, getGatheringStart } from "../lib/timeline";
 import type { TimeFormatPreference } from "../lib/calendar";
 import type { TimelineEntry } from "../types";
 
@@ -23,13 +24,18 @@ const formatRange = (
       ? `${formatDate(start)}, all day`
       : `${formatDate(start)} – ${formatDate(lastDay)}, all day`;
   }
-  const startText = `${formatDate(start)} ${formatEventTime(start, entry.start_is_approximate, { preference })}`;
+  // With gathering, the approximate start applies to when people gather.
+  const { seconds, isOptional, label } = getGathering(entry);
+  const gathering = seconds
+    ? `, ${label ?? "gather"} ${formatEventTime(getGatheringStart(entry), entry.start_is_approximate, { preference })}${isOptional ? " (optional)" : ""}`
+    : "";
+  const startText = `${formatDate(start)} ${formatEventTime(start, entry.start_is_approximate && !seconds, { preference })}`;
   const endTime = formatEventTime(end, entry.end_is_approximate, {
     preference,
   });
   return localDateKey(entry.starts_at) === localDateKey(entry.ends_at)
-    ? `${startText} – ${endTime}`
-    : `${startText} – ${formatDate(end)} ${endTime}`;
+    ? `${startText} – ${endTime}${gathering}`
+    : `${startText} – ${formatDate(end)} ${endTime}${gathering}`;
 };
 
 // Recipients cannot change a shared event, so this view has no inputs.

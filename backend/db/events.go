@@ -37,12 +37,14 @@ func (s *Store) CreateEvent(ctx context.Context, userID uuid.UUID, event Event) 
 		INSERT INTO events (
 			timeline_item_id, starts_at, ends_at, is_all_day, kind, location,
 			commute_before_seconds, commute_after_seconds, main_tag_id,
-			start_is_approximate, end_is_approximate
+			start_is_approximate, end_is_approximate, gathering_seconds,
+			gathering_is_optional, gathering_label
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE(NULLIF($9, '00000000-0000-0000-0000-000000000000'::uuid), (SELECT default_tag_id FROM users WHERE id = $10)), $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE(NULLIF($9, '00000000-0000-0000-0000-000000000000'::uuid), (SELECT default_tag_id FROM users WHERE id = $10)), $11, $12, $13, $14, $15)
 	`, itemID, event.StartsAt, event.EndsAt, event.IsAllDay, event.Kind, event.Location,
 		event.CommuteBeforeSeconds, event.CommuteAfterSeconds, event.MainTagID, userID,
-		event.StartIsApproximate, event.EndIsApproximate)
+		event.StartIsApproximate, event.EndIsApproximate, event.GatheringSeconds,
+		event.GatheringIsOptional, event.GatheringLabel)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -118,11 +120,13 @@ func (s *Store) UpdateEvent(ctx context.Context, userID, eventID uuid.UUID, even
 		UPDATE events
 		SET starts_at = $2, ends_at = $3, is_all_day = $4, kind = $5, location = $6,
 			commute_before_seconds = $7, commute_after_seconds = $8, main_tag_id = $9,
-			start_is_approximate = $10, end_is_approximate = $11
+			start_is_approximate = $10, end_is_approximate = $11, gathering_seconds = $12,
+			gathering_is_optional = $13, gathering_label = $14
 		WHERE timeline_item_id = $1
 	`, eventID, event.StartsAt, event.EndsAt, event.IsAllDay, event.Kind, event.Location,
 		event.CommuteBeforeSeconds, event.CommuteAfterSeconds, event.MainTagID,
-		event.StartIsApproximate, event.EndIsApproximate)
+		event.StartIsApproximate, event.EndIsApproximate, event.GatheringSeconds,
+		event.GatheringIsOptional, event.GatheringLabel)
 	if err != nil {
 		return err
 	}

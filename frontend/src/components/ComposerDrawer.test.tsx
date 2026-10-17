@@ -121,6 +121,46 @@ describe("ComposerDrawer commute fields", () => {
       (screen.getByLabelText("Commute after (min)") as HTMLInputElement).value,
     ).toBe("");
   });
+
+  it("prefills gathering minutes and hides them for informational events", () => {
+    renderComposer({
+      id: "event-1",
+      type: "event",
+      title: "Football",
+      kind: "attendable",
+      starts_at: "2026-10-15T18:00:00",
+      ends_at: "2026-10-15T19:30:00",
+      gathering_seconds: 1800,
+      gathering_is_optional: true,
+      gathering_label: "Mingle",
+      is_completed: false,
+    });
+    expect(
+      (screen.getByLabelText("Gathering before (min)") as HTMLInputElement)
+        .value,
+    ).toBe("30");
+    expect(
+      (screen.getByLabelText("Optional (drop-in)") as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(
+      (screen.getByLabelText("Gathering label") as HTMLInputElement).value,
+    ).toBe("Mingle");
+
+    fireEvent.change(screen.getByLabelText("Gathering before (min)"), {
+      target: { value: "" },
+    });
+    expect(screen.queryByLabelText("Gathering label")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Gathering before (min)"), {
+      target: { value: "15" },
+    });
+    expect(
+      (screen.getByLabelText("Gathering label") as HTMLInputElement).value,
+    ).toBe("Mingle");
+    fireEvent.change(screen.getByLabelText("Kind"), {
+      target: { value: "informational" },
+    });
+    expect(screen.queryByLabelText("Gathering before (min)")).toBeNull();
+  });
 });
 
 describe("ComposerDrawer approximate fields", () => {

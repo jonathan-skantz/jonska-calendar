@@ -21,7 +21,7 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := validateEventRequest(request); err != nil {
+	if err := validateEventRequest(&request); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -37,6 +37,9 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		EndIsApproximate:     request.EndIsApproximate,
 		Kind:                 request.Kind,
 		Location:             request.Location,
+		GatheringSeconds:     request.GatheringSeconds,
+		GatheringIsOptional:  request.GatheringIsOptional,
+		GatheringLabel:       request.GatheringLabel,
 		CommuteBeforeSeconds: request.CommuteBeforeSeconds,
 		CommuteAfterSeconds:  request.CommuteAfterSeconds,
 		MainTagID:            request.MainTagID,
@@ -69,7 +72,7 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := validateEventRequest(request); err != nil {
+	if err := validateEventRequest(&request); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -78,9 +81,11 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		StartsAt: request.StartsAt, EndsAt: request.EndsAt, Kind: request.Kind,
 		IsAllDay:           request.IsAllDay,
 		StartIsApproximate: request.StartIsApproximate, EndIsApproximate: request.EndIsApproximate,
-		Location: request.Location, CommuteBeforeSeconds: request.CommuteBeforeSeconds,
-		CommuteAfterSeconds: request.CommuteAfterSeconds,
-		MainTagID:           request.MainTagID,
+		Location: request.Location, GatheringSeconds: request.GatheringSeconds,
+		GatheringIsOptional: request.GatheringIsOptional, GatheringLabel: request.GatheringLabel,
+		CommuteBeforeSeconds: request.CommuteBeforeSeconds,
+		CommuteAfterSeconds:  request.CommuteAfterSeconds,
+		MainTagID:            request.MainTagID,
 	}); err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update event"},

@@ -52,4 +52,24 @@ describe("SharedEventDrawer", () => {
 
     expect(screen.getByText("Tue, Oct 20 ~18:00 – 19:30")).toBeTruthy();
   });
+
+  it("shows gathering time", () => {
+    render(
+      <SharedEventDrawer
+        entry={{
+          ...entry,
+          kind: "attendable",
+          gathering_seconds: 1800,
+          gathering_is_optional: true,
+          gathering_label: "Mingle",
+        }}
+        timeFormat="24-hour"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Tue, Oct 20 18:00 – 19:30, Mingle 17:30 (optional)"),
+    ).toBeTruthy();
+  });
 });
