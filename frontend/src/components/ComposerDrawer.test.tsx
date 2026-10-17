@@ -313,3 +313,62 @@ describe("ComposerDrawer reminders", () => {
     });
   });
 });
+
+describe("ComposerDrawer quick add draft", () => {
+  it("prefills a new event from draft values and lists the warnings", () => {
+    const { container } = render(
+      <ComposerDrawer
+        type="event"
+        editingItem={null}
+        selectedDate="2026-10-15"
+        draftEventStart={null}
+        tags={[]}
+        selectedTagIds={[]}
+        mainTagId={null}
+        timeFormat="24-hour"
+        fieldErrors={{}}
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+        onTypeChange={vi.fn()}
+        onSelectedTagIdsChange={vi.fn()}
+        onMainTagIdChange={vi.fn()}
+        draftValues={{
+          title: "Middag",
+          starts_at: new Date(2026, 9, 17, 18, 0).toISOString(),
+          ends_at: new Date(2026, 9, 17, 21, 0).toISOString(),
+          start_is_approximate: true,
+          location: "mormor",
+          kind: "attendable",
+          commute_before_seconds: 1800,
+        }}
+        draftReminderOffsets={[3600]}
+        draftWarnings={['Couldn\'t place "after work"']}
+      />,
+    );
+
+    expect(screen.getByText("New item")).toBeTruthy();
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe(
+      "Middag",
+    );
+    expect((screen.getByLabelText("Location") as HTMLInputElement).value).toBe(
+      "mormor",
+    );
+    expect(
+      (screen.getByLabelText("Approximate start") as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(
+      (screen.getByLabelText("Commute before (min)") as HTMLInputElement).value,
+    ).toBe("30");
+    expect(
+      (screen.getByLabelText("Starts hour") as HTMLInputElement).value,
+    ).toBe("18");
+    expect((screen.getByLabelText("Ends hour") as HTMLInputElement).value).toBe(
+      "21",
+    );
+    expect(
+      container.querySelector<HTMLInputElement>('input[name="reminder_offset"]')
+        ?.value,
+    ).toBe("3600");
+    expect(screen.getByText('Couldn\'t place "after work"')).toBeTruthy();
+  });
+});

@@ -522,3 +522,12 @@
   background: var(--paper);
   box-shadow: 0 6px 24px rgba(39, 52, 47, 0.18);
 }
+
+.draft-warnings {
+  margin: 0 0 12px;
+  padding: 8px 12px 8px 26px;
+  border: 1px solid #ead9b4;
+  background: #fbf4e4;
+  color: #7a5a1c;
+  font-size: 12px;
+}

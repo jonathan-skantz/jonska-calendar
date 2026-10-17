@@ -11,6 +11,16 @@ Requirements: Go 1.27, Node 22, Docker, `mise`, and Goose.
 DATABASE_URL=postgres://<user>:<password>@localhost:5432/<database>?sslmode=disable
 ```
 
+Optional: to enable quick add (natural-language events), put the Anthropic key
+in `.env.local`, not `.env`. `.env` is committed; `.env.local` is git-ignored,
+and `.claude/settings.json` stops Claude Code from reading it. Without a key the
+quick add field shows "Quick add is not configured".
+
+```dotenv
+ANTHROPIC_API_KEY=<key>
+# ANTHROPIC_MODEL=claude-haiku-5-5
+```
+
 2. Install frontend dependencies once:
 
 ```sh

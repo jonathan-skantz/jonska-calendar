@@ -49,6 +49,8 @@ The frontend is a separate development server. Vite proxies `/api` to the Go ser
   - `handler.go` contains shared handler setup and timeline operations. `requests.go` defines API payloads and responses. Feature files contain event, task, tag, and sharing endpoints. `validation.go` contains request validation.
 - [backend/internal/weather/](../backend/internal/weather/)
   - `client.go` fetches hourly forecasts and daily sun times from Open-Meteo. `conditions.go` reduces them to each day's conditions and `HH:MM` sunrise/sunset. `handler.go` serves `GET /api/weather` from the shared forecast cache.
+- [backend/internal/quickadd/](../backend/internal/quickadd/)
+  - `client.go` calls the Anthropic Messages API through the official Go SDK with structured outputs (a JSON schema), so the reply is a JSON event draft. `draft.go` validates that draft and resolves tag names. `handler.go` serves `POST /api/events/parse` with a per-user rate limit. It never writes to the database.
 - [backend/db/](../backend/db/)
   - `store.go` owns the PostgreSQL pool reference and setup. `users.go`, `events.go`, `tasks.go`, `tags.go`, `sharing.go`, and `timeline.go` group queries by feature. `models.go` and `errors.go` define store types and sentinel errors.
 - [backend/db/migrations](../backend/db/migrations)
@@ -169,6 +171,22 @@ refreshed on the next request; if the refresh fails the stale row is served.
 Concurrent requests for one cell share a single upstream call (`singleflight`,
 per process).
 
+### Quick add
+
+Quick add has no table. `POST /api/events/parse` sends the typed text and the
+caller's tag names to Anthropic (`ANTHROPIC_API_KEY`, optional
+`ANTHROPIC_MODEL`, default `claude-haiku-5-5`, read from the git-ignored
+`.env.local`). Without a key the route
+returns `503` and the rest of the app works as before. Treat the model's reply as
+untrusted input: `validateDraft` drops values the event form could not hold,
+and turns them into warnings. It also maps tag names to the caller's own tag
+IDs; it never creates tags. Dates come back as stated (`relative_days`,
+`weekday` with `week_offset`, or `calendar`), and
+`frontend/src/features/quickAdd/resolveDraft.ts` turns them into local dates
+with the browser's today and week start. The result only prefills the event
+form, and the event is created through `POST /api/events` when the user saves.
+The rate limit (30 parses per user per hour) is in memory and per process.
+
 `users.display_name` is optional. Queries read names through the SQL function `user_display_name(display_name, email)` (migration 17), which falls back to the email local-part.
 
 ## SQL Code Generation
@@ -226,6 +244,7 @@ All API routes use JSON request and response bodies unless the response is `204 
 | `POST /api/reminders/{reminderID}/notified`     | None                                        | `204`; keeps the first delivery time                 |
 | `GET /api/transit-card/days?from=&to=`          | None                                        | Array of reported transit-card days                  |
 | `PUT /api/transit-card/days`                    | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                |
+| `POST /api/events/parse`                        | `text` (1-500 characters)                   | `{draft, warnings, unresolved}`; `429`; `502`; `503` |
 | `GET /api/weather?lat=&lon=`                    | None                                        | `{date, conditions, sunrise?, sunset?}[]`; `503`     |
 | `GET /api/household`                            | None                                        | Household or `null`                                  |
 | `POST /api/household`                           | `name`, `transit_card_count`                | `201`; `409` if already in a household               |
@@ -273,6 +292,7 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Change event reminders                        | `backend/db/reminders.go`, `backend/internal/timeline/reminders.go`                                                   | migration 21                                           |
 | Change transit-card declarations              | `backend/db/transit_card.go`, `backend/internal/timeline/transit_card.go`                                             | migration 12, `frontend/src/features/transitCard/`     |
 | Change weather icons or caching               | `backend/internal/weather/`                                                                                           | migrations 22-23, `frontend/src/features/weather/`     |
+| Change quick add parsing                      | `backend/internal/quickadd/`                                                                                          | `frontend/src/features/quickAdd/`                      |
 | Change households or card conflicts           | `backend/db/households.go`, `backend/internal/timeline/household.go`                                                  | migration 15, `frontend/src/features/household/`       |
 | Change timeline JSON shape                    | `db.TimelineEntry` in `backend/db/models.go`                                                                          | frontend `TimelineEntry` type and grid rendering       |
 | Change week navigation/date math              | `frontend/src/App.tsx` date helpers and week state                                                                    | `date-fns` imports                                     |

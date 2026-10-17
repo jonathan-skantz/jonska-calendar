@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
+	"github.com/jonathan-skantz/calendar/backend/internal/quickadd"
 	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
 	"github.com/jonathan-skantz/calendar/backend/internal/weather"
 )
@@ -18,6 +21,11 @@ func main() {
 
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
+	}
+	// Secrets such as ANTHROPIC_API_KEY live in the untracked .env.local,
+	// because .env is committed.
+	if err := godotenv.Load(".env.local"); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		log.Printf("Reading .env.local: %v", err)
 	}
 	connURL := os.Getenv("DATABASE_URL")
 	if connURL == "" {
@@ -44,6 +52,14 @@ func main() {
 
 	weatherHandler := weather.New(handler.Store, weather.CurrentUser(timelineHandler.CurrentUser), weather.NewClient())
 
+	// Quick add stays off (503) without a key, so the rest of the app runs
+	// without one.
+	var quickAddClient *quickadd.Client
+	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+		quickAddClient = quickadd.NewClient(apiKey, os.Getenv("ANTHROPIC_MODEL"))
+	}
+	quickAddHandler := quickadd.New(handler.Store, quickadd.CurrentUser(timelineHandler.CurrentUser), quickAddClient)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, World!"))
@@ -55,6 +71,7 @@ func main() {
 	mux.HandleFunc("GET /api/auth/me", handler.CurrentUser)
 	mux.HandleFunc("PATCH /api/auth/me", handler.UpdateCurrentUser)
 	mux.HandleFunc("POST /api/events", timelineHandler.CreateEvent)
+	mux.HandleFunc("POST /api/events/parse", quickAddHandler.Parse)
 	mux.HandleFunc("PUT /api/events/{eventID}", timelineHandler.UpdateEvent)
 	mux.HandleFunc("POST /api/tasks", timelineHandler.CreateTask)
 	mux.HandleFunc("PUT /api/tasks/{taskID}", timelineHandler.UpdateTask)

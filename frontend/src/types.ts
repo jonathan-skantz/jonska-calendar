@@ -109,3 +109,49 @@ export type WeatherDay = {
   sunrise?: string;
   sunset?: string;
 };
+
+// A date as the quick-add text stated it. The browser resolves it, since only
+// it knows today, the time zone and the week start.
+export type DraftDate =
+  | { kind: "relative_days"; days: number }
+  | {
+      kind: "weekday";
+      weekday:
+        | "monday"
+        | "tuesday"
+        | "wednesday"
+        | "thursday"
+        | "friday"
+        | "saturday"
+        | "sunday";
+      week_offset?: 0 | 1;
+    }
+  | { kind: "calendar"; month: number; day: number; year?: number };
+
+// Only the fields the text stated; the event form fills in the rest.
+export type EventDraft = {
+  title?: string;
+  date?: DraftDate;
+  end_date?: DraftDate;
+  start_time?: string;
+  end_time?: string;
+  duration_minutes?: number;
+  all_day?: boolean;
+  start_is_approximate?: boolean;
+  end_is_approximate?: boolean;
+  location?: string;
+  kind?: "attendable" | "informational";
+  tag_ids?: string[];
+  commute_before_minutes?: number;
+  commute_after_minutes?: number;
+  gathering_minutes?: number;
+  gathering_is_optional?: boolean;
+  gathering_label?: string;
+  reminder_minutes?: number[];
+};
+
+export type ParseEventResponse = {
+  draft: EventDraft;
+  warnings: string[];
+  unresolved: string[];
+};

@@ -143,6 +143,23 @@ Events have a start date/time and end date/time.
   - name days,
   - holidays,
 
+#### Quick add (Demo)
+
+- [x] A field next to "Add item" takes one sentence in Swedish or English, e.g.
+      "middag hos mormor på lördag ca 18–21 #familj, påminn en timme innan".
+      Pressing Enter opens the new-event form with the stated fields filled in:
+      title, date and time, all-day, approximate edges, location, attend or
+      heads-up, existing tags, commute, gathering, and reminders.
+- [x] Nothing is saved until the user reviews the form and presses Save.
+- [x] Fields the sentence doesn't mention keep the form's defaults. Parts that
+      can't be pinned down (e.g. "sometime next week"), tags that don't exist,
+      a missing date or time, or a past date are listed above the form instead
+      of being guessed. Tags are never created from quick add.
+- [x] "Friday" means the next Friday (today included); "next Friday" means
+      Friday in the following week, by the user's week start.
+- [x] The sentence is sent to Anthropic's API to be read. Each user can do 30
+      quick adds per hour.
+
 ### Timeline Item Type 2: Tasks
 
 **UI fields (Demo):**

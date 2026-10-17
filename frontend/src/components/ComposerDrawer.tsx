@@ -42,6 +42,11 @@ type ComposerDrawerProps = {
   onAddReminder?: (offsetSeconds: number) => void;
   onRemoveReminder?: (reminder: ReminderItem) => void;
   shareCount?: number;
+  // Initial values for a new event, e.g. from quick add, and notes on what
+  // the draft could not fill in.
+  draftValues?: Partial<TimelineEntry>;
+  draftReminderOffsets?: number[];
+  draftWarnings?: string[];
 };
 
 export const ComposerDrawer = ({
@@ -66,40 +71,43 @@ export const ComposerDrawer = ({
   reminderError,
   onAddReminder,
   onRemoveReminder,
+  draftValues,
+  draftReminderOffsets = [],
+  draftWarnings = [],
 }: ComposerDrawerProps) => {
-  const [isAllDay, setIsAllDay] = useState(Boolean(editingItem?.is_all_day));
-  const [kind, setKind] = useState(editingItem?.kind ?? "attendable");
+  const initial = editingItem ?? draftValues;
+  const [isAllDay, setIsAllDay] = useState(Boolean(initial?.is_all_day));
+  const [kind, setKind] = useState(initial?.kind ?? "attendable");
   const isSavedEvent = editingItem?.type === "event";
-  const [queuedReminderOffsets, setQueuedReminderOffsets] = useState<number[]>(
-    [],
-  );
-  const [isSkipped, setIsSkipped] = useState(Boolean(editingItem?.is_skipped));
+  const [queuedReminderOffsets, setQueuedReminderOffsets] =
+    useState<number[]>(draftReminderOffsets);
+  const [isSkipped, setIsSkipped] = useState(Boolean(initial?.is_skipped));
   const allowsCommute = kind === "attendable" && !isAllDay;
   const commuteMinutes = (seconds?: number) =>
     seconds ? String(Math.round(seconds / SECONDS_PER_MINUTE)) : "";
   // Kept in state so values survive while the fields are hidden by a kind or
   // all-day toggle.
   const [approximate, setApproximate] = useState({
-    start_is_approximate: Boolean(editingItem?.start_is_approximate),
-    end_is_approximate: Boolean(editingItem?.end_is_approximate),
+    start_is_approximate: Boolean(initial?.start_is_approximate),
+    end_is_approximate: Boolean(initial?.end_is_approximate),
   });
   const [gatheringDetails, setGatheringDetails] = useState({
-    gathering_is_optional: Boolean(editingItem?.gathering_is_optional),
-    gathering_label: editingItem?.gathering_label ?? "",
+    gathering_is_optional: Boolean(initial?.gathering_is_optional),
+    gathering_label: initial?.gathering_label ?? "",
   });
   const [commute, setCommute] = useState({
-    gathering_minutes: commuteMinutes(editingItem?.gathering_seconds),
-    commute_before_minutes: commuteMinutes(editingItem?.commute_before_seconds),
-    commute_after_minutes: commuteMinutes(editingItem?.commute_after_seconds),
+    gathering_minutes: commuteMinutes(initial?.gathering_seconds),
+    commute_before_minutes: commuteMinutes(initial?.commute_before_seconds),
+    commute_after_minutes: commuteMinutes(initial?.commute_after_seconds),
   });
   const defaultEventStart =
-    inputDateTime(editingItem?.starts_at) ||
+    inputDateTime(initial?.starts_at) ||
     inputDateTime(draftEventStart ?? undefined) ||
     `${selectedDate}T09:00`;
   const defaultEventEnd =
-    (editingItem?.is_all_day && editingItem.ends_at
-      ? inputDateTime(subDays(new Date(editingItem.ends_at), 1).toISOString())
-      : inputDateTime(editingItem?.ends_at)) ||
+    (initial?.is_all_day && initial.ends_at
+      ? inputDateTime(subDays(new Date(initial.ends_at), 1).toISOString())
+      : inputDateTime(initial?.ends_at)) ||
     inputDateTime(
       addMinutes(
         new Date(defaultEventStart),
@@ -148,6 +156,13 @@ export const ComposerDrawer = ({
             </button>
           </div>
         )}
+        {draftWarnings.length > 0 && (
+          <ul className="draft-warnings" aria-label="Quick add notes">
+            {draftWarnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+        )}
         <form className="composer-form" noValidate onSubmit={onSubmit}>
           <label className={fieldErrors.title ? "field-invalid" : ""}>
             Title
@@ -157,7 +172,7 @@ export const ComposerDrawer = ({
               aria-describedby={
                 fieldErrors.title && error ? "composer-error" : undefined
               }
-              defaultValue={editingItem?.title}
+              defaultValue={initial?.title}
               placeholder={
                 type === "event" ? "What is happening?" : "What needs doing?"
               }
@@ -173,7 +188,7 @@ export const ComposerDrawer = ({
               aria-describedby={
                 fieldErrors.description && error ? "composer-error" : undefined
               }
-              defaultValue={editingItem?.description}
+              defaultValue={initial?.description}
             />
           </label>
           <label className={fieldErrors.url ? "field-invalid" : ""}>
@@ -185,7 +200,7 @@ export const ComposerDrawer = ({
                 fieldErrors.url && error ? "composer-error" : undefined
               }
               type="url"
-              defaultValue={editingItem?.url}
+              defaultValue={initial?.url}
               placeholder="https://"
             />
           </label>
@@ -303,7 +318,7 @@ export const ComposerDrawer = ({
                   aria-describedby={
                     fieldErrors.location && error ? "composer-error" : undefined
                   }
-                  defaultValue={editingItem?.location}
+                  defaultValue={initial?.location}
                   placeholder="Home, online, or somewhere else"
                 />
               </label>

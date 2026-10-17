@@ -38,6 +38,10 @@ import type {
 import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
 import { AuthScreen } from "./components/AuthScreen";
 import { ComposerDrawer } from "./components/ComposerDrawer";
+import { QuickAddBar } from "./components/QuickAddBar";
+import { parseEvent } from "./features/quickAdd/parseEvent";
+import { resolveDraft } from "./features/quickAdd/resolveDraft";
+import { getRequestErrorMessage } from "./lib/requestErrors";
 import { CalendarEntry } from "./components/CalendarEntry";
 import { AllDayEvent } from "./components/AllDayEvent";
 import { Sidebar } from "./components/Sidebar";
@@ -172,6 +176,7 @@ function App() {
     selectedTagIds: composerTagIds,
     mainTagId: composerMainTagId,
     draftEventStart,
+    draft: composerDraft,
     setType: setComposerType,
     setDraftEventStart,
     setSelectedTagIds: setComposerTagIds,
@@ -180,6 +185,29 @@ function App() {
     edit: editItem,
     close: closeComposerDrawer,
   } = composer;
+  // Quick add only prefills the event form; the user still reviews and saves.
+  const quickAddEvent = async (text: string) => {
+    try {
+      const result = await parseEvent(text);
+      const resolved = resolveDraft(
+        result.draft,
+        new Date(),
+        weekStartsOn,
+        selectedDate,
+      );
+      openNewComposer(undefined, {
+        ...resolved,
+        warnings: [
+          ...result.unresolved.map((part) => `Couldn't place "${part}"`),
+          ...result.warnings,
+          ...resolved.warnings,
+        ],
+      });
+      return null;
+    } catch (error) {
+      return getRequestErrorMessage(error, "Couldn't read that");
+    }
+  };
   // The share drawer is stacked on the composer, so it closes with it.
   const closeComposer = () => {
     setSharingEvent(null);
@@ -465,6 +493,7 @@ function App() {
               onPrevious={() => moveWeek(-7)}
               onNext={() => moveWeek(7)}
               onAddItem={() => openNewComposer()}
+              quickAdd={<QuickAddBar onSubmit={quickAddEvent} />}
             >
               {actionError &&
                 !showComposer &&
@@ -561,6 +590,9 @@ function App() {
             editingItem && addReminder(editingItem.id, offset)
           }
           onRemoveReminder={(reminder) => removeReminder(reminder.id)}
+          draftValues={composerDraft?.values}
+          draftReminderOffsets={composerDraft?.reminderOffsets}
+          draftWarnings={composerDraft?.warnings}
         />
       )}
       {showComposer && editingItem && (

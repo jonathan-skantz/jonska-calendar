@@ -2,6 +2,7 @@ import { useState } from "react";
 import { dateKey } from "../lib/calendar";
 import { getDefaultEventTagSelection } from "../lib/timeline";
 import type { Tag, TimelineEntry } from "../types";
+import type { ResolvedDraft } from "../features/quickAdd/resolveDraft";
 
 type UseComposerOptions = {
   tags: Tag[];
@@ -22,14 +23,25 @@ export const useComposer = ({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [mainTagId, setMainTagId] = useState<string | null>(null);
   const [draftEventStart, setDraftEventStart] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ResolvedDraft | null>(null);
 
-  const openNew = (startAt?: Date) => {
+  const openNew = (startAt?: Date, nextDraft?: ResolvedDraft) => {
     setEditingItem(null);
     setType("event");
-    const selection = getDefaultEventTagSelection(tags);
+    setDraft(nextDraft ?? null);
+    // Tags named in a draft replace the default selection; the first is main.
+    const draftTagIds = (nextDraft?.tagIds ?? []).filter((id) =>
+      tags.some((tag) => tag.id === id),
+    );
+    const selection = draftTagIds.length
+      ? { tagIds: draftTagIds, mainTagId: draftTagIds[0] }
+      : getDefaultEventTagSelection(tags);
     setSelectedTagIds(selection.tagIds);
     setMainTagId(selection.mainTagId);
-    const start = startAt ?? new Date(`${selectedDate}T09:00`);
+    const draftStart = nextDraft?.values.starts_at;
+    const start =
+      startAt ??
+      (draftStart ? new Date(draftStart) : new Date(`${selectedDate}T09:00`));
     onSelectedDateChange(dateKey(start));
     setDraftEventStart(start.toISOString());
     onResetErrors();
@@ -39,6 +51,7 @@ export const useComposer = ({
   const edit = (entry: TimelineEntry) => {
     setEditingItem(entry);
     setType(entry.type);
+    setDraft(null);
     setDraftEventStart(null);
     onResetErrors();
     setSelectedTagIds(entry.tags?.map((tag) => tag.id) ?? []);
@@ -58,6 +71,7 @@ export const useComposer = ({
     selectedTagIds,
     mainTagId,
     draftEventStart,
+    draft,
     setType,
     setEditingItem,
     setDraftEventStart,

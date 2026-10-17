@@ -6,6 +6,7 @@ type WeekHeaderProps = {
   onPrevious: () => void;
   onNext: () => void;
   onAddItem: () => void;
+  quickAdd?: ReactNode;
   children?: ReactNode;
 };
 
@@ -15,6 +16,7 @@ export const WeekHeader = ({
   onPrevious,
   onNext,
   onAddItem,
+  quickAdd,
   children,
 }: WeekHeaderProps) => (
   <>
@@ -36,6 +38,7 @@ export const WeekHeader = ({
         </button>
       </div>
       <div className="week-actions">
+        {quickAdd}
         <span className="item-count">{itemCount} items</span>
         <button className="primary-button compact" onClick={onAddItem}>
           Add item <span>＋</span>
