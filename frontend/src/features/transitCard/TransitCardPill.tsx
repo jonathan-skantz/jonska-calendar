@@ -1,4 +1,8 @@
-import type { TransitCardPillVariant } from "./transitCardDays";
+import { getTransitCardPillVariant } from "./transitCardDays";
+import type {
+  TransitCardDayView,
+  TransitCardPillVariant,
+} from "./transitCardDays";
 import { BusIcon } from "./BusIcon";
 import { cx } from "../../lib/classNames";
 
@@ -42,3 +46,25 @@ export const TransitCardPill = ({
     </span>
   </span>
 );
+
+// The week header's Card row: a pill in each day's column that has an answer
+// or is still waiting for one.
+export const TransitCardDayPills = ({
+  views,
+  fallbackName,
+}: {
+  views: TransitCardDayView[];
+  // Names the current user on days they have not reported yet.
+  fallbackName: string;
+}) =>
+  views.map((view, index) => {
+    const variant = getTransitCardPillVariant(view);
+    return variant ? (
+      <TransitCardPill
+        key={view.key}
+        name={view.day?.display_name ?? fallbackName}
+        variant={variant}
+        column={index}
+      />
+    ) : null;
+  });

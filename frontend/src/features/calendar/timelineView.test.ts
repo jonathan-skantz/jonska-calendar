@@ -10,6 +10,8 @@ import {
   getEventOverlapDepth,
   getEventPreview,
   getGatheringSegment,
+  getScrollToHour,
+  layoutDayEntries,
 } from "./timelineView";
 import { gridOffset } from "../../lib/calendar";
 import type { TimelineEntry } from "../../types";
@@ -409,5 +411,68 @@ describe("adjacency and elapsed overlay", () => {
         label,
       ),
     ).toEqual({ kind: "none" });
+  });
+});
+
+describe("day entry layout", () => {
+  const day = new Date(2026, 9, 15);
+
+  it("lays out busy entries and ghosts as separate layers", () => {
+    const meeting = event({ id: "meeting", kind: "attendable" });
+    const headsUp = event({ id: "heads-up", kind: "informational" });
+    const allDay = event({
+      id: "all-day",
+      is_all_day: true,
+      starts_at: "2026-10-15T00:00:00",
+      ends_at: "2026-10-16T00:00:00",
+    });
+
+    const { ghosts, busy } = layoutDayEntries(
+      [meeting, headsUp, allDay],
+      day,
+      new Date(2026, 9, 15, 8),
+    );
+
+    expect(ghosts.map((item) => item.entry.id)).toEqual(["heads-up"]);
+    expect(busy.map((item) => item.entry.id)).toEqual(["meeting"]);
+    // The busy block is inset so the overlapped ghost's edge stays visible,
+    // and ghosts never count toward the busy layer's overlap depth.
+    expect(busy[0]).toMatchObject({ overlapsGhost: true, overlapDepth: 0 });
+    expect(ghosts[0].overlapsGhost).toBe(false);
+  });
+
+  it("marks entries that have fully elapsed", () => {
+    const morning = event({
+      id: "morning",
+      kind: "attendable",
+      starts_at: "2026-10-15T08:00:00",
+      ends_at: "2026-10-15T09:00:00",
+    });
+    const later = event({ id: "later", kind: "attendable" });
+
+    const { busy } = layoutDayEntries(
+      [morning, later],
+      day,
+      new Date(2026, 9, 15, 9, 30),
+    );
+
+    expect(busy.map((item) => [item.entry.id, item.fullyElapsed])).toEqual([
+      ["morning", true],
+      ["later", false],
+    ]);
+  });
+});
+
+describe("scroll position", () => {
+  const dates = [new Date(2026, 9, 15), new Date(2026, 9, 16)];
+
+  it("keeps the previous hour visible when today is shown", () => {
+    expect(getScrollToHour(dates, new Date(2026, 9, 16, 14, 20))).toBe(13);
+    // Early in the day the default hour still applies.
+    expect(getScrollToHour(dates, new Date(2026, 9, 16, 3))).toBe(7);
+  });
+
+  it("uses the default hour for ranges without today", () => {
+    expect(getScrollToHour(dates, new Date(2026, 9, 20, 14))).toBe(7);
   });
 });

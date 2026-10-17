@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  DEFAULT_SCROLL_HOUR,
   PHONE_DAY_COUNT,
   WEEK_DAY_COUNT,
   dateKey,
@@ -9,94 +8,77 @@ import {
   formatTime,
 } from "./lib/calendar";
 import { PHONE_MEDIA_QUERY } from "./lib/layout";
-import { isBusy } from "./lib/timeline";
+import { getErrorText, getRequestErrorMessage } from "./lib/requestErrors";
 import type { Tag, TimelineEntry } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useSidebarState } from "./hooks/useSidebarState";
-import { useComposer } from "./features/composer/useComposer";
-import { useTagVisibility } from "./features/tags/useTagVisibility";
-import { useWorkspace } from "./features/timeline/useWorkspace";
+import { Sidebar } from "./components/Sidebar";
+import { TopBar } from "./components/TopBar";
+import { AuthScreen } from "./features/auth/AuthScreen";
 import { useAuth } from "./features/auth/useAuth";
-import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
-import { useTagMutations } from "./features/tags/useTagMutations";
-import { useCalendarState } from "./features/calendar/useCalendarState";
-import { useCalendarPreferences } from "./features/calendar/useCalendarPreferences";
+import { AllDayEvent } from "./features/calendar/AllDayEvent";
+import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
+import { DayEntries } from "./features/calendar/DayEntries";
+import { SunIndicators } from "./features/calendar/SunIndicators";
+import { WeekCalendar } from "./features/calendar/WeekCalendar";
+import { WeekHeader } from "./features/calendar/WeekHeader";
 import { getEffectiveWeekStart } from "./features/calendar/calendarPreferences";
 import {
-  getCalendarEntryLayout,
+  getAllDayEventSpans,
   getCalendarDates,
   getClickedEventStart,
   getElapsedOverlayState,
-  getEntriesForDate,
-  entriesOverlap,
-  getCommuteSegments,
-  getGatheringSegment,
-  eventBodyOverlapsDate,
-  getEventAdjacency,
-  getEventOverlapDepth,
   getEventPreview,
-  getAllDayEventSpans,
+  getScrollToHour,
   getVisibleWeekEntries,
 } from "./features/calendar/timelineView";
-import type {
-  CommuteSegment,
-  GatheringSegment,
-} from "./features/calendar/timelineView";
-import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
-import { AuthScreen } from "./features/auth/AuthScreen";
+import { useCalendarPreferences } from "./features/calendar/useCalendarPreferences";
+import { useCalendarState } from "./features/calendar/useCalendarState";
 import { ComposerDrawer } from "./features/composer/ComposerDrawer";
+import { useComposer } from "./features/composer/useComposer";
+import { HouseholdSettings } from "./features/household/HouseholdSettings";
+import {
+  useHousehold,
+  useHouseholdMutations,
+} from "./features/household/useHousehold";
 import { QuickAddBar } from "./features/quickAdd/QuickAddBar";
 import { parseEvent } from "./features/quickAdd/parseEvent";
 import { resolveDraft } from "./features/quickAdd/resolveDraft";
-import { getErrorText, getRequestErrorMessage } from "./lib/requestErrors";
-import { CalendarEntry } from "./features/calendar/CalendarEntry";
-import { AllDayEvent } from "./features/calendar/AllDayEvent";
-import { Sidebar } from "./components/Sidebar";
-import { TagEditorDrawer } from "./features/tags/TagEditorDrawer";
-import { WeekCalendar } from "./features/calendar/WeekCalendar";
-import { WeekHeader } from "./features/calendar/WeekHeader";
-import { TopBar } from "./components/TopBar";
+import { ReminderToasts } from "./features/reminders/ReminderToasts";
+import { RemindersDrawer } from "./features/reminders/RemindersDrawer";
+import { isReminderUpcoming } from "./features/reminders/reminders";
+import { useEventReminders } from "./features/reminders/useEventReminders";
 import { SettingsPage } from "./features/settings/SettingsPage";
-import { HouseholdSettings } from "./features/household/HouseholdSettings";
 import { ShareEventDrawer } from "./features/sharing/ShareEventDrawer";
 import { SharedEventDrawer } from "./features/sharing/SharedEventDrawer";
 import {
   useEventShareMutations,
   useEventShares,
 } from "./features/sharing/useEventShares";
-import {
-  useHousehold,
-  useHouseholdMutations,
-} from "./features/household/useHousehold";
-import { TransitCardPill } from "./features/transitCard/TransitCardPill";
+import { TagEditorDrawer } from "./features/tags/TagEditorDrawer";
+import { useTagMutations } from "./features/tags/useTagMutations";
+import { useTagVisibility } from "./features/tags/useTagVisibility";
+import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
+import { useWorkspace } from "./features/timeline/useWorkspace";
 import { TransitCardDrawer } from "./features/transitCard/TransitCardDrawer";
-import {
-  getTransitCardDayViews,
-  getTransitCardPillVariant,
-} from "./features/transitCard/transitCardDays";
+import { TransitCardDayPills } from "./features/transitCard/TransitCardPill";
+import { getTransitCardDayViews } from "./features/transitCard/transitCardDays";
 import {
   useSaveTransitCardDays,
   useTransitCardDays,
 } from "./features/transitCard/useTransitCard";
-import { useWeather } from "./features/weather/useWeather";
 import { getSunIndicators } from "./features/weather/sunTimes";
-import { SunIndicators } from "./features/calendar/SunIndicators";
-import {
-  useReminderMutations,
-  useReminders,
-} from "./features/reminders/useReminders";
-import { useReminderNotifications } from "./features/reminders/useReminderNotifications";
-import {
-  getRemindersByEvent,
-  isReminderUpcoming,
-} from "./features/reminders/reminders";
-import { RemindersDrawer } from "./features/reminders/RemindersDrawer";
-import { ReminderToasts } from "./features/reminders/ReminderToasts";
-import type { Reminder } from "./types";
+import { useWeather } from "./features/weather/useWeather";
 import "./App.css";
 
-const NO_REMINDERS: Reminder[] = [];
+// The drawers opened from the calendar. Only one is open at a time; the
+// composer and the share drawer stacked on it are tracked separately.
+type OpenDrawer =
+  | { kind: "tags" }
+  | { kind: "transitCard" }
+  | { kind: "reminders" }
+  | { kind: "sharedEvent"; entry: TimelineEntry };
 
 function App() {
   const {
@@ -106,16 +88,19 @@ function App() {
     logout,
     updateDisplayName,
   } = useAuth();
-  const workspaceQuery = useWorkspace(Boolean(user));
+  const signedIn = Boolean(user);
+  const workspaceQuery = useWorkspace(signedIn);
   const entries = workspaceQuery.data?.entries ?? [];
   const tags = workspaceQuery.data?.tags ?? [];
-  const loading = authLoading || workspaceQuery.isLoading;
-  const [showTagEditor, setShowTagEditor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showTransitCard, setShowTransitCard] = useState(false);
+  const [drawer, setDrawer] = useState<OpenDrawer | null>(null);
+  const [sharingEvent, setSharingEvent] = useState<TimelineEntry | null>(null);
   const { preferences, updatePreferences } = useCalendarPreferences(
     user?.id ?? "",
   );
+  const { timeFormat } = preferences;
+  const formatTimeLabel = (value: Date) =>
+    formatTime(value, { preference: timeFormat });
   const { hiddenTagIds, toggleTagVisibility, removeHiddenTag } =
     useTagVisibility();
   const today = useCurrentTime();
@@ -125,42 +110,19 @@ function App() {
   const sidebar = useSidebarState(isPhone);
   const { rangeStart, selectedDate, setSelectedDate, moveRange } =
     useCalendarState(today, weekStartsOn, dayCount);
+  const dates = getCalendarDates(rangeStart, dayCount);
   const tagMutations = useTagMutations(removeHiddenTag);
   const timeline = useTimelineMutations();
-  const dates = getCalendarDates(rangeStart, dayCount);
   const transitCardQuery = useTransitCardDays(
     dateKey(dates[0]),
     dateKey(dates[dates.length - 1]),
-    Boolean(user),
+    signedIn,
   );
   const saveTransitCardDays = useSaveTransitCardDays();
-  const weatherByDay = useWeather(Boolean(user));
-  const householdQuery = useHousehold(Boolean(user));
-  const household = householdQuery.data ?? null;
+  const weatherByDay = useWeather(signedIn);
+  const household = useHousehold(signedIn).data ?? null;
   const householdMutations = useHouseholdMutations();
-  const [sharingEvent, setSharingEvent] = useState<TimelineEntry | null>(null);
-  const [viewingSharedEvent, setViewingSharedEvent] =
-    useState<TimelineEntry | null>(null);
-  const remindersQuery = useReminders(Boolean(user));
-  const reminders = remindersQuery.data ?? NO_REMINDERS;
-  const remindersByEvent = getRemindersByEvent(reminders);
-  const reminderMutations = useReminderMutations();
-  const [showReminders, setShowReminders] = useState(false);
-  const [reminderError, setReminderError] = useState<string | null>(null);
-  const reminderNotifications = useReminderNotifications(
-    reminders,
-    reminderMutations.markNotified,
-    preferences.timeFormat,
-  );
-  const getReminderItems = (eventId: string) =>
-    (remindersByEvent.get(eventId) ?? []).map((reminder) => ({
-      id: reminder.id,
-      offsetSeconds: reminder.offset_seconds,
-    }));
-  const addReminder = async (eventId: string, offsetSeconds: number) =>
-    setReminderError(await reminderMutations.add(eventId, offsetSeconds));
-  const removeReminder = async (reminderId: string) =>
-    setReminderError(await reminderMutations.remove(reminderId));
+  const reminders = useEventReminders(signedIn, timeFormat);
   const eventSharesQuery = useEventShares(sharingEvent?.id ?? null);
   const shareMutations = useEventShareMutations(sharingEvent?.id ?? null);
   const composer = useComposer({
@@ -170,25 +132,11 @@ function App() {
     onResetErrors: () => {
       timeline.saveItem.reset();
       timeline.deleteItem.reset();
-      setReminderError(null);
+      reminders.clearError();
     },
   });
-  const {
-    showComposer,
-    type: composerType,
-    editingItem,
-    selectedTagIds: composerTagIds,
-    mainTagId: composerMainTagId,
-    draftEventStart,
-    draft: composerDraft,
-    setType: setComposerType,
-    setDraftEventStart,
-    setSelectedTagIds: setComposerTagIds,
-    setMainTagId: setComposerMainTagId,
-    openNew: openNewComposer,
-    edit: editItem,
-    close: closeComposerDrawer,
-  } = composer;
+  const { editingItem } = composer;
+
   // Quick add only prefills the event form; the user still reviews and saves.
   const quickAddEvent = async (text: string) => {
     try {
@@ -199,7 +147,7 @@ function App() {
         weekStartsOn,
         selectedDate,
       );
-      openNewComposer(undefined, {
+      composer.openNew(undefined, {
         ...resolved,
         warnings: [
           ...result.unresolved.map((part) => `Couldn't place "${part}"`),
@@ -215,65 +163,70 @@ function App() {
   // The share drawer is stacked on the composer, so it closes with it.
   const closeComposer = () => {
     setSharingEvent(null);
-    closeComposerDrawer();
+    composer.close();
   };
-
   // Events shared with the user are read-only, so they open a details view.
   const openEntry = (entry: TimelineEntry) => {
-    setReminderError(null);
-    if (entry.is_shared) setViewingSharedEvent(entry);
-    else editItem(entry);
+    reminders.clearError();
+    if (entry.is_shared) setDrawer({ kind: "sharedEvent", entry });
+    else composer.edit(entry);
   };
   // Reminders and their notifications refer to events by id.
   const openEventById = (eventId: string) => {
     const entry = entries.find((candidate) => candidate.id === eventId);
     if (!entry) return;
-    setShowReminders(false);
+    setDrawer(null);
     openEntry(entry);
   };
-
-  const handleDeleteItem = (entry: TimelineEntry) => {
+  const deleteItem = (entry: TimelineEntry) => {
     if (!window.confirm(`Delete “${entry.title}”?`)) return;
     timeline.deleteItem.mutate(entry, {
       onSuccess: () => {
         closeComposer();
-        setDraftEventStart(null);
+        composer.setDraftEventStart(null);
       },
     });
   };
-
+  const saveComposerItem = (form: FormData) =>
+    timeline.saveItem.mutate(
+      {
+        type: composer.type,
+        editingItem,
+        form,
+        mainTagId: composer.mainTagId,
+        selectedTagIds: composer.selectedTagIds,
+        tags,
+      },
+      { onSuccess: closeComposer },
+    );
+  const createTag = () => {
+    const name = window.prompt("Tag name")?.trim();
+    if (name) tagMutations.createTag.mutate(name);
+  };
   const deleteTag = (tag: Tag) => {
     if (window.confirm(`Delete tag “${tag.name}”?`)) {
       tagMutations.deleteTag.mutate(tag);
     }
   };
-
-  const createTag = () => {
-    const name = window.prompt("Tag name")?.trim();
-    if (name) tagMutations.createTag.mutate(name);
-  };
-
-  const saveComposerItem = (form: FormData) =>
-    timeline.saveItem.mutate(
-      {
-        type: composerType,
-        editingItem,
-        form,
-        mainTagId: composerMainTagId,
-        selectedTagIds: composerTagIds,
-        tags,
-      },
-      { onSuccess: closeComposer },
-    );
-
   const openTagEditor = () => {
     tagMutations.updateTag.reset();
     tagMutations.updateDefaultTag.reset();
     tagMutations.deleteTag.reset();
-    setShowTagEditor(true);
+    setDrawer({ kind: "tags" });
   };
+  const openTransitCard = () => {
+    saveTransitCardDays.reset();
+    setDrawer({ kind: "transitCard" });
+  };
+  const openSettings = () => {
+    setShowSettings(true);
+    setDrawer(null);
+    closeComposer();
+    if (isPhone) sidebar.close();
+  };
+  const signOut = () => logout.mutate();
 
-  if (loading)
+  if (authLoading || workspaceQuery.isLoading)
     return <div className="loading-screen">Loading your calendar...</div>;
   if (!user) {
     return (
@@ -289,10 +242,8 @@ function App() {
     timeline.toggleTask.error ?? tagMutations.createTag.error,
     "Unable to update",
   );
-  const openTasks = entries.filter(
-    (entry) => entry.type === "task" && !entry.is_completed,
-  ).length;
   const weekEntries = getVisibleWeekEntries(entries, dates, hiddenTagIds);
+  const allDayEventSpans = getAllDayEventSpans(weekEntries, dates);
   // Until the days load, every day would look unreported, so show nothing.
   const transitCardViews = transitCardQuery.data
     ? getTransitCardDayViews(
@@ -303,147 +254,9 @@ function App() {
         household?.members,
       )
     : [];
-  const allDayEventSpans = getAllDayEventSpans(weekEntries, dates);
-  const openTransitCard = () => {
-    saveTransitCardDays.reset();
-    setShowTransitCard(true);
-  };
-  const openNewEventAt = (
-    event: Parameters<typeof getClickedEventStart>[0],
-    date: Date,
-  ) => openNewComposer(getClickedEventStart(event, date));
-  const renderGridEntry = (
-    entry: TimelineEntry,
-    layout: ReturnType<typeof getCalendarEntryLayout>,
-    trimTop = false,
-    trimBottom = false,
-    overlapDepth = 0,
-    commuteSegments: CommuteSegment[] = [],
-    gatheringSegment: GatheringSegment | null = null,
-    showBody = true,
-    overlapsGhost = false,
-  ) => {
-    return (
-      <CalendarEntry
-        key={entry.id}
-        entry={entry}
-        startMinutes={layout.startMinutes}
-        durationMinutes={layout.durationMinutes}
-        trimTop={trimTop}
-        trimBottom={trimBottom}
-        overlapDepth={overlapDepth}
-        timeFormat={preferences.timeFormat}
-        continuesFromPreviousDay={layout.continuesFromPreviousDay}
-        continuesToNextDay={layout.continuesToNextDay}
-        commuteSegments={commuteSegments}
-        gatheringSegment={gatheringSegment}
-        showBody={showBody}
-        overlapsGhost={overlapsGhost}
-        reminders={remindersByEvent.get(entry.id)}
-        onEdit={openEntry}
-        onToggleTask={(entry) => timeline.toggleTask.mutate(entry)}
-      />
-    );
-  };
-  const renderDayEntries = (date: Date) => {
-    const dayEntries = getEntriesForDate(weekEntries, date).filter(
-      (entry) => entry.type !== "event" || !entry.is_all_day,
-    );
-    // Busy and not-busy (heads-up, skipped) entries are laid out separately:
-    // ghosts never push busy blocks aside. Ghosts render first so busy blocks
-    // paint over them.
-    const ghosts = dayEntries.filter((entry) => !isBusy(entry));
-    const busy = dayEntries.filter(isBusy);
-    const layoutLayer = (layer: TimelineEntry[]) =>
-      layer.map((entry, index) => {
-        const previous = layer[index - 1];
-        const next = layer[index + 1];
-        const { trimTop, trimBottom } = getEventAdjacency(
-          entry,
-          previous,
-          next,
-        );
-        const layout = getCalendarEntryLayout(entry, today, date);
-        const overlapDepth = getEventOverlapDepth(entry, layer.slice(0, index));
-        const overlapsGhost =
-          isBusy(entry) && ghosts.some((ghost) => entriesOverlap(entry, ghost));
-        return {
-          layout,
-          rendered: renderGridEntry(
-            entry,
-            layout,
-            trimTop,
-            trimBottom,
-            overlapDepth,
-            getCommuteSegments(entry, date),
-            getGatheringSegment(entry, date),
-            eventBodyOverlapsDate(entry, date),
-            overlapsGhost,
-          ),
-        };
-      });
-    // Elapsed entries are dimmed together in one wrapper per layer, so a
-    // dimmed busy block still paints over every ghost.
-    const groupElapsed = (
-      layer: ReturnType<typeof layoutLayer>,
-      key: string,
-    ) => {
-      const elapsed = layer.filter((item) => item.layout.fullyElapsed);
-      return [
-        ...(elapsed.length
-          ? [
-              <div className="elapsed-event-group" key={key}>
-                {elapsed.map((item) => item.rendered)}
-              </div>,
-            ]
-          : []),
-        ...layer
-          .filter((item) => !item.layout.fullyElapsed)
-          .map((item) => item.rendered),
-      ];
-    };
-    return [
-      ...groupElapsed(layoutLayer(ghosts), "elapsed-ghosts"),
-      ...groupElapsed(layoutLayer(busy), "elapsed-busy"),
-    ];
-  };
-  const renderAllDayEntries = () =>
-    allDayEventSpans.map((span) => (
-      <AllDayEvent
-        key={span.entry.id}
-        {...span}
-        onEdit={openEntry}
-        reminders={remindersByEvent.get(span.entry.id)}
-      />
-    ));
   const emailName = user.email.split("@")[0];
-  const userDisplayName = user.display_name || emailName;
-  const transitCardPills = transitCardViews.map((view, index) => {
-    const variant = getTransitCardPillVariant(view);
-    return variant ? (
-      <TransitCardPill
-        key={view.key}
-        name={view.day?.display_name ?? userDisplayName}
-        variant={variant}
-        column={index}
-      />
-    ) : null;
-  });
-  const openSettings = () => {
-    setShowSettings(true);
-    setShowTagEditor(false);
-    setShowTransitCard(false);
-    closeComposer();
-    if (isPhone) sidebar.close();
-  };
-  const rangeIncludesToday = dates.some(
-    (date) => dateKey(date) === dateKey(today),
-  );
-  // Keep the previous hour visible so the current time isn't at the very top.
-  const scrollToHour = rangeIncludesToday
-    ? Math.max(DEFAULT_SCROLL_HOUR, today.getHours() - 1)
-    : DEFAULT_SCROLL_HOUR;
   const formatRangeDate = isPhone ? formatShortDate : formatDate;
+
   return (
     <main className="app-shell">
       <TopBar
@@ -451,12 +264,13 @@ function App() {
         sidebarOpen={sidebar.open}
         onToggleSidebar={sidebar.toggle}
         upcomingReminderCount={
-          reminders.filter((reminder) => isReminderUpcoming(reminder, today))
-            .length
+          reminders.reminders.filter((reminder) =>
+            isReminderUpcoming(reminder, today),
+          ).length
         }
-        onOpenReminders={() => setShowReminders(true)}
+        onOpenReminders={() => setDrawer({ kind: "reminders" })}
         onOpenSettings={openSettings}
-        onLogout={() => logout.mutate()}
+        onLogout={signOut}
       />
       {showSettings ? (
         <SettingsPage
@@ -492,12 +306,16 @@ function App() {
                 <button className="text-button" onClick={openSettings}>
                   Settings
                 </button>
-                <button className="text-button" onClick={() => logout.mutate()}>
+                <button className="text-button" onClick={signOut}>
                   Sign out
                 </button>
               </div>
             }
-            openTaskCount={openTasks}
+            openTaskCount={
+              entries.filter(
+                (entry) => entry.type === "task" && !entry.is_completed,
+              ).length
+            }
             tags={tags}
             hiddenTagIds={hiddenTagIds}
             onToggleTagVisibility={toggleTagVisibility}
@@ -510,23 +328,39 @@ function App() {
               itemCount={weekEntries.length}
               onPrevious={() => moveRange(-1)}
               onNext={() => moveRange(1)}
-              onAddItem={() => openNewComposer()}
+              onAddItem={() => composer.openNew()}
               quickAdd={<QuickAddBar onSubmit={quickAddEvent} />}
             >
               {pageError && <p className="error action-error">{pageError}</p>}
             </WeekHeader>
             <WeekCalendar
               dates={dates}
-              timeFormat={preferences.timeFormat}
+              timeFormat={timeFormat}
               hasAllDayEvents={allDayEventSpans.length > 0}
               weatherByDay={weatherByDay}
-              transitCardPills={transitCardPills}
+              transitCardPills={
+                <TransitCardDayPills
+                  views={transitCardViews}
+                  fallbackName={user.display_name || emailName}
+                />
+              }
               onTransitCardClick={
                 transitCardQuery.data ? openTransitCard : undefined
               }
-              renderAllDay={renderAllDayEntries}
-              onDayClick={openNewEventAt}
-              scrollToHour={scrollToHour}
+              renderAllDay={() =>
+                allDayEventSpans.map((span) => (
+                  <AllDayEvent
+                    key={span.entry.id}
+                    {...span}
+                    onEdit={openEntry}
+                    reminders={reminders.remindersByEvent.get(span.entry.id)}
+                  />
+                ))
+              }
+              onDayClick={(event, date) =>
+                composer.openNew(getClickedEventStart(event, date))
+              }
+              scrollToHour={getScrollToHour(dates, today)}
               onSwipe={isPhone ? moveRange : undefined}
               renderDay={(date) => (
                 <>
@@ -535,25 +369,32 @@ function App() {
                       date,
                       weatherByDay.get(dateKey(date)),
                       preferences,
-                      (value) =>
-                        formatTime(value, {
-                          preference: preferences.timeFormat,
-                        }),
+                      formatTimeLabel,
                     )}
                   />
-                  {renderDayEntries(date)}
+                  <DayEntries
+                    entries={weekEntries}
+                    date={date}
+                    now={today}
+                    timeFormat={timeFormat}
+                    remindersByEvent={reminders.remindersByEvent}
+                    onEdit={openEntry}
+                    onToggleTask={(entry) => timeline.toggleTask.mutate(entry)}
+                  />
                   <CalendarDayIndicators
                     preview={
-                      showComposer && !editingItem
+                      composer.showComposer && !editingItem
                         ? getEventPreview(
-                            draftEventStart,
+                            composer.draftEventStart,
                             date,
-                            preferences.timeFormat,
+                            timeFormat,
                           )
                         : null
                     }
-                    elapsed={getElapsedOverlayState(date, today, (value) =>
-                      formatTime(value, { preference: preferences.timeFormat }),
+                    elapsed={getElapsedOverlayState(
+                      date,
+                      today,
+                      formatTimeLabel,
                     )}
                   />
                 </>
@@ -562,17 +403,17 @@ function App() {
           </div>
         </section>
       )}
-      {showComposer && (
+      {composer.showComposer && (
         <ComposerDrawer
-          key={`${editingItem?.id ?? "new"}-${composerType}`}
-          type={composerType}
+          key={`${editingItem?.id ?? "new"}-${composer.type}`}
+          type={composer.type}
           editingItem={editingItem}
           selectedDate={selectedDate}
-          draftEventStart={draftEventStart}
+          draftEventStart={composer.draftEventStart}
           tags={tags}
-          selectedTagIds={composerTagIds}
-          mainTagId={composerMainTagId}
-          timeFormat={preferences.timeFormat}
+          selectedTagIds={composer.selectedTagIds}
+          mainTagId={composer.mainTagId}
+          timeFormat={timeFormat}
           error={getErrorText(
             timeline.saveItem.error ?? timeline.deleteItem.error,
             "Unable to save item",
@@ -580,9 +421,9 @@ function App() {
           pending={timeline.saveItem.isPending}
           onSave={saveComposerItem}
           onClose={closeComposer}
-          onTypeChange={setComposerType}
-          onSelectedTagIdsChange={setComposerTagIds}
-          onMainTagIdChange={setComposerMainTagId}
+          onTypeChange={composer.setType}
+          onSelectedTagIdsChange={composer.setSelectedTagIds}
+          onMainTagIdChange={composer.setMainTagId}
           onShare={
             editingItem?.type === "event"
               ? () => setSharingEvent(editingItem)
@@ -591,22 +432,22 @@ function App() {
           shareCount={
             entries.find((entry) => entry.id === editingItem?.id)?.share_count
           }
-          reminders={editingItem ? getReminderItems(editingItem.id) : []}
-          reminderError={reminderError}
+          reminders={editingItem ? reminders.itemsFor(editingItem.id) : []}
+          reminderError={reminders.error}
           onAddReminder={(offset) =>
-            editingItem && addReminder(editingItem.id, offset)
+            editingItem && reminders.add(editingItem.id, offset)
           }
-          onRemoveReminder={(reminder) => removeReminder(reminder.id)}
-          draftValues={composerDraft?.values}
-          draftReminderOffsets={composerDraft?.reminderOffsets}
-          draftWarnings={composerDraft?.warnings}
+          onRemoveReminder={(reminder) => reminders.remove(reminder.id)}
+          draftValues={composer.draft?.values}
+          draftReminderOffsets={composer.draft?.reminderOffsets}
+          draftWarnings={composer.draft?.warnings}
         />
       )}
-      {showComposer && editingItem && (
+      {composer.showComposer && editingItem && (
         <button
           className="danger-button drawer-delete-action"
           type="button"
-          onClick={() => handleDeleteItem(editingItem)}
+          onClick={() => deleteItem(editingItem)}
         >
           Delete item
         </button>
@@ -628,34 +469,34 @@ function App() {
           onClose={() => setSharingEvent(null)}
         />
       )}
-      {viewingSharedEvent && (
+      {drawer?.kind === "sharedEvent" && (
         <SharedEventDrawer
-          entry={viewingSharedEvent}
-          timeFormat={preferences.timeFormat}
-          onClose={() => setViewingSharedEvent(null)}
-          reminders={getReminderItems(viewingSharedEvent.id)}
-          reminderError={reminderError}
-          onAddReminder={(offset) => addReminder(viewingSharedEvent.id, offset)}
-          onRemoveReminder={(reminder) => removeReminder(reminder.id)}
+          entry={drawer.entry}
+          timeFormat={timeFormat}
+          onClose={() => setDrawer(null)}
+          reminders={reminders.itemsFor(drawer.entry.id)}
+          reminderError={reminders.error}
+          onAddReminder={(offset) => reminders.add(drawer.entry.id, offset)}
+          onRemoveReminder={(reminder) => reminders.remove(reminder.id)}
         />
       )}
-      {showReminders && (
+      {drawer?.kind === "reminders" && (
         <RemindersDrawer
-          reminders={reminders}
+          reminders={reminders.reminders}
           now={today}
-          timeFormat={preferences.timeFormat}
+          timeFormat={timeFormat}
           onOpenEvent={openEventById}
-          onRemove={(reminder) => removeReminder(reminder.id)}
-          onClose={() => setShowReminders(false)}
+          onRemove={(reminder) => reminders.remove(reminder.id)}
+          onClose={() => setDrawer(null)}
         />
       )}
       <ReminderToasts
-        toasts={reminderNotifications.toasts}
-        timeFormat={preferences.timeFormat}
+        toasts={reminders.notifications.toasts}
+        timeFormat={timeFormat}
         onOpenEvent={openEventById}
-        onDismiss={reminderNotifications.dismiss}
+        onDismiss={reminders.notifications.dismiss}
       />
-      {showTransitCard && (
+      {drawer?.kind === "transitCard" && (
         <TransitCardDrawer
           views={transitCardViews}
           cardCount={household?.transit_card_count}
@@ -664,15 +505,15 @@ function App() {
             "Unable to save transit card days",
           )}
           pending={saveTransitCardDays.isPending}
-          onClose={() => setShowTransitCard(false)}
+          onClose={() => setDrawer(null)}
           onSave={(submission) =>
             saveTransitCardDays.mutate(submission, {
-              onSuccess: () => setShowTransitCard(false),
+              onSuccess: () => setDrawer(null),
             })
           }
         />
       )}
-      {showTagEditor && (
+      {drawer?.kind === "tags" && (
         <TagEditorDrawer
           tags={tags}
           error={getErrorText(
@@ -681,7 +522,7 @@ function App() {
               tagMutations.deleteTag.error,
             "Unable to update tags",
           )}
-          onClose={() => setShowTagEditor(false)}
+          onClose={() => setDrawer(null)}
           onUpdate={(tag, name, color) => {
             if (name) tagMutations.updateTag.mutate({ tag, name, color });
           }}

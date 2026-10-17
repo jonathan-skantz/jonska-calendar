@@ -8,6 +8,7 @@ import {
   MINUTES_PER_HOUR,
   SECONDS_PER_MINUTE,
   TASK_DISPLAY_DURATION_MINUTES,
+  DEFAULT_SCROLL_HOUR,
   WEEK_DAY_COUNT,
   dateKey,
   formatTime,
@@ -24,6 +25,7 @@ import {
   getEntryMinutes,
   getOccupiedRange,
   getTimelineEntryDate,
+  isBusy,
   isEventVisible,
 } from "../../lib/timeline";
 import type { TimelineEntry } from "../../types";
@@ -419,3 +421,51 @@ export const getCalendarEntryLayout = (
     continuesToNextDay: false,
   };
 };
+
+// One timed entry placed in a day column. The fields match CalendarEntry's
+// layout props.
+export type DayEntryLayout = ReturnType<typeof getCalendarEntryLayout> & {
+  entry: TimelineEntry;
+  trimTop: boolean;
+  trimBottom: boolean;
+  overlapDepth: number;
+  commuteSegments: CommuteSegment[];
+  gatheringSegment: GatheringSegment | null;
+  showBody: boolean;
+  overlapsGhost: boolean;
+};
+
+// Busy and not-busy (heads-up, skipped) entries are laid out as separate
+// layers, so ghosts never push busy blocks aside. All-day events are drawn in
+// the header instead.
+export const layoutDayEntries = (
+  entries: TimelineEntry[],
+  date: Date,
+  now: Date,
+) => {
+  const timed = getEntriesForDate(entries, date).filter(
+    (entry) => entry.type !== "event" || !entry.is_all_day,
+  );
+  const ghosts = timed.filter((entry) => !isBusy(entry));
+  const busy = timed.filter(isBusy);
+  const layoutLayer = (layer: TimelineEntry[]): DayEntryLayout[] =>
+    layer.map((entry, index) => ({
+      ...getCalendarEntryLayout(entry, now, date),
+      ...getEventAdjacency(entry, layer[index - 1], layer[index + 1]),
+      entry,
+      overlapDepth: getEventOverlapDepth(entry, layer.slice(0, index)),
+      commuteSegments: getCommuteSegments(entry, date),
+      gatheringSegment: getGatheringSegment(entry, date),
+      showBody: eventBodyOverlapsDate(entry, date),
+      overlapsGhost:
+        isBusy(entry) && ghosts.some((ghost) => entriesOverlap(entry, ghost)),
+    }));
+  return { ghosts: layoutLayer(ghosts), busy: layoutLayer(busy) };
+};
+
+// The hour the grid scrolls to when it shows a range. With today in range, the
+// previous hour stays visible so the current time isn't at the very top.
+export const getScrollToHour = (dates: Date[], now: Date) =>
+  dates.some((date) => dateKey(date) === dateKey(now))
+    ? Math.max(DEFAULT_SCROLL_HOUR, now.getHours() - 1)
+    : DEFAULT_SCROLL_HOUR;
