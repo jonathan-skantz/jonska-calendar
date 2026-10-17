@@ -6,6 +6,7 @@ import {
   getCommuteSegments,
   getEntriesForDate,
   getEventOverlapDepth,
+  getEventPreview,
   getGatheringSegment,
 } from "./timelineView";
 import type { TimelineEntry } from "../../types";
@@ -334,5 +335,19 @@ describe("not-busy layer", () => {
     ).toBe(false);
     // Laid out on its own layer, the lecture is not indented by the heads-up.
     expect(getEventOverlapDepth(lecture, [])).toBe(0);
+  });
+});
+
+describe("new event preview", () => {
+  it("ends the default duration after the start", () => {
+    expect(
+      getEventPreview("2026-10-15T09:00:00", new Date(2026, 9, 15), "24-hour"),
+    ).toMatchObject({ startsAt: "09:00", endsAt: "11:00" });
+  });
+
+  it("only shows on the day the draft starts", () => {
+    expect(
+      getEventPreview("2026-10-15T09:00:00", new Date(2026, 9, 16)),
+    ).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { addDays, startOfDay } from "date-fns";
+import { addDays, addMinutes, startOfDay } from "date-fns";
 import type { MouseEvent } from "react";
 import {
   DEFAULT_EVENT_DURATION_MINUTES,
@@ -205,11 +205,7 @@ export const getEventPreview = (
   timeFormat: TimeFormatPreference = "browser",
 ): EventPreview | null => {
   if (!startAt || localDateKey(startAt) !== dateKey(date)) return null;
-  const start = new Date(startAt);
-  const end = new Date(
-    start.getTime() +
-      DEFAULT_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
-  ).toISOString();
+  const end = addMinutes(new Date(startAt), DEFAULT_EVENT_DURATION_MINUTES);
   return {
     top: gridOffset(minutesIntoDay(startAt)),
     height: gridOffset(DEFAULT_EVENT_DURATION_MINUTES),
