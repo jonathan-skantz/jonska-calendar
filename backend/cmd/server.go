@@ -11,6 +11,7 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
+	"github.com/jonathan-skantz/calendar/backend/internal/weather"
 )
 
 func main() {
@@ -40,6 +41,8 @@ func main() {
 		user, err := handler.UserFromRequest(r)
 		return user.ID, err
 	})
+
+	weatherHandler := weather.New(handler.Store, weather.CurrentUser(timelineHandler.CurrentUser), weather.NewClient())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +83,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/household", timelineHandler.UpdateHousehold)
 	mux.HandleFunc("POST /api/household/members", timelineHandler.AddHouseholdMember)
 	mux.HandleFunc("DELETE /api/household/members/me", timelineHandler.LeaveHousehold)
+	mux.HandleFunc("GET /api/weather", weatherHandler.Forecast)
 
 	server := &http.Server{
 		Addr:    ":8080",

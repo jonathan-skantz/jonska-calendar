@@ -7,4 +7,5 @@ export const queryKeys = {
   eventShares: (eventId: string) => ["event-shares", eventId] as const,
   transitCardDays: (from: string, to: string) =>
     ["transit-card", from, to] as const,
+  weather: (lat: number, lon: number) => ["weather", lat, lon] as const,
 };

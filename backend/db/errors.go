@@ -21,6 +21,7 @@ var (
 	ErrAlreadyInHousehold  = errors.New("user already belongs to a household")
 	ErrReminderExists      = errors.New("a reminder with that offset already exists")
 	ErrReminderNotFound    = errors.New("reminder not found")
+	ErrWeatherNotCached    = errors.New("weather forecast not cached")
 )
 
 func isUniqueViolation(err error) bool {

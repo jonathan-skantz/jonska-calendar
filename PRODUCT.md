@@ -189,6 +189,20 @@ separate from events and tasks.
 - [ ] Removing other members, invitations that must be accepted, and several
       households per user are **Future**.
 
+### Weather
+
+- [x] Each day heading in the week view shows one icon per weather condition
+      seen in daylight that day (sunny, partly cloudy, cloudy, fog, rain, snow,
+      thunder). A sunny day with showers shows both a sun and rain.
+- [x] A condition must last at least two daylight hours to be shown (thunder:
+      one hour). Cloudy is left out when it rains or snows. At most three icons
+      are shown, keeping the most disruptive weather.
+- [x] The forecast is for the browser's current location. Without location
+      permission, or outside the forecast window (the past 7 days to 16 days
+      ahead), no icons are shown.
+- [x] Forecasts come from Open-Meteo and are cached on the server per area of
+      about 10 km for 3 hours, shared by all users in that area.
+
 ## Future Features
 
 The following product ideas are intentionally deferred from the first demo:

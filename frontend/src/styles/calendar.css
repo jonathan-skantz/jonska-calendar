@@ -53,6 +53,37 @@
   text-transform: uppercase;
 }
 
+/* Fixed height so headings line up whether or not a day has a forecast. */
+.day-weather {
+  display: flex;
+  gap: 3px;
+  height: 14px;
+}
+
+.weather-icon {
+  color: var(--muted);
+}
+
+.weather-icon .sun {
+  color: #e2a93b;
+}
+
+.weather-icon .cloud {
+  color: #9aa6a0;
+}
+
+.weather-icon .drops {
+  color: #4a83b8;
+}
+
+.weather-icon .flakes {
+  color: #8fb4d6;
+}
+
+.weather-icon .bolt {
+  color: var(--yellow);
+}
+
 .day-heading.weekend {
   background: #fff0ee;
 }

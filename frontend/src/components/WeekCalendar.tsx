@@ -1,6 +1,8 @@
 import type { MouseEvent, ReactNode } from "react";
 import { dateKey, formatDate, formatHour } from "../lib/calendar";
 import type { TimeFormatPreference } from "../lib/calendar";
+import type { WeatherCondition } from "../types";
+import { WeatherIcons } from "./WeatherIcons";
 
 type WeekCalendarProps = {
   dates: Date[];
@@ -11,6 +13,7 @@ type WeekCalendarProps = {
   onTransitCardClick?: () => void;
   hasAllDayEvents: boolean;
   timeFormat: TimeFormatPreference;
+  weatherByDay: Map<string, WeatherCondition[]>;
 };
 
 export const WeekCalendar = ({
@@ -22,6 +25,7 @@ export const WeekCalendar = ({
   onTransitCardClick,
   hasAllDayEvents,
   timeFormat,
+  weatherByDay,
 }: WeekCalendarProps) => (
   <div className="week-calendar" aria-label="Week calendar">
     <div className="week-day-headings">
@@ -33,6 +37,7 @@ export const WeekCalendar = ({
         >
           <strong>{date.getDate()}</strong>
           <span>{formatDate(date).split(",")[0]}</span>
+          <WeatherIcons conditions={weatherByDay.get(dateKey(date)) ?? []} />
         </div>
       ))}
     </div>

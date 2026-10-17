@@ -98,3 +98,11 @@ export type Household = {
 };
 
 export type AuthMode = "login" | "register";
+
+export type WeatherCondition =
+  "clear" | "partly-cloudy" | "cloudy" | "fog" | "rain" | "snow" | "thunder";
+
+export type WeatherDay = {
+  date: string;
+  conditions: WeatherCondition[];
+};

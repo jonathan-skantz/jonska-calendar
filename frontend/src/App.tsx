@@ -67,6 +67,7 @@ import {
   useSaveTransitCardDays,
   useTransitCardDays,
 } from "./features/transitCard/useTransitCard";
+import { useWeather } from "./features/weather/useWeather";
 import {
   useReminderMutations,
   useReminders,
@@ -123,6 +124,7 @@ function App() {
     Boolean(user),
   );
   const saveTransitCardDays = useSaveTransitCardDays(setActionError);
+  const weatherByDay = useWeather(Boolean(user));
   const householdQuery = useHousehold(Boolean(user));
   const household = householdQuery.data ?? null;
   const householdMutations = useHouseholdMutations();
@@ -472,6 +474,7 @@ function App() {
               dates={dates}
               timeFormat={preferences.timeFormat}
               hasAllDayEvents={allDayEventSpans.length > 0}
+              weatherByDay={weatherByDay}
               transitCardPills={transitCardPills}
               onTransitCardClick={
                 transitCardQuery.data ? openTransitCard : undefined
