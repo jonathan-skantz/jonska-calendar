@@ -7,7 +7,8 @@ afterEach(cleanup);
 
 describe("ComposerDrawer validation state", () => {
   it("exposes invalid fields to assistive technology", () => {
-    render(
+    const onSave = vi.fn();
+    const { container } = render(
       <ComposerDrawer
         type="event"
         editingItem={null}
@@ -17,16 +18,20 @@ describe("ComposerDrawer validation state", () => {
         selectedTagIds={[]}
         mainTagId={null}
         timeFormat="browser"
-        fieldErrors={{ title: true, starts_at: true, ends_at: true }}
-        error="Please correct the highlighted fields."
-        onSubmit={vi.fn()}
+        onSave={onSave}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
         onSelectedTagIdsChange={vi.fn()}
         onMainTagIdChange={vi.fn()}
       />,
     );
+    // An empty title and an end before the start.
+    fireEvent.change(screen.getByLabelText("Ends date"), {
+      target: { value: "2026-10-14" },
+    });
+    fireEvent.submit(container.querySelector("form")!);
 
+    expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Title").getAttribute("aria-invalid")).toBe(
       "true",
     );
@@ -54,6 +59,55 @@ describe("ComposerDrawer validation state", () => {
   });
 });
 
+describe("ComposerDrawer saving", () => {
+  const renderTask = (props: { error?: string; pending?: boolean } = {}) => {
+    const onSave = vi.fn();
+    const { container } = render(
+      <ComposerDrawer
+        type="task"
+        editingItem={null}
+        selectedDate="2026-10-15"
+        draftEventStart={null}
+        tags={[]}
+        selectedTagIds={[]}
+        mainTagId={null}
+        timeFormat="browser"
+        onSave={onSave}
+        onClose={vi.fn()}
+        onTypeChange={vi.fn()}
+        onSelectedTagIdsChange={vi.fn()}
+        onMainTagIdChange={vi.fn()}
+        {...props}
+      />,
+    );
+    return { onSave, form: container.querySelector("form")! };
+  };
+
+  it("saves valid form values", () => {
+    const { onSave, form } = renderTask();
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Follow up" },
+    });
+    fireEvent.submit(form);
+
+    expect(onSave).toHaveBeenCalledOnce();
+    expect((onSave.mock.calls[0][0] as FormData).get("title")).toBe(
+      "Follow up",
+    );
+  });
+
+  it("shows the save error and disables saving while pending", () => {
+    renderTask({ error: "Unable to create item", pending: true });
+
+    expect(screen.getByRole("alert").textContent).toBe("Unable to create item");
+    expect(
+      screen
+        .getByRole("button", { name: /save item/i })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+});
+
 describe("ComposerDrawer commute fields", () => {
   const renderComposer = (editingItem: TimelineEntry | null = null) =>
     render(
@@ -66,8 +120,7 @@ describe("ComposerDrawer commute fields", () => {
         selectedTagIds={[]}
         mainTagId={null}
         timeFormat="browser"
-        fieldErrors={{}}
-        onSubmit={vi.fn()}
+        onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
         onSelectedTagIdsChange={vi.fn()}
@@ -199,8 +252,7 @@ describe("ComposerDrawer approximate fields", () => {
         selectedTagIds={[]}
         mainTagId={null}
         timeFormat="browser"
-        fieldErrors={{}}
-        onSubmit={vi.fn()}
+        onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
         onSelectedTagIdsChange={vi.fn()}
@@ -244,8 +296,7 @@ describe("ComposerDrawer reminders", () => {
     selectedTagIds: [],
     mainTagId: null,
     timeFormat: "browser" as const,
-    fieldErrors: {},
-    onSubmit: vi.fn(),
+    onSave: vi.fn(),
     onClose: vi.fn(),
     onTypeChange: vi.fn(),
     onSelectedTagIdsChange: vi.fn(),
@@ -326,8 +377,7 @@ describe("ComposerDrawer quick add draft", () => {
         selectedTagIds={[]}
         mainTagId={null}
         timeFormat="24-hour"
-        fieldErrors={{}}
-        onSubmit={vi.fn()}
+        onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
         onSelectedTagIdsChange={vi.fn()}

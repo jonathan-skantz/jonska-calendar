@@ -17,6 +17,8 @@ type TransitCardDrawerProps = {
   // The household's card count; undefined when the user has no household.
   cardCount?: number;
   error: string;
+  // Whether a save is in flight.
+  pending?: boolean;
   onClose: () => void;
   onSave: (submission: TransitCardSubmission) => void;
 };
@@ -51,6 +53,7 @@ export const TransitCardDrawer = ({
   views,
   cardCount,
   error,
+  pending = false,
   onClose,
   onSave,
 }: TransitCardDrawerProps) => {
@@ -154,7 +157,11 @@ export const TransitCardDrawer = ({
           Saving records every remaining day shown here. Days without an answer
           are reported as not needed.
         </p>
-        <button className="primary-button" type="submit" disabled={!submission}>
+        <button
+          className="primary-button"
+          type="submit"
+          disabled={!submission || pending}
+        >
           {nothingNeeded ? "Save – no days needed" : "Save"}
         </button>
       </form>

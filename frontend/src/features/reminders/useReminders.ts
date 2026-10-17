@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, sendForError } from "../../lib/api";
+import { api } from "../../lib/api";
+import { useActionMutation } from "../../hooks/useActionMutation";
 import { invalidateReminders } from "../../lib/queryInvalidation";
 import { queryKeys } from "../../lib/queryKeys";
 import type { Reminder } from "../../types";
@@ -26,13 +27,11 @@ export const requestNotificationPermission = () => {
 // add and remove resolve to an error message, or null when they succeeded.
 export const useReminderMutations = () => {
   const queryClient = useQueryClient();
+  const run = useActionMutation("Unable to update reminders", () =>
+    invalidateReminders(queryClient),
+  );
   const send = (path: string, method: string, body?: unknown) =>
-    sendForError(path, {
-      method,
-      body,
-      fallbackMessage: "Unable to update reminders",
-      onSuccess: () => invalidateReminders(queryClient),
-    });
+    run({ path, method, body });
 
   return {
     add: (eventId: string, offsetSeconds: number) => {

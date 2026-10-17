@@ -1,27 +1,18 @@
-import type { FormEvent } from "react";
+import { useState } from "react";
 import type { AuthMode } from "../../types";
+import type { Credentials } from "./useAuth";
 
 type AuthScreenProps = {
-  mode: AuthMode;
-  email: string;
-  password: string;
   error: string;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onEmailChange: (value: string) => void;
-  onPasswordChange: (value: string) => void;
-  onToggleMode: () => void;
+  pending: boolean;
+  onSubmit: (credentials: Credentials) => void;
 };
 
-export function AuthScreen({
-  mode,
-  email,
-  password,
-  error,
-  onSubmit,
-  onEmailChange,
-  onPasswordChange,
-  onToggleMode,
-}: AuthScreenProps) {
+export function AuthScreen({ error, pending, onSubmit }: AuthScreenProps) {
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   return (
     <main className="auth-screen">
       <div className="auth-mark">JS / CAL</div>
@@ -35,13 +26,18 @@ export function AuthScreen({
         <p className="auth-copy">
           Your days, shared with the people who belong in them.
         </p>
-        <form onSubmit={onSubmit}>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit({ mode, email, password });
+          }}
+        >
           <label>
             Email
             <input
               type="email"
               value={email}
-              onChange={(event) => onEmailChange(event.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               required
             />
           </label>
@@ -50,17 +46,20 @@ export function AuthScreen({
             <input
               type="password"
               value={password}
-              onChange={(event) => onPasswordChange(event.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               required
             />
           </label>
           {error && <p className="error">{error}</p>}
-          <button className="primary-button" type="submit">
+          <button className="primary-button" type="submit" disabled={pending}>
             {mode === "login" ? "Enter calendar" : "Create account"}{" "}
             <span>↗</span>
           </button>
         </form>
-        <button className="text-button" onClick={onToggleMode}>
+        <button
+          className="text-button"
+          onClick={() => setMode(mode === "login" ? "register" : "login")}
+        >
           {mode === "login"
             ? "New here? Create an account"
             : "Already have an account? Sign in"}

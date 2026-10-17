@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, sendForError } from "../../lib/api";
+import { api } from "../../lib/api";
+import { useActionMutation } from "../../hooks/useActionMutation";
 import { invalidateHousehold } from "../../lib/queryInvalidation";
 import { queryKeys } from "../../lib/queryKeys";
 import type { Household } from "../../types";
@@ -20,13 +21,11 @@ export type HouseholdDetails = {
 // Each action resolves to an error message, or null when it succeeded.
 export const useHouseholdMutations = () => {
   const queryClient = useQueryClient();
+  const run = useActionMutation("Unable to update household", () =>
+    invalidateHousehold(queryClient),
+  );
   const send = (path: string, method: string, body?: unknown) =>
-    sendForError(path, {
-      method,
-      body,
-      fallbackMessage: "Unable to update household",
-      onSuccess: () => invalidateHousehold(queryClient),
-    });
+    run({ path, method, body });
 
   return {
     create: (details: HouseholdDetails) =>

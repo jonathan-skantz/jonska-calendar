@@ -31,7 +31,11 @@ describe("useAuth", () => {
     await waitFor(() => expect(result.current.user).toEqual(user));
 
     await act(async () => {
-      await result.current.authenticate("register", user.email, "secret");
+      await result.current.authenticate.mutateAsync({
+        mode: "register",
+        email: user.email,
+        password: "secret",
+      });
     });
 
     const authRequests = mockedApi.mock.calls
@@ -60,10 +64,16 @@ describe("useAuth", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
-      await result.current.authenticate("login", user.email, "wrong");
+      await result.current.authenticate
+        .mutateAsync({ mode: "login", email: user.email, password: "wrong" })
+        .catch(() => {});
     });
 
-    expect(result.current.error).toBe("Invalid email or password");
+    await waitFor(() =>
+      expect(result.current.authenticate.error?.message).toBe(
+        "Invalid email or password",
+      ),
+    );
     queryClient.clear();
   });
 
@@ -84,7 +94,7 @@ describe("useAuth", () => {
     await waitFor(() => expect(result.current.user).toEqual(user));
 
     await act(async () => {
-      await result.current.logout();
+      await result.current.logout.mutateAsync();
     });
 
     expect(queryClient.getQueryData(["workspace"])).toBeUndefined();

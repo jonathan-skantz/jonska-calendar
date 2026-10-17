@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../lib/api";
 import { useTimelineMutations } from "./useTimelineMutations";
@@ -13,7 +13,9 @@ const tags = [
 ];
 
 describe("useTimelineMutations", () => {
-  beforeEach(() => mockedApi.mockReset());
+  beforeEach(() => {
+    mockedApi.mockReset();
+  });
   afterEach(cleanup);
 
   it("creates an event with its main tag and attaches selected additional tags", async () => {
@@ -24,9 +26,7 @@ describe("useTimelineMutations", () => {
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
-    const onError = vi.fn();
-    const onSaved = vi.fn();
-    const { result } = renderHook(() => useTimelineMutations(onError), {
+    const { result } = renderHook(() => useTimelineMutations(), {
       wrapper,
     });
     const form = new FormData();
@@ -36,14 +36,13 @@ describe("useTimelineMutations", () => {
     form.set("ends_at", "2026-10-15T11:00");
 
     await act(async () => {
-      await result.current.saveItem({
+      await result.current.saveItem.mutateAsync({
         type: "event",
         editingItem: null,
         form,
         mainTagId: "work",
         selectedTagIds: ["work", "home"],
         tags,
-        onSaved,
       });
     });
 
@@ -55,8 +54,7 @@ describe("useTimelineMutations", () => {
       method: "POST",
       body: JSON.stringify({ tag_id: "home" }),
     });
-    expect(onSaved).toHaveBeenCalledOnce();
-    expect(onError).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.saveItem.isSuccess).toBe(true));
     queryClient.clear();
   });
 
@@ -68,7 +66,7 @@ describe("useTimelineMutations", () => {
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
-    const { result } = renderHook(() => useTimelineMutations(vi.fn()), {
+    const { result } = renderHook(() => useTimelineMutations(), {
       wrapper,
     });
     const form = new FormData();
@@ -80,14 +78,13 @@ describe("useTimelineMutations", () => {
     form.append("reminder_offset", "86400");
 
     await act(async () => {
-      await result.current.saveItem({
+      await result.current.saveItem.mutateAsync({
         type: "event",
         editingItem: null,
         form,
         mainTagId: "work",
         selectedTagIds: ["work"],
         tags,
-        onSaved: vi.fn(),
       });
     });
 

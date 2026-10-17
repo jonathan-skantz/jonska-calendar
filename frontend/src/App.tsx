@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
 import {
   DEFAULT_SCROLL_HOUR,
   PHONE_DAY_COUNT,
@@ -10,10 +9,8 @@ import {
   formatTime,
 } from "./lib/calendar";
 import { PHONE_MEDIA_QUERY } from "./lib/layout";
-import { getComposerFieldErrors } from "./features/composer/formValidation";
 import { isBusy } from "./lib/timeline";
-import type { ComposerFieldErrors } from "./features/composer/formValidation";
-import type { AuthMode, Tag, TimelineEntry } from "./types";
+import type { Tag, TimelineEntry } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useSidebarState } from "./hooks/useSidebarState";
@@ -52,7 +49,7 @@ import { ComposerDrawer } from "./features/composer/ComposerDrawer";
 import { QuickAddBar } from "./features/quickAdd/QuickAddBar";
 import { parseEvent } from "./features/quickAdd/parseEvent";
 import { resolveDraft } from "./features/quickAdd/resolveDraft";
-import { getRequestErrorMessage } from "./lib/requestErrors";
+import { getErrorText, getRequestErrorMessage } from "./lib/requestErrors";
 import { CalendarEntry } from "./features/calendar/CalendarEntry";
 import { AllDayEvent } from "./features/calendar/AllDayEvent";
 import { Sidebar } from "./components/Sidebar";
@@ -105,7 +102,6 @@ function App() {
   const {
     user,
     isLoading: authLoading,
-    error,
     authenticate,
     logout,
     updateDisplayName,
@@ -114,9 +110,6 @@ function App() {
   const entries = workspaceQuery.data?.entries ?? [];
   const tags = workspaceQuery.data?.tags ?? [];
   const loading = authLoading || workspaceQuery.isLoading;
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showTagEditor, setShowTagEditor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTransitCard, setShowTransitCard] = useState(false);
@@ -132,18 +125,15 @@ function App() {
   const sidebar = useSidebarState(isPhone);
   const { rangeStart, selectedDate, setSelectedDate, moveRange } =
     useCalendarState(today, weekStartsOn, dayCount);
-  const [actionError, setActionError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
-  const tagMutations = useTagMutations(setActionError, removeHiddenTag);
-  const { toggleTask, deleteItem, saveItem } =
-    useTimelineMutations(setActionError);
+  const tagMutations = useTagMutations(removeHiddenTag);
+  const timeline = useTimelineMutations();
   const dates = getCalendarDates(rangeStart, dayCount);
   const transitCardQuery = useTransitCardDays(
     dateKey(dates[0]),
     dateKey(dates[dates.length - 1]),
     Boolean(user),
   );
-  const saveTransitCardDays = useSaveTransitCardDays(setActionError);
+  const saveTransitCardDays = useSaveTransitCardDays();
   const weatherByDay = useWeather(Boolean(user));
   const householdQuery = useHousehold(Boolean(user));
   const household = householdQuery.data ?? null;
@@ -178,8 +168,8 @@ function App() {
     selectedDate,
     onSelectedDateChange: setSelectedDate,
     onResetErrors: () => {
-      setActionError("");
-      setFieldErrors({});
+      timeline.saveItem.reset();
+      timeline.deleteItem.reset();
       setReminderError(null);
     },
   });
@@ -242,62 +232,45 @@ function App() {
     openEntry(entry);
   };
 
-  const submitAuth = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    void authenticate(authMode, email, password);
-  };
-
-  const handleDeleteItem = async (entry: TimelineEntry) => {
-    await deleteItem(
-      entry,
-      () => window.confirm(`Delete “${entry.title}”?`),
-      () => {
+  const handleDeleteItem = (entry: TimelineEntry) => {
+    if (!window.confirm(`Delete “${entry.title}”?`)) return;
+    timeline.deleteItem.mutate(entry, {
+      onSuccess: () => {
         closeComposer();
         setDraftEventStart(null);
       },
-    );
-  };
-
-  const deleteTag = async (tag: Tag) => {
-    await tagMutations.deleteTag(tag, () =>
-      window.confirm(`Delete tag “${tag.name}”?`),
-    );
-  };
-
-  const createTag = async () => {
-    const name = window.prompt("Tag name")?.trim();
-    if (!name) return;
-    await tagMutations.createTag(name);
-  };
-
-  const createItem = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const errors = getComposerFieldErrors(
-      event.currentTarget,
-      composerType,
-      composerTagIds,
-      composerMainTagId,
-    );
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      setActionError("Please correct the highlighted fields.");
-      return;
-    }
-    setFieldErrors({});
-    setActionError("");
-    const form = new FormData(event.currentTarget);
-    await saveItem({
-      type: composerType,
-      editingItem,
-      form,
-      mainTagId: composerMainTagId,
-      selectedTagIds: composerTagIds,
-      tags,
-      onSaved: () => {
-        closeComposer();
-        setActionError("");
-      },
     });
+  };
+
+  const deleteTag = (tag: Tag) => {
+    if (window.confirm(`Delete tag “${tag.name}”?`)) {
+      tagMutations.deleteTag.mutate(tag);
+    }
+  };
+
+  const createTag = () => {
+    const name = window.prompt("Tag name")?.trim();
+    if (name) tagMutations.createTag.mutate(name);
+  };
+
+  const saveComposerItem = (form: FormData) =>
+    timeline.saveItem.mutate(
+      {
+        type: composerType,
+        editingItem,
+        form,
+        mainTagId: composerMainTagId,
+        selectedTagIds: composerTagIds,
+        tags,
+      },
+      { onSuccess: closeComposer },
+    );
+
+  const openTagEditor = () => {
+    tagMutations.updateTag.reset();
+    tagMutations.updateDefaultTag.reset();
+    tagMutations.deleteTag.reset();
+    setShowTagEditor(true);
   };
 
   if (loading)
@@ -305,20 +278,17 @@ function App() {
   if (!user) {
     return (
       <AuthScreen
-        mode={authMode}
-        email={email}
-        password={password}
-        error={error}
-        onSubmit={submitAuth}
-        onEmailChange={setEmail}
-        onPasswordChange={setPassword}
-        onToggleMode={() =>
-          setAuthMode(authMode === "login" ? "register" : "login")
-        }
+        error={getErrorText(authenticate.error, "Unable to sign in")}
+        pending={authenticate.isPending}
+        onSubmit={(credentials) => authenticate.mutate(credentials)}
       />
     );
   }
 
+  const pageError = getErrorText(
+    timeline.toggleTask.error ?? tagMutations.createTag.error,
+    "Unable to update",
+  );
   const openTasks = entries.filter(
     (entry) => entry.type === "task" && !entry.is_completed,
   ).length;
@@ -335,7 +305,7 @@ function App() {
     : [];
   const allDayEventSpans = getAllDayEventSpans(weekEntries, dates);
   const openTransitCard = () => {
-    setActionError("");
+    saveTransitCardDays.reset();
     setShowTransitCard(true);
   };
   const openNewEventAt = (
@@ -371,7 +341,7 @@ function App() {
         overlapsGhost={overlapsGhost}
         reminders={remindersByEvent.get(entry.id)}
         onEdit={openEntry}
-        onToggleTask={toggleTask}
+        onToggleTask={(entry) => timeline.toggleTask.mutate(entry)}
       />
     );
   };
@@ -486,7 +456,7 @@ function App() {
         }
         onOpenReminders={() => setShowReminders(true)}
         onOpenSettings={openSettings}
-        onLogout={logout}
+        onLogout={() => logout.mutate()}
       />
       {showSettings ? (
         <SettingsPage
@@ -522,7 +492,7 @@ function App() {
                 <button className="text-button" onClick={openSettings}>
                   Settings
                 </button>
-                <button className="text-button" onClick={logout}>
+                <button className="text-button" onClick={() => logout.mutate()}>
                   Sign out
                 </button>
               </div>
@@ -532,10 +502,7 @@ function App() {
             hiddenTagIds={hiddenTagIds}
             onToggleTagVisibility={toggleTagVisibility}
             onAddTag={createTag}
-            onEditTags={() => {
-              setActionError("");
-              setShowTagEditor(true);
-            }}
+            onEditTags={openTagEditor}
           />
           <div className="timeline-column">
             <WeekHeader
@@ -546,12 +513,7 @@ function App() {
               onAddItem={() => openNewComposer()}
               quickAdd={<QuickAddBar onSubmit={quickAddEvent} />}
             >
-              {actionError &&
-                !showComposer &&
-                !showTagEditor &&
-                !showTransitCard && (
-                  <p className="error action-error">{actionError}</p>
-                )}
+              {pageError && <p className="error action-error">{pageError}</p>}
             </WeekHeader>
             <WeekCalendar
               dates={dates}
@@ -611,9 +573,12 @@ function App() {
           selectedTagIds={composerTagIds}
           mainTagId={composerMainTagId}
           timeFormat={preferences.timeFormat}
-          fieldErrors={fieldErrors}
-          error={actionError}
-          onSubmit={createItem}
+          error={getErrorText(
+            timeline.saveItem.error ?? timeline.deleteItem.error,
+            "Unable to save item",
+          )}
+          pending={timeline.saveItem.isPending}
+          onSave={saveComposerItem}
           onClose={closeComposer}
           onTypeChange={setComposerType}
           onSelectedTagIdsChange={setComposerTagIds}
@@ -694,21 +659,35 @@ function App() {
         <TransitCardDrawer
           views={transitCardViews}
           cardCount={household?.transit_card_count}
-          error={actionError}
+          error={getErrorText(
+            saveTransitCardDays.error,
+            "Unable to save transit card days",
+          )}
+          pending={saveTransitCardDays.isPending}
           onClose={() => setShowTransitCard(false)}
-          onSave={async (submission) => {
-            if (await saveTransitCardDays(submission))
-              setShowTransitCard(false);
-          }}
+          onSave={(submission) =>
+            saveTransitCardDays.mutate(submission, {
+              onSuccess: () => setShowTransitCard(false),
+            })
+          }
         />
       )}
       {showTagEditor && (
         <TagEditorDrawer
           tags={tags}
-          error={actionError}
+          error={getErrorText(
+            tagMutations.updateTag.error ??
+              tagMutations.updateDefaultTag.error ??
+              tagMutations.deleteTag.error,
+            "Unable to update tags",
+          )}
           onClose={() => setShowTagEditor(false)}
-          onUpdate={tagMutations.updateTag}
-          onUpdateDefault={(tag) => tagMutations.updateDefaultTag(tag.id)}
+          onUpdate={(tag, name, color) => {
+            if (name) tagMutations.updateTag.mutate({ tag, name, color });
+          }}
+          onUpdateDefault={(tag) =>
+            tagMutations.updateDefaultTag.mutate(tag.id)
+          }
           onDelete={deleteTag}
         />
       )}

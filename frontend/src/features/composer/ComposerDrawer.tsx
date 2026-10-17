@@ -9,6 +9,7 @@ import {
   inputDateTime,
   type TimeFormatPreference,
 } from "../../lib/calendar";
+import { getComposerFieldErrors } from "./formValidation";
 import type { ComposerField, ComposerFieldErrors } from "./formValidation";
 import type { Tag, TimelineEntry } from "../../types";
 import { Drawer } from "../../components/Drawer";
@@ -20,6 +21,7 @@ import { requestNotificationPermission } from "../reminders/useReminders";
 import { cx } from "../../lib/classNames";
 
 const ERROR_ID = "composer-error";
+const FIELD_ERROR_MESSAGE = "Please correct the highlighted fields.";
 
 type ComposerDrawerProps = {
   type: "event" | "task";
@@ -30,9 +32,12 @@ type ComposerDrawerProps = {
   selectedTagIds: string[];
   mainTagId: string | null;
   timeFormat: TimeFormatPreference;
-  fieldErrors: ComposerFieldErrors;
+  // The last save or delete failure.
   error?: string;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  // Whether a save is in flight.
+  pending?: boolean;
+  // Called with the form values once they pass validation.
+  onSave: (form: FormData) => void;
   onClose: () => void;
   onTypeChange: (type: "event" | "task") => void;
   onSelectedTagIdsChange: (update: (current: string[]) => string[]) => void;
@@ -62,9 +67,9 @@ export const ComposerDrawer = ({
   selectedTagIds,
   mainTagId,
   timeFormat,
-  fieldErrors,
-  error,
-  onSubmit,
+  error: requestError,
+  pending = false,
+  onSave,
   onClose,
   onTypeChange,
   onSelectedTagIdsChange,
@@ -80,6 +85,22 @@ export const ComposerDrawer = ({
   draftWarnings = [],
 }: ComposerDrawerProps) => {
   const initial = editingItem ?? draftValues;
+  const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
+  const error =
+    Object.keys(fieldErrors).length > 0 ? FIELD_ERROR_MESSAGE : requestError;
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const errors = getComposerFieldErrors(
+      event.currentTarget,
+      type,
+      selectedTagIds,
+      mainTagId,
+    );
+    setFieldErrors(errors);
+    if (Object.keys(errors).length === 0) {
+      onSave(new FormData(event.currentTarget));
+    }
+  };
   // A field with an error highlights its label, and its control is marked
   // invalid and points at the form error message.
   const isInvalid = (field: ComposerField) => Boolean(fieldErrors[field]);
@@ -166,7 +187,7 @@ export const ComposerDrawer = ({
           ))}
         </ul>
       )}
-      <form className="composer-form" noValidate onSubmit={onSubmit}>
+      <form className="composer-form" noValidate onSubmit={submit}>
         <label className={labelClass("title")}>
           Title
           <input
@@ -450,7 +471,7 @@ export const ComposerDrawer = ({
               : "Share…"}
           </button>
         )}
-        <button className="primary-button" type="submit">
+        <button className="primary-button" type="submit" disabled={pending}>
           {editingItem ? "Save changes" : "Save item"} <span>↗</span>
         </button>
       </form>

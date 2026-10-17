@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, sendForError } from "../../lib/api";
+import { api } from "../../lib/api";
+import { useActionMutation } from "../../hooks/useActionMutation";
 import { invalidateWorkspace } from "../../lib/queryInvalidation";
 import { queryKeys } from "../../lib/queryKeys";
 import type { EventShare } from "../../types";
@@ -22,21 +23,17 @@ export const useEventShares = (eventId: string | null) =>
 // Each action resolves to an error message, or null when it succeeded.
 export const useEventShareMutations = (eventId: string | null) => {
   const queryClient = useQueryClient();
-  const send = async (path: string, method: string, body?: unknown) => {
-    if (!eventId) return "No event selected";
-    return sendForError(`/api/events/${eventId}/shares${path}`, {
-      method,
-      body,
-      fallbackMessage: "Unable to update sharing",
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.eventShares(eventId),
-        });
-        // share_count on the owner's timeline entry changes too.
-        await invalidateWorkspace(queryClient);
-      },
+  const run = useActionMutation("Unable to update sharing", async () => {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.eventShares(eventId ?? ""),
     });
-  };
+    // share_count on the owner's timeline entry changes too.
+    await invalidateWorkspace(queryClient);
+  });
+  const send = async (path: string, method: string, body?: unknown) =>
+    eventId
+      ? run({ path: `/api/events/${eventId}/shares${path}`, method, body })
+      : "No event selected";
 
   return {
     add: (email: string) => send("", "POST", { recipient_email: email }),
