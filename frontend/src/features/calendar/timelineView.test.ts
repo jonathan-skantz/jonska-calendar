@@ -212,6 +212,7 @@ describe("gathering", () => {
       label: undefined,
       startMinutes: 1050,
       durationMinutes: 30,
+      continuesFromPreviousDay: false,
       endsAtEventStart: true,
     });
     expect(getCommuteSegments(gathering, day)[0]).toMatchObject({
@@ -242,6 +243,7 @@ describe("gathering", () => {
       label: undefined,
       startMinutes: 1425,
       durationMinutes: 15,
+      continuesFromPreviousDay: false,
       endsAtEventStart: false,
     });
     expect(eventBodyOverlapsDate(early, day)).toBe(true);
@@ -251,6 +253,7 @@ describe("gathering", () => {
       label: undefined,
       startMinutes: 0,
       durationMinutes: 15,
+      continuesFromPreviousDay: true,
       endsAtEventStart: true,
     });
   });

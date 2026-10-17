@@ -366,23 +366,30 @@ function App() {
           ),
         };
       });
-    const entriesWithLayout = [...layoutLayer(ghosts), ...layoutLayer(busy)];
-    const elapsedEntries = entriesWithLayout.filter(
-      (item) => item.layout.fullyElapsed,
-    );
-    const firstElapsedIndex = entriesWithLayout.findIndex(
-      (item) => item.layout.fullyElapsed,
-    );
-
-    return entriesWithLayout.map((item, index) => {
-      if (!item.layout.fullyElapsed) return item.rendered;
-      if (index !== firstElapsedIndex) return null;
-      return (
-        <div className="elapsed-event-group" key="elapsed-event-group">
-          {elapsedEntries.map((elapsedEntry) => elapsedEntry.rendered)}
-        </div>
-      );
-    });
+    // Elapsed entries are dimmed together in one wrapper per layer, so a
+    // dimmed busy block still paints over every ghost.
+    const groupElapsed = (
+      layer: ReturnType<typeof layoutLayer>,
+      key: string,
+    ) => {
+      const elapsed = layer.filter((item) => item.layout.fullyElapsed);
+      return [
+        ...(elapsed.length
+          ? [
+              <div className="elapsed-event-group" key={key}>
+                {elapsed.map((item) => item.rendered)}
+              </div>,
+            ]
+          : []),
+        ...layer
+          .filter((item) => !item.layout.fullyElapsed)
+          .map((item) => item.rendered),
+      ];
+    };
+    return [
+      ...groupElapsed(layoutLayer(ghosts), "elapsed-ghosts"),
+      ...groupElapsed(layoutLayer(busy), "elapsed-busy"),
+    ];
   };
   const renderAllDayEntries = () =>
     allDayEventSpans.map((span) => (

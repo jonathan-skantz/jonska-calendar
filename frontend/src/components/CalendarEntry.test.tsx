@@ -72,6 +72,7 @@ describe("CalendarEntry", () => {
           label: item.gathering_label,
           startMinutes: 1050,
           durationMinutes: 30,
+          continuesFromPreviousDay: false,
           endsAtEventStart: true,
         }}
         showBody
@@ -209,5 +210,70 @@ describe("CalendarEntry", () => {
     expect(
       screen.getByRole("img", { name: "Reminders: 15 min before" }),
     ).toBeTruthy();
+  });
+
+  it("fades approximate edges only where the event really starts or ends", () => {
+    // Continuation markers size themselves with a ResizeObserver.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const nightShift: TimelineEntry = {
+      ...lecture,
+      kind: "attendable",
+      start_is_approximate: true,
+      end_is_approximate: true,
+      starts_at: "2026-10-15T22:00:00",
+      ends_at: "2026-10-16T02:00:00",
+    };
+    const renderSegment = (fromPrevious: boolean, toNext: boolean) =>
+      render(
+        <CalendarEntry
+          entry={nightShift}
+          startMinutes={fromPrevious ? 0 : 1320}
+          durationMinutes={120}
+          trimTop={false}
+          trimBottom={false}
+          overlapDepth={0}
+          continuesFromPreviousDay={fromPrevious}
+          continuesToNextDay={toNext}
+          commuteSegments={[]}
+          showBody
+          timeFormat="24-hour"
+          onEdit={vi.fn()}
+          onToggleTask={vi.fn()}
+        />,
+      ).container.querySelector("article")!.className;
+
+    const firstDay = renderSegment(false, true);
+    expect(firstDay).toContain("approximate-start");
+    expect(firstDay).not.toContain("approximate-end");
+    cleanup();
+    const secondDay = renderSegment(true, false);
+    expect(secondDay).not.toContain("approximate-start");
+    expect(secondDay).toContain("approximate-end");
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps a short event's title with mandatory gathering", () => {
+    const { container } = renderGathering(
+      {
+        ...gatheringEntry,
+        title: "Quick sync",
+        starts_at: "2026-10-15T18:00:00",
+        ends_at: "2026-10-15T18:15:00",
+        start_is_approximate: false,
+      },
+      false,
+      1050,
+    );
+    const article = container.querySelector("article")!;
+    // Content is no longer pushed below the start line.
+    expect(article.style.paddingTop).toBe("");
+    expect(article.firstElementChild?.className).toBe("gathering-label");
+    expect(article.querySelector(".gathering-start")?.tagName).toBe("I");
   });
 });

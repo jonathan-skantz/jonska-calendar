@@ -49,6 +49,8 @@ export type GatheringSegment = {
   label?: string;
   startMinutes: number;
   durationMinutes: number;
+  // True when gathering began on an earlier day than this segment.
+  continuesFromPreviousDay: boolean;
   // False when the event itself starts on a later day than this segment.
   endsAtEventStart: boolean;
 };
@@ -346,6 +348,7 @@ export const getGatheringSegment = (
         label: gathering.label,
         startMinutes: segment.startMinutes,
         durationMinutes: segment.durationMinutes,
+        continuesFromPreviousDay: segment.continuesFromPreviousDay,
         endsAtEventStart: !segment.continuesToNextDay,
       }
     : null;

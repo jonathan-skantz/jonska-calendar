@@ -152,7 +152,11 @@ export const CalendarEntry = ({
   // itself still starts exactly. The fade goes on the top-most piece.
   const gathering = getGathering(entry);
   const startTimeIsApproximate = startIsApproximate && gathering.seconds === 0;
-  const articleFadesStart = startIsApproximate && !optionalGathering;
+  // Fades mark the real start and end, never a midnight where the event
+  // continues on another day.
+  const articleFadesStart =
+    startIsApproximate && !optionalGathering && !continuesFromPreviousDay;
+  const articleFadesEnd = endIsApproximate && !continuesToNextDay;
   const gatheringTime = formatEventTime(
     getGatheringStart(entry),
     startIsApproximate,
@@ -169,8 +173,9 @@ export const CalendarEntry = ({
     gatheringSegment.durationMinutes >= COMMUTE_LABEL_MIN_MINUTES,
   );
   // Mandatory gathering is the top part of the event block, in full event
-  // color: you must be there. Its height is measured from the block top,
-  // which the separator and continuation insets push down.
+  // color: you must be there. A line marks the real start; its offset is
+  // measured from the block top, which the separator and continuation insets
+  // push down.
   const gatheringHeight = mandatoryGathering
     ? `calc(${gridOffset(mandatoryGathering.startMinutes + mandatoryGathering.durationMinutes - startMinutes)} - ${topInset}px)`
     : undefined;
@@ -195,7 +200,7 @@ export const CalendarEntry = ({
           },
         ]
       : []),
-    ...(endIsApproximate
+    ...(articleFadesEnd
       ? [
           {
             image: "linear-gradient(to top, var(--paper), transparent)",
@@ -286,7 +291,7 @@ export const CalendarEntry = ({
   // other entries instead of part of the event block.
   const renderOptionalGathering = (segment: GatheringSegment) => (
     <div
-      className={`gathering-band optional ${startIsApproximate ? "approximate-start" : ""}`}
+      className={`gathering-band optional ${startIsApproximate && !segment.continuesFromPreviousDay ? "approximate-start" : ""}`}
       role="img"
       aria-label={gatheringDescription}
       title={gatheringDescription}
@@ -322,7 +327,7 @@ export const CalendarEntry = ({
       {showBody && (
         <article
           ref={entryRef}
-          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${optionalGathering ? "has-optional-gathering" : ""} ${commuteAfter ? "has-commute-after" : ""} ${articleFadesStart ? "approximate-start" : ""} ${isGhost ? `not-busy ${entry.is_skipped ? "skipped" : "heads-up"}` : ""} ${endIsApproximate ? "approximate-end" : ""}`}
+          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${optionalGathering ? "has-optional-gathering" : ""} ${commuteAfter ? "has-commute-after" : ""} ${articleFadesStart ? "approximate-start" : ""} ${isGhost ? `not-busy ${entry.is_skipped ? "skipped" : "heads-up"}` : ""} ${articleFadesEnd ? "approximate-end" : ""}`}
           style={
             {
               top: gridOffset(startMinutes),
@@ -331,9 +336,6 @@ export const CalendarEntry = ({
               right: overlapInset,
               zIndex: hasEarlierOverlap && !isGhost ? 2 : undefined,
               transform: topInset ? `translateY(${topInset}px)` : undefined,
-              paddingTop: gatheringHeight
-                ? `calc(${gatheringHeight} + 4px)`
-                : undefined,
               ...(entry.type === "event" && mainTag
                 ? {
                     ...(isGhost
@@ -378,7 +380,7 @@ export const CalendarEntry = ({
             </span>
           )}
           {mandatoryGathering?.endsAtEventStart && (
-            <span
+            <i
               className="gathering-start"
               style={{ top: gatheringHeight }}
               role={showGatheringChip ? undefined : "img"}
