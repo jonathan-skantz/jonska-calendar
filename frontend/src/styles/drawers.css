@@ -287,3 +287,106 @@
   color: var(--transit-conflict);
   font-weight: 600;
 }
+
+/* Stacked above the composer and its fixed delete button. */
+.share-drawer-backdrop {
+  z-index: 30;
+  background: rgba(39, 52, 47, 0.08);
+}
+
+.share-add {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  margin: 18px 0 8px;
+}
+
+.share-recipients {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.share-recipient {
+  border: 1px solid var(--line);
+  background: #fffefa;
+}
+
+.share-recipient-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 10px;
+}
+
+.share-recipient-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  color: var(--moss-dark);
+  text-align: left;
+  cursor: pointer;
+}
+
+.share-recipient-toggle small {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-badge {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.share-badge.custom {
+  color: var(--moss-dark);
+  font-weight: 600;
+}
+
+.share-recipient-fields {
+  gap: 12px;
+  padding: 4px 12px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.share-recipient-fields .primary-button {
+  justify-self: start;
+}
+
+.share-open-button {
+  justify-self: start;
+  cursor: pointer;
+}
+
+.shared-event-view dl {
+  display: grid;
+  gap: 4px;
+  margin: 24px 0;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.shared-event-view dt {
+  margin-top: 12px;
+  color: var(--moss-dark);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.shared-event-view dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.shared-event-description {
+  white-space: pre-wrap;
+}

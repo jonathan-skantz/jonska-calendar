@@ -6,16 +6,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Household queries never take a household ID from the client. The household
 // is always derived from the caller's own membership row.
-
-func isUniqueViolation(err error) bool {
-	pgErr, ok := errors.AsType[*pgconn.PgError](err)
-	return ok && pgErr.Code == "23505"
-}
 
 // GetHousehold returns the caller's household, or nil when they have none.
 func (s *Store) GetHousehold(ctx context.Context, userID uuid.UUID) (*Household, error) {
@@ -34,7 +28,7 @@ func (s *Store) GetHousehold(ctx context.Context, userID uuid.UUID) (*Household,
 	}
 
 	rows, err := s.db.Query(ctx, `
-		SELECT u.id, COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1))
+		SELECT u.id, user_display_name(u.display_name, u.email)
 		FROM household_members AS m
 		JOIN users AS u ON u.id = m.user_id
 		WHERE m.household_id = $1

@@ -43,7 +43,6 @@ export function AllDayEvent({
           backgroundColor,
           ...(tag ? { color: tagTextColor(tag.color) } : {}),
         }}
-        disabled={entry.is_shared}
         onClick={(event) => {
           event.stopPropagation();
           onEdit(entry);

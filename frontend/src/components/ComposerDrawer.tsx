@@ -29,6 +29,9 @@ type ComposerDrawerProps = {
   onTypeChange: (type: "event" | "task") => void;
   onSelectedTagIdsChange: (update: (current: string[]) => string[]) => void;
   onMainTagIdChange: (tagId: string) => void;
+  // Set only when editing a saved event the user owns.
+  onShare?: () => void;
+  shareCount?: number;
 };
 
 export const ComposerDrawer = ({
@@ -47,6 +50,8 @@ export const ComposerDrawer = ({
   onTypeChange,
   onSelectedTagIdsChange,
   onMainTagIdChange,
+  onShare,
+  shareCount = 0,
 }: ComposerDrawerProps) => {
   const [isAllDay, setIsAllDay] = useState(Boolean(editingItem?.is_all_day));
   const [kind, setKind] = useState(editingItem?.kind ?? "informational");
@@ -303,6 +308,17 @@ export const ComposerDrawer = ({
                 required
               />
             </label>
+          )}
+          {onShare && (
+            <button
+              className="text-button share-open-button"
+              type="button"
+              onClick={onShare}
+            >
+              {shareCount > 0
+                ? `Shared with ${shareCount} – manage sharing…`
+                : "Share…"}
+            </button>
           )}
           <button className="primary-button" type="submit">
             {editingItem ? "Save changes" : "Save item"} <span>↗</span>

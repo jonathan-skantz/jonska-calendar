@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -506,27 +507,29 @@ func TestPersonalTags(t *testing.T) {
 	t.Fatalf("timeline did not contain event %s after deleting its main tag", eventWithDeletedMainTagID)
 }
 
-func TestShareEventAndUpdateLocalAppearance(t *testing.T) {
+func TestShareEventWithPerRecipientFields(t *testing.T) {
 	store, ownerID := setupTestStore(t)
-	recipientID, err := store.Register(context.Background(), "recipient@example.com", "hash")
+	ctx := context.Background()
+	xID, err := store.Register(ctx, "x@example.com", "hash")
 	if err != nil {
 		t.Fatal(err)
 	}
+	yID, err := store.Register(ctx, "y@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentUser := ownerID
+	handler := New(store, func(*http.Request) (uuid.UUID, error) { return currentUser, nil })
 
-	ownerHandler := New(store, func(*http.Request) (uuid.UUID, error) { return ownerID, nil })
-	eventRequest := httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(`{
-		"title":"Original title",
-		"description":"Original details",
-		"url":"https://example.com/original",
+	eventResponse := httptest.NewRecorder()
+	handler.CreateEvent(eventResponse, httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(`{
+		"title":"Secret owner title",
+		"description":"Owner details",
 		"starts_at":"2026-10-09T18:00:00Z",
 		"ends_at":"2026-10-09T19:00:00Z",
 		"kind":"attendable",
-		"location":"Original location",
-		"commute_before_seconds":1200,
-		"commute_after_seconds":900
-	}`))
-	eventResponse := httptest.NewRecorder()
-	ownerHandler.CreateEvent(eventResponse, eventRequest)
+		"location":"Owner location"
+	}`)))
 	if eventResponse.Code != http.StatusCreated {
 		t.Fatalf("event: expected status %d, got %d", http.StatusCreated, eventResponse.Code)
 	}
@@ -534,115 +537,129 @@ func TestShareEventAndUpdateLocalAppearance(t *testing.T) {
 	if err := json.NewDecoder(eventResponse.Body).Decode(&created); err != nil {
 		t.Fatal(err)
 	}
+	eventID := created.ID.String()
 
-	shareRequest := httptest.NewRequest(http.MethodPost, "/api/events/"+created.ID.String()+"/shares", bytes.NewBufferString(`{"recipient_email":"recipient@example.com"}`))
-	shareRequest.SetPathValue("eventID", created.ID.String())
-	shareResponse := httptest.NewRecorder()
-	ownerHandler.ShareEvent(shareResponse, shareRequest)
-	if shareResponse.Code != http.StatusCreated {
-		t.Fatalf("share: expected status %d, got %d: %s", http.StatusCreated, shareResponse.Code, shareResponse.Body.String())
+	request := func(method, path, body string, fn http.HandlerFunc, shareID string) *httptest.ResponseRecorder {
+		if path == "" {
+			path = "/api/events/" + eventID + "/shares/" + shareID
+		}
+		req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
+		req.SetPathValue("eventID", eventID)
+		req.SetPathValue("shareID", shareID)
+		response := httptest.NewRecorder()
+		fn(response, req)
+		return response
 	}
-	var share createResponse
-	if err := json.NewDecoder(shareResponse.Body).Decode(&share); err != nil {
+	share := func(body string) *httptest.ResponseRecorder {
+		return request(http.MethodPost, "/api/events/"+eventID+"/shares", body, handler.ShareEvent, "")
+	}
+	timeline := func(userID uuid.UUID) (string, []db.TimelineEntry) {
+		currentUser = userID
+		defer func() { currentUser = ownerID }()
+		response := httptest.NewRecorder()
+		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+		body := response.Body.String()
+		var entries []db.TimelineEntry
+		if err := json.Unmarshal([]byte(body), &entries); err != nil {
+			t.Fatal(err)
+		}
+		return body, entries
+	}
+
+	xShare := share(`{"recipient_email":"X@example.com","title":"Title for X","location":" Gate B ","url":"  "}`)
+	if xShare.Code != http.StatusCreated {
+		t.Fatalf("share with x: expected status %d, got %d: %s", http.StatusCreated, xShare.Code, xShare.Body.String())
+	}
+	var xShareID createResponse
+	if err := json.NewDecoder(xShare.Body).Decode(&xShareID); err != nil {
 		t.Fatal(err)
 	}
-
-	recipientHandler := New(store, func(*http.Request) (uuid.UUID, error) { return recipientID, nil })
-	getRequest := httptest.NewRequest(http.MethodGet, "/api/shared-events/"+share.ID.String(), nil)
-	getRequest.SetPathValue("shareID", share.ID.String())
-	getResponse := httptest.NewRecorder()
-	recipientHandler.GetSharedEvent(getResponse, getRequest)
-	if getResponse.Code != http.StatusOK {
-		t.Fatalf("get shared event: expected status %d, got %d", http.StatusOK, getResponse.Code)
+	if code := share(`{"recipient_email":"y@example.com"}`).Code; code != http.StatusCreated {
+		t.Fatalf("share with y: expected status %d, got %d", http.StatusCreated, code)
 	}
-	var shared sharedEventResponse
-	if err := json.NewDecoder(getResponse.Body).Decode(&shared); err != nil {
+	if code := share(`{"recipient_email":"y@example.com"}`).Code; code != http.StatusConflict {
+		t.Fatalf("expected sharing twice to conflict, got %d", code)
+	}
+	if code := share(`{"recipient_email":"test@example.com"}`).Code; code != http.StatusBadRequest {
+		t.Fatalf("expected sharing with yourself to fail, got %d", code)
+	}
+	if code := share(`{"recipient_email":"nobody@example.com"}`).Code; code != http.StatusNotFound {
+		t.Fatalf("expected unknown recipient to fail, got %d", code)
+	}
+
+	list := request(http.MethodGet, "/api/events/"+eventID+"/shares", "", handler.ListEventShares, "")
+	var shares []db.EventShare
+	if err := json.NewDecoder(list.Body).Decode(&shares); err != nil {
 		t.Fatal(err)
 	}
-	if shared.OriginalTitle != "Original title" || shared.LocalTitle != nil {
-		t.Fatalf("unexpected initial shared event: %+v", shared)
+	if len(shares) != 2 || shares[0].RecipientEmail != "x@example.com" || shares[0].RecipientDisplayName != "x" ||
+		shares[0].Title == nil || *shares[0].Title != "Title for X" ||
+		shares[0].Location == nil || *shares[0].Location != "Gate B" || shares[0].URL != nil ||
+		shares[1].Title != nil {
+		t.Fatalf("unexpected shares %+v", shares)
 	}
 
-	updateRequest := httptest.NewRequest(http.MethodPatch, "/api/shared-events/"+share.ID.String(), bytes.NewBufferString(`{
-		"title":"Local title",
-		"location":"Local location",
-		"custom_info":"Private note"
+	xBody, xEntries := timeline(xID)
+	if len(xEntries) != 1 || xEntries[0].Title != "Title for X" || *xEntries[0].Location != "Gate B" ||
+		*xEntries[0].Description != "Owner details" || !xEntries[0].IsShared ||
+		xEntries[0].SharedBy == nil || *xEntries[0].SharedBy != "test" {
+		t.Fatalf("unexpected x timeline %+v", xEntries)
+	}
+	if strings.Contains(xBody, "Secret owner title") || strings.Contains(xBody, "main_tag_id") ||
+		strings.Contains(xBody, `"tags"`) || strings.Contains(xBody, "Owner location") {
+		t.Fatalf("x timeline leaked owner data: %s", xBody)
+	}
+	if _, yEntries := timeline(yID); len(yEntries) != 1 || yEntries[0].Title != "Secret owner title" {
+		t.Fatalf("unexpected y timeline %+v", yEntries)
+	}
+	if _, ownerEntries := timeline(ownerID); len(ownerEntries) != 1 || ownerEntries[0].ShareCount != 2 {
+		t.Fatalf("expected owner to see two shares, got %+v", ownerEntries)
+	}
+
+	// Later edits to the event reach recipients unless the owner set their own value.
+	updateEvent := httptest.NewRequest(http.MethodPut, "/api/events/"+eventID, bytes.NewBufferString(`{
+		"title":"Renamed",
+		"starts_at":"2026-10-09T20:00:00Z",
+		"ends_at":"2026-10-09T21:00:00Z",
+		"kind":"attendable"
 	}`))
-	updateRequest.SetPathValue("shareID", share.ID.String())
+	updateEvent.SetPathValue("eventID", eventID)
 	updateResponse := httptest.NewRecorder()
-	recipientHandler.UpdateSharedEvent(updateResponse, updateRequest)
+	handler.UpdateEvent(updateResponse, updateEvent)
 	if updateResponse.Code != http.StatusNoContent {
-		t.Fatalf("update shared event: expected status %d, got %d", http.StatusNoContent, updateResponse.Code)
+		t.Fatalf("update event: expected status %d, got %d", http.StatusNoContent, updateResponse.Code)
+	}
+	if _, xEntries := timeline(xID); xEntries[0].Title != "Title for X" || xEntries[0].StartsAt.UTC().Hour() != 20 {
+		t.Fatalf("x should keep their title and get the new time, got %+v", xEntries[0])
+	}
+	if _, yEntries := timeline(yID); yEntries[0].Title != "Renamed" {
+		t.Fatalf("y should follow the event title, got %+v", yEntries[0])
 	}
 
-	getRequest = httptest.NewRequest(http.MethodGet, "/api/shared-events/"+share.ID.String(), nil)
-	getRequest.SetPathValue("shareID", share.ID.String())
-	getResponse = httptest.NewRecorder()
-	recipientHandler.GetSharedEvent(getResponse, getRequest)
-	if getResponse.Code != http.StatusOK {
-		t.Fatalf("get updated event: expected status %d, got %d", http.StatusOK, getResponse.Code)
+	if code := request(http.MethodPut, "", `{"title":"","location":"Gate C"}`, handler.UpdateEventShare, xShareID.ID.String()).Code; code != http.StatusNoContent {
+		t.Fatalf("update share: expected status %d, got %d", http.StatusNoContent, code)
 	}
-	if err := json.NewDecoder(getResponse.Body).Decode(&shared); err != nil {
-		t.Fatal(err)
-	}
-	if shared.OriginalTitle != "Original title" || shared.LocalTitle == nil || *shared.LocalTitle != "Local title" {
-		t.Fatalf("local title override was not preserved: %+v", shared)
-	}
-	if shared.OriginalLocation == nil || *shared.OriginalLocation != "Original location" || shared.LocalLocation == nil || *shared.LocalLocation != "Local location" {
-		t.Fatalf("local location override was not preserved: %+v", shared)
-	}
-	if shared.PrivateCustomInfo == nil || *shared.PrivateCustomInfo != "Private note" {
-		t.Fatalf("private custom info was not preserved: %+v", shared)
+	if _, xEntries := timeline(xID); xEntries[0].Title != "Renamed" || *xEntries[0].Location != "Gate C" {
+		t.Fatalf("x should follow the event title again, got %+v", xEntries[0])
 	}
 
-	partialUpdate := httptest.NewRequest(http.MethodPatch, "/api/shared-events/"+share.ID.String(), bytes.NewBufferString(`{
-		"location":"Updated local location"
-	}`))
-	partialUpdate.SetPathValue("shareID", share.ID.String())
-	partialResponse := httptest.NewRecorder()
-	recipientHandler.UpdateSharedEvent(partialResponse, partialUpdate)
-	if partialResponse.Code != http.StatusNoContent {
-		t.Fatalf("partial update: expected status %d, got %d", http.StatusNoContent, partialResponse.Code)
+	// Recipients cannot manage shares, even for an event shared with them.
+	currentUser = xID
+	if code := request(http.MethodGet, "", "", handler.ListEventShares, "").Code; code != http.StatusNotFound {
+		t.Fatalf("recipient listed shares: got %d", code)
 	}
+	if code := request(http.MethodPut, "", `{"title":"Mine"}`, handler.UpdateEventShare, xShareID.ID.String()).Code; code != http.StatusNotFound {
+		t.Fatalf("recipient updated share: got %d", code)
+	}
+	if code := request(http.MethodDelete, "", "", handler.DeleteEventShare, xShareID.ID.String()).Code; code != http.StatusNotFound {
+		t.Fatalf("recipient deleted share: got %d", code)
+	}
+	currentUser = ownerID
 
-	getRequest = httptest.NewRequest(http.MethodGet, "/api/shared-events/"+share.ID.String(), nil)
-	getRequest.SetPathValue("shareID", share.ID.String())
-	getResponse = httptest.NewRecorder()
-	recipientHandler.GetSharedEvent(getResponse, getRequest)
-	if err := json.NewDecoder(getResponse.Body).Decode(&shared); err != nil {
-		t.Fatal(err)
+	if code := request(http.MethodDelete, "", "", handler.DeleteEventShare, xShareID.ID.String()).Code; code != http.StatusNoContent {
+		t.Fatalf("delete share: expected status %d, got %d", http.StatusNoContent, code)
 	}
-	if shared.LocalTitle == nil || *shared.LocalTitle != "Local title" ||
-		shared.LocalLocation == nil || *shared.LocalLocation != "Updated local location" ||
-		shared.PrivateCustomInfo == nil || *shared.PrivateCustomInfo != "Private note" {
-		t.Fatalf("partial update erased existing overrides: %+v", shared)
-	}
-
-	timelineRequest := httptest.NewRequest(http.MethodGet, "/api/timeline", nil)
-	timelineResponse := httptest.NewRecorder()
-	recipientHandler.ListTimeline(timelineResponse, timelineRequest)
-	if timelineResponse.Code != http.StatusOK {
-		t.Fatalf("list timeline: expected status %d, got %d", http.StatusOK, timelineResponse.Code)
-	}
-	var timeline []db.TimelineEntry
-	if err := json.NewDecoder(timelineResponse.Body).Decode(&timeline); err != nil {
-		t.Fatal(err)
-	}
-	if len(timeline) != 1 || !timeline[0].IsShared || timeline[0].Title != "Local title" {
-		t.Fatalf("unexpected recipient timeline: %+v", timeline)
-	}
-	if timeline[0].SourceTitle == nil || *timeline[0].SourceTitle != "Original title" {
-		t.Fatalf("timeline did not preserve source title: %+v", timeline[0])
-	}
-	if timeline[0].CommuteBeforeSeconds != 0 || timeline[0].CommuteAfterSeconds != 0 {
-		t.Fatalf("recipient timeline exposed owner commute: %+v", timeline[0])
-	}
-
-	ownerGetRequest := httptest.NewRequest(http.MethodGet, "/api/shared-events/"+share.ID.String(), nil)
-	ownerGetRequest.SetPathValue("shareID", share.ID.String())
-	ownerGetResponse := httptest.NewRecorder()
-	ownerHandler.GetSharedEvent(ownerGetResponse, ownerGetRequest)
-	if ownerGetResponse.Code != http.StatusNotFound {
-		t.Fatalf("owner should not use recipient shared-event view: expected status %d, got %d", http.StatusNotFound, ownerGetResponse.Code)
+	if _, xEntries := timeline(xID); len(xEntries) != 0 {
+		t.Fatalf("expected x to lose the event, got %+v", xEntries)
 	}
 }

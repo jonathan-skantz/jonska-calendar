@@ -460,6 +460,11 @@
   pointer-events: none;
 }
 
+.grid-entry .share-marker {
+  font-style: normal;
+  opacity: 0.85;
+}
+
 .grid-entry strong {
   overflow: hidden;
   text-overflow: ellipsis;

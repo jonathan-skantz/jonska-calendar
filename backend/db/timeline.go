@@ -70,7 +70,8 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 	eventRows, err := s.db.Query(ctx, `
 		SELECT item.id, item.title, item.description, item.url,
 			event.starts_at, event.ends_at, event.is_all_day, event.kind, event.location,
-			event.commute_before_seconds, event.commute_after_seconds, event.main_tag_id
+			event.commute_before_seconds, event.commute_after_seconds, event.main_tag_id,
+			(SELECT count(*) FROM event_shares AS share WHERE share.event_id = item.id)
 		FROM timeline_items AS item
 		JOIN events AS event ON event.timeline_item_id = item.id
 		WHERE item.user_id = $1
@@ -85,7 +86,7 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
 			&entry.CommuteBeforeSeconds, &entry.CommuteAfterSeconds,
-			&entry.MainTagID,
+			&entry.MainTagID, &entry.ShareCount,
 		); err != nil {
 			eventRows.Close()
 			return nil, err
@@ -130,19 +131,21 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 
 func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
 	rows, err := s.db.Query(ctx, `
+		-- Recipients only ever see the effective values: the owner's
+		-- per-recipient field when set, otherwise the event's own value. The
+		-- owner's original fields, tags, and commute are never projected.
 		SELECT
 			share.event_id,
-			COALESCE(override.title, item.title),
-			COALESCE(override.description, item.description),
-			COALESCE(override.url, item.url),
+			COALESCE(share.title, item.title),
+			COALESCE(share.description, item.description),
+			COALESCE(share.url, item.url),
 			event.starts_at, event.ends_at, event.is_all_day, event.kind,
-			COALESCE(override.location, event.location),
-			-- Commute is the owner's personal travel, not part of the shared projection.
-			item.title, override.custom_info, event.main_tag_id
+			COALESCE(share.location, event.location),
+			user_display_name(owner.display_name, owner.email)
 		FROM event_shares AS share
 		JOIN timeline_items AS item ON item.id = share.event_id
 		JOIN events AS event ON event.timeline_item_id = share.event_id
-		LEFT JOIN event_share_overrides AS override ON override.event_share_id = share.id
+		JOIN users AS owner ON owner.id = item.user_id
 		WHERE share.recipient_user_id = $1
 	`, userID)
 	if err != nil {
@@ -158,7 +161,7 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 		if err := rows.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
-			&entry.SourceTitle, &entry.CustomInfo, &entry.MainTagID,
+			&entry.SharedBy,
 		); err != nil {
 			return nil, err
 		}

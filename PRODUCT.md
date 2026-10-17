@@ -55,20 +55,18 @@ Events have an exact start date/time and end date/time in the first demo.
 
 **Sharing events (Demo):**
 
-- [ ] Sharing is direct user-to-user. Both users must be registered.
-- [ ] User A can share an event with user B.
-- [ ] The owner controls which event fields are shared. The recipient can only
-      change the local visual presentation of the shared event.
-- [ ] The recipient may locally override the displayed:
-  - [ ] title
-  - [ ] URL
-  - [ ] description/details
-  - [ ] location
-- [ ] A recipient's local overrides never change the owner's source event or what
-      other recipients see.
-- [ ] The recipient UI must make it clear when the local appearance differs from
-      the original event details.
-- [x] Recipients cannot edit the shared source event.
+- [x] Sharing is direct user-to-user. Both users must be registered.
+- [x] User A can share an event with users B and C.
+- [x] The owner can set the title, description/details, URL, and location
+      separately for each recipient (e.g. B sees "Title for B", C sees
+      "Title for C"). An empty field shows the event's own value, so later
+      edits to the event still reach that recipient. Times, all-day, and kind
+      always come from the event.
+- [x] Tags are never shared. Recipients see shared events without the owner's
+      tags or the owner's original values for fields customized for them.
+- [x] Recipients see shared events read-only, marked with the owner's name,
+      and cannot edit them.
+- [ ] Recipient-local overrides of shared fields are **Future**.
 - [ ] Busy-only sharing and independently hiding or transforming fields are
       **Future** unless explicitly added to the demo scope.
 
@@ -77,7 +75,7 @@ Events have an exact start date/time and end date/time in the first demo.
 - [ ] The user can add custom info in a separate field for events that are shared with them, e.g.:
   - `CUSTOM INFO: This lecture will be given on zoom: zoom.com/my-link/...`
   - `CUSTOM INFO: The company's URL: the-company.com/...`
-- [ ] Recipient-private custom info is **Demo**.
+- [ ] Recipient-private custom info is **Future**.
 - [ ] Making an event appear in a TODO-list without being completeable is
       **Future**.
 

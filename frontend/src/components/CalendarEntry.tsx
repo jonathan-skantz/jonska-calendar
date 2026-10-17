@@ -108,9 +108,8 @@ export const CalendarEntry = ({
     (trimBottom && !commuteAfter ? EVENT_SEPARATOR_PIXELS : 0) +
     (continuesToNextDay ? CONTINUATION_MARKER_HEIGHT : 0);
   const commuteColor = mainTag?.color ?? "var(--yellow)";
-  const openEditor = () => {
-    if (!entry.is_shared) onEdit(entry);
-  };
+  // Shared entries open a read-only view; App decides which drawer to show.
+  const openEditor = () => onEdit(entry);
 
   useEffect(() => {
     const entryElement = entryRef.current;
@@ -215,7 +214,17 @@ export const CalendarEntry = ({
               color={mainTag?.color ?? "var(--yellow)"}
             />
           )}
-          <strong>{entry.title}</strong>
+          <strong>
+            {entry.share_count ? (
+              <i
+                className="share-marker"
+                title={`Shared with ${entry.share_count} ${entry.share_count === 1 ? "person" : "people"}`}
+              >
+                ⇄{" "}
+              </i>
+            ) : null}
+            {entry.title}
+          </strong>
           <span>
             {entry.type === "event"
               ? [entry.starts_at, entry.ends_at]
@@ -225,6 +234,7 @@ export const CalendarEntry = ({
               : "Task"}
           </span>
           {entry.location && <span>{entry.location}</span>}
+          {entry.shared_by && <span>from {entry.shared_by}</span>}
           {continuesToNextDay && (
             <ContinuationMarkers
               position="bottom"

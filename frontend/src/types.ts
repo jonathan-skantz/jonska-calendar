@@ -27,10 +27,28 @@ export type TimelineEntry = {
   commute_after_seconds?: number;
   is_completed: boolean;
   is_shared?: boolean;
-  source_title?: string;
-  custom_info?: string;
+  // Owner's display name, only on events shared with the current user.
+  shared_by?: string;
+  // Number of recipients, only on the current user's own events.
+  share_count?: number;
   tags?: Tag[];
   main_tag_id?: string;
+};
+
+// The owner's per-recipient values. A missing field means the recipient sees
+// the event's own value.
+export type ShareFields = {
+  title?: string;
+  description?: string;
+  url?: string;
+  location?: string;
+};
+
+export type EventShare = ShareFields & {
+  id: string;
+  recipient_user_id: string;
+  recipient_email: string;
+  recipient_display_name: string;
 };
 
 export type TransitCardNeed = "yes" | "maybe" | "no";

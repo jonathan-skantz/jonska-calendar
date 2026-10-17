@@ -64,7 +64,8 @@ export const Sidebar = ({
         )}
       </div>
       <p className="tag-help">
-        Click a tag to hide or show its events. Default: {tags.find((tag) => tag.is_default)?.name ?? "none"}
+        Click a tag to hide or show its events. Default:{" "}
+        {tags.find((tag) => tag.is_default)?.name ?? "none"}
       </p>
     </div>
     <div className="tag-editor-trigger">
@@ -75,8 +76,7 @@ export const Sidebar = ({
     <div className="side-section family-note">
       <span className="note-symbol">✳</span>
       <p>
-        Shared events stay yours to arrange. Changes you make to their
-        appearance are private.
+        Events shared with you are read-only; only the owner can change them.
       </p>
     </div>
   </aside>

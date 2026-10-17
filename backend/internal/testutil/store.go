@@ -30,6 +30,8 @@ var migrationNames = []string{
 	"13_add_user_display_name.sql",
 	"14_restrict_event_commute.sql",
 	"15_add_households.sql",
+	"16_owner_share_fields.sql",
+	"17_add_user_display_name_function.sql",
 }
 
 func NewStore(t *testing.T) *db.Store {

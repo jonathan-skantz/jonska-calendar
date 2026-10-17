@@ -64,26 +64,22 @@ type Tag struct {
 	IsDefault bool      `json:"is_default"`
 }
 
-// SharedEvent combines the owner's current event fields with the recipient's
-// local overrides. Original* values come from the joined source event; they
-// are not duplicated columns in the sharing tables.
-type SharedEvent struct {
-	ShareID             uuid.UUID
-	EventID             uuid.UUID
-	RecipientUserID     uuid.UUID
-	OriginalTitle       string
-	OriginalDescription *string
-	OriginalURL         *string
-	OriginalLocation    *string
-	StartsAt            time.Time
-	EndsAt              time.Time
-	IsAllDay            bool
-	Kind                string
-	LocalTitle          *string
-	LocalDescription    *string
-	LocalURL            *string
-	LocalLocation       *string
-	PrivateCustomInfo   *string
+// ShareFields are the owner's per-recipient presentation of a shared event.
+// A nil field means the recipient sees the event's own value.
+type ShareFields struct {
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	URL         *string `json:"url,omitempty"`
+	Location    *string `json:"location,omitempty"`
+}
+
+// EventShare is the owner's view of one recipient of an event.
+type EventShare struct {
+	ID                   uuid.UUID `json:"id"`
+	RecipientUserID      uuid.UUID `json:"recipient_user_id"`
+	RecipientEmail       string    `json:"recipient_email"`
+	RecipientDisplayName string    `json:"recipient_display_name"`
+	ShareFields
 }
 
 type TimelineEntry struct {
@@ -102,8 +98,8 @@ type TimelineEntry struct {
 	CommuteAfterSeconds  int        `json:"commute_after_seconds,omitempty"`
 	IsCompleted          bool       `json:"is_completed"`
 	IsShared             bool       `json:"is_shared,omitempty"`
-	SourceTitle          *string    `json:"source_title,omitempty"`
-	CustomInfo           *string    `json:"custom_info,omitempty"`
+	SharedBy             *string    `json:"shared_by,omitempty"`
+	ShareCount           int        `json:"share_count,omitempty"`
 	Tags                 []Tag      `json:"tags,omitempty"`
 	MainTagID            *uuid.UUID `json:"main_tag_id,omitempty"`
 }

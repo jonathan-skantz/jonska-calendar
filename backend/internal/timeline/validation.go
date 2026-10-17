@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/jonathan-skantz/calendar/backend/db"
 )
 
 var (
@@ -175,4 +177,25 @@ func validateHouseholdRequest(request *householdRequest) error {
 		return ErrInvalidTransitCardCount
 	}
 	return nil
+}
+
+// normalizeShareField trims a per-recipient value; blank means "same as event".
+func normalizeShareField(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func normalizeShareFields(request shareFieldsRequest) db.ShareFields {
+	return db.ShareFields{
+		Title:       normalizeShareField(request.Title),
+		Description: normalizeShareField(request.Description),
+		URL:         normalizeShareField(request.URL),
+		Location:    normalizeShareField(request.Location),
+	}
 }

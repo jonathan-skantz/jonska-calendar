@@ -11,8 +11,7 @@ The demo is a small family calendar. It currently supports:
 - deadline-only tasks and completion state;
 - a custom seven-day, 24-hour React week grid;
 - personal tags;
-- direct event sharing between registered users;
-- recipient-local event presentation overrides and private custom info;
+- direct event sharing between registered users, with per-recipient fields set by the owner;
 - per-day shared transit-card declarations, households with conflict detection, and user display names.
 
 The product intentionally does not implement uncertain timing, recurrence, reminders, conflict detection, automatic task scheduling, external calendars, advanced sharing policies, triggers, templates, or backup/import.
@@ -108,15 +107,14 @@ replacement as the new default.
 events
   |
   +--- event_shares --- recipient_user_id
-             |
-             +--- event_share_overrides
+                       (title, description, url, location: owner-set, nullable)
 ```
 
-The event remains owned by the original user's `timeline_items` row. `event_shares` stores the recipient relationship. `event_share_overrides` stores only recipient-local title, description, URL, location, and private custom info.
+The event remains owned by the original user's `timeline_items` row. `event_shares` stores the recipient relationship and the owner's per-recipient values. A NULL field means the recipient sees the event's own value, so later edits to the event still reach them; times, all-day, and kind always come from the event. Recipients cannot override anything. Only the owner manages shares, and every share query checks ownership through `timeline_items.user_id`.
 
 The owner is derived through `event_shares.event_id -> events.timeline_item_id -> timeline_items.user_id`; it is deliberately not duplicated in `event_shares`.
 
-A shared event is a projection, not a copy. The source fields are read from the owner's current event, and local override fields are applied only for the recipient. This is why the API can show both the source title and the recipient's local title.
+A shared event is a projection, not a copy. Each field is the share's value when the owner set one, and otherwise the owner's current event value. The recipient only ever receives these effective values.
 
 ### Transit card declarations
 
@@ -142,7 +140,7 @@ row is `conflict` when more members said `yes` that day than the household has
 cards. `maybe` never conflicts, and a user without a household never sees a
 conflict.
 
-`users.display_name` is optional. Readers fall back to the email local-part.
+`users.display_name` is optional. Queries read names through the SQL function `user_display_name(display_name, email)` (migration 17), which falls back to the email local-part.
 
 ## SQL Code Generation
 
@@ -168,37 +166,38 @@ Authorization is intentionally enforced at the database query boundary as well a
 
 All API routes use JSON request and response bodies unless the response is `204 No Content`. Error responses use plain text. Authenticated routes require the HTTP-only `calendar_session` cookie.
 
-| Method and path                              | Request JSON                                | Successful response                                  |
-| -------------------------------------------- | ------------------------------------------- | ---------------------------------------------------- |
-| `POST /api/auth/register`                    | `email`, `password`                         | `201` with `{ "id": "<uuid>" }`                      |
-| `POST /api/auth/login`                       | `email`, `password`                         | `200` with `{ "id": "<uuid>" }` and a session cookie |
-| `POST /api/auth/logout`                      | None                                        | `204`; clears the session cookie                     |
-| `GET /api/auth/me`                           | None                                        | `{ "id", "email" }`, plus `display_name` when set    |
-| `PATCH /api/auth/me`                         | `display_name` (empty clears it)            | `204`                                                |
-| `GET /api/timeline`                          | None                                        | Array of timeline entries                            |
-| `POST /api/events`                           | Event fields below                          | `201` with `{ "id": "<uuid>" }`                      |
-| `PUT /api/events/{eventID}`                  | Event fields below                          | `204`                                                |
-| `POST /api/tasks`                            | Task fields below                           | `201` with `{ "id": "<uuid>" }`                      |
-| `PUT /api/tasks/{taskID}`                    | Task fields below                           | `204`                                                |
-| `PATCH /api/tasks/{taskID}`                  | `is_completed`                              | `204`                                                |
-| `DELETE /api/timeline/{itemID}`              | None                                        | `204`                                                |
-| `GET /api/tags`                              | None                                        | Array of tags                                        |
-| `POST /api/tags`                             | `name`                                      | `201` with a tag                                     |
-| `PATCH /api/tags/{tagID}`                    | `name`, `color`                             | `204`                                                |
-| `DELETE /api/tags/{tagID}`                   | None                                        | `204`                                                |
-| `PUT /api/tags/default`                      | `tag_id`                                    | `204`                                                |
-| `POST /api/timeline/{itemID}/tags`           | `tag_id`                                    | `204`                                                |
-| `DELETE /api/timeline/{itemID}/tags/{tagID}` | None                                        | `204`                                                |
-| `POST /api/events/{eventID}/shares`          | `recipient_email`                           | `201` with `{ "id": "<share-uuid>" }`                |
-| `GET /api/shared-events/{shareID}`           | None                                        | Shared event response below                          |
-| `PATCH /api/shared-events/{shareID}`         | Any supplied override fields below          | `204`                                                |
-| `GET /api/transit-card/days?from=&to=`       | None                                        | Array of reported transit-card days                  |
-| `PUT /api/transit-card/days`                 | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                |
-| `GET /api/household`                         | None                                        | Household or `null`                                  |
-| `POST /api/household`                        | `name`, `transit_card_count`                | `201`; `409` if already in a household               |
-| `PATCH /api/household`                       | `name`, `transit_card_count`                | `204`; `404` without a household                     |
-| `POST /api/household/members`                | `email`                                     | `204`; `404` unknown email; `409` already a member   |
-| `DELETE /api/household/members/me`           | None                                        | `204`; deletes the household when it becomes empty   |
+| Method and path                                 | Request JSON                                | Successful response                                  |
+| ----------------------------------------------- | ------------------------------------------- | ---------------------------------------------------- |
+| `POST /api/auth/register`                       | `email`, `password`                         | `201` with `{ "id": "<uuid>" }`                      |
+| `POST /api/auth/login`                          | `email`, `password`                         | `200` with `{ "id": "<uuid>" }` and a session cookie |
+| `POST /api/auth/logout`                         | None                                        | `204`; clears the session cookie                     |
+| `GET /api/auth/me`                              | None                                        | `{ "id", "email" }`, plus `display_name` when set    |
+| `PATCH /api/auth/me`                            | `display_name` (empty clears it)            | `204`                                                |
+| `GET /api/timeline`                             | None                                        | Array of timeline entries                            |
+| `POST /api/events`                              | Event fields below                          | `201` with `{ "id": "<uuid>" }`                      |
+| `PUT /api/events/{eventID}`                     | Event fields below                          | `204`                                                |
+| `POST /api/tasks`                               | Task fields below                           | `201` with `{ "id": "<uuid>" }`                      |
+| `PUT /api/tasks/{taskID}`                       | Task fields below                           | `204`                                                |
+| `PATCH /api/tasks/{taskID}`                     | `is_completed`                              | `204`                                                |
+| `DELETE /api/timeline/{itemID}`                 | None                                        | `204`                                                |
+| `GET /api/tags`                                 | None                                        | Array of tags                                        |
+| `POST /api/tags`                                | `name`                                      | `201` with a tag                                     |
+| `PATCH /api/tags/{tagID}`                       | `name`, `color`                             | `204`                                                |
+| `DELETE /api/tags/{tagID}`                      | None                                        | `204`                                                |
+| `PUT /api/tags/default`                         | `tag_id`                                    | `204`                                                |
+| `POST /api/timeline/{itemID}/tags`              | `tag_id`                                    | `204`                                                |
+| `DELETE /api/timeline/{itemID}/tags/{tagID}`    | None                                        | `204`                                                |
+| `GET /api/events/{eventID}/shares`              | None                                        | Array of event shares (owner only)                   |
+| `POST /api/events/{eventID}/shares`             | `recipient_email`, optional share fields    | `201` with `{ "id": "<share-uuid>" }`                |
+| `PUT /api/events/{eventID}/shares/{shareID}`    | Share fields                                | `204`                                                |
+| `DELETE /api/events/{eventID}/shares/{shareID}` | None                                        | `204`                                                |
+| `GET /api/transit-card/days?from=&to=`          | None                                        | Array of reported transit-card days                  |
+| `PUT /api/transit-card/days`                    | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                |
+| `GET /api/household`                            | None                                        | Household or `null`                                  |
+| `POST /api/household`                           | `name`, `transit_card_count`                | `201`; `409` if already in a household               |
+| `PATCH /api/household`                          | `name`, `transit_card_count`                | `204`; `404` without a household                     |
+| `POST /api/household/members`                   | `email`                                     | `204`; `404` unknown email; `409` already a member   |
+| `DELETE /api/household/members/me`              | None                                        | `204`; deletes the household when it becomes empty   |
 
 Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. For all-day events, the end timestamp is exclusive and starts at midnight after the last displayed date. The `kind` value is `attendable` or `informational`. Commute durations are seconds in whole minutes, from 0 up to 24 hours, and must be 0 unless the event is a timed (not all-day) `attendable` event. Migration 14 enforces the same rules in the database. The week grid draws commute as hatched bands next to the event block. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
 
@@ -206,9 +205,9 @@ Task request fields are `title`, `description`, `url`, and `deadline_at`. The ti
 
 Tag colors use six hexadecimal digits with a leading `#`, such as `#547968`. The digits can use uppercase or lowercase letters. The frontend chooses black or white tag text by comparing each color's WCAG contrast ratio against both. Tag responses contain `id`, `name`, `color`, and `is_default`.
 
-Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `source_title`, `custom_info`, `tags`, and `main_tag_id`. Optional response fields are omitted when empty. Timestamps use JSON time format.
+Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fields are `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `deadline_at`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, `is_shared`, `shared_by`, `share_count`, `tags`, and `main_tag_id`. `shared_by` (the owner's display name) appears only on events shared with the caller, which never include tags, `main_tag_id`, or commute. `share_count` appears only on the caller's own shared events. Optional response fields are omitted when empty. Timestamps use JSON time format.
 
-Shared event responses contain `share_id`, `event_id`, `original_title`, `starts_at`, `ends_at`, `is_all_day`, and `kind`. Optional fields are `original_description`, `original_url`, `original_location`, `local_title`, `local_description`, `local_url`, `local_location`, and `private_custom_info`. The patch accepts any subset of the local fields: `title`, `description`, `url`, `location`, and `custom_info`.
+Share fields are `title`, `description`, `url`, and `location`. Each is trimmed, and an empty or missing value means "same as the event"; `PUT` replaces all four. Event share responses contain `id`, `recipient_user_id`, `recipient_email`, and `recipient_display_name`, plus the share fields that are set. Sharing an event the caller does not own, or listing, updating, or removing its shares, returns `404`. Sharing with yourself returns `400`, and sharing twice with the same user returns `409`.
 
 Transit-card dates use `YYYY-MM-DD`. Ranges are inclusive and cover at most 62 days; `needed_dates` and `maybe_dates` must be inside the range, and no date may appear twice across them; every other day in the range is saved as `no`. The server does not know the user's time zone, so it rejects a `from` earlier than yesterday in UTC, and the frontend enforces the exact local day. Day responses contain `date`, `user_id`, `display_name`, `need`, and `status` (`resolved` or `conflict`). Only reported days are returned, for the caller and the other members of their household.
 
@@ -225,7 +224,7 @@ The frontend uses:
 
 The week grid is not a pre-built calendar component. It derives each item's vertical position from minutes after local midnight and renders static blocks. Dragging is intentionally absent. An item's position changes only after saving an edited event through the API.
 
-The workspace query returns both owned and shared timeline entries. Shared entries already contain effective local presentation values and source metadata, so the UI does not need to reconstruct sharing rules. Shared entries never include the owner's commute durations, because commute is the owner's personal travel.
+The workspace query returns both owned and shared timeline entries. Shared entries already contain the effective per-recipient values, so the UI does not need to reconstruct sharing rules, and the owner's original values for customized fields never reach the recipient. Shared entries never include the owner's commute durations, because commute is the owner's personal travel.
 
 ## Where to Change Things
 
@@ -235,7 +234,7 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Change auth/session behavior                  | `backend/internal/auth/handler.go`                                               | `backend/db/users.go`, migration 2                     |
 | Change event/task validation                  | `backend/internal/timeline/validation.go`                                        | PostgreSQL constraints and feature handler/store files |
 | Change event/task persistence                 | `backend/db/events.go` or `backend/db/tasks.go`                                  | migrations 1 and 3                                     |
-| Change sharing ownership or overrides         | `backend/db/sharing.go` and `backend/db/timeline.go`                             | migrations 4/5, timeline handlers                      |
+| Change sharing or per-recipient fields        | `backend/db/sharing.go` and `backend/db/timeline.go`                             | migrations 4/5/16, `frontend/src/features/sharing/`    |
 | Change tag ownership, defaults, or attachment | `backend/db/tags.go`                                                             | migrations 6-8, timeline handlers                      |
 | Change transit-card declarations              | `backend/db/transit_card.go`, `backend/internal/timeline/transit_card.go`        | migration 12, `frontend/src/features/transitCard/`     |
 | Change households or card conflicts           | `backend/db/households.go`, `backend/internal/timeline/household.go`             | migration 15, `frontend/src/features/household/`       |
@@ -250,7 +249,7 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 ## Maintainability Rules
 
 - Keep domain invariants in the backend. The frontend is not an authorization boundary.
-- Keep source event data separate from recipient-local shared-event presentation.
+- Keep source event data separate from the owner's per-recipient share fields.
 - Use transactions when one logical operation updates both `timeline_items` and a subtype row.
 - Add a migration for schema changes; do not rewrite applied migrations.
 - Prefer typed request/response structs over unstructured maps.
@@ -265,7 +264,7 @@ The current demo is functional, but `App.tsx` and `store.go` are becoming broad.
 
 1. Move remaining auth, timeline, tag, and calendar mutations out of `App.tsx` only when this reduces state coordination.
 2. Consider a backend service layer only when workflows span multiple stores or need reusable business rules. Do not add one solely for indirection.
-3. Add UI and API support for edit/share/local overrides before implementing future scheduling or recurrence features.
+3. Keep sharing changes on the owner-managed share model before implementing future scheduling or recurrence features.
 
 ## Future Architecture Pressure
 

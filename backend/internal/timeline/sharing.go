@@ -10,14 +10,57 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
 
+// Only the event owner manages shares. Recipients are read-only and see a
+// shared event through their timeline, never through these routes.
+
+var (
+	eventNotFound = mappedErrorResponse{
+		cause:    db.ErrEventNotFound,
+		response: httpErrorResponse{status: http.StatusNotFound, message: "event not found"},
+	}
+	shareNotFound = mappedErrorResponse{
+		cause:    db.ErrSharedEventNotFound,
+		response: httpErrorResponse{status: http.StatusNotFound, message: "share not found"},
+	}
+)
+
+func parsePathID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(r.PathValue(name))
+	if err != nil {
+		http.Error(w, "invalid "+name, http.StatusBadRequest)
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+func (h *Handler) ListEventShares(w http.ResponseWriter, r *http.Request) {
+	ownerID, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+	eventID, ok := parsePathID(w, r, "eventID")
+	if !ok {
+		return
+	}
+	shares, err := h.Store.ListEventShares(r.Context(), ownerID, eventID)
+	if err != nil {
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to list shares"},
+			eventNotFound,
+		)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(shares)
+}
+
 func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
-	eventID, err := uuid.Parse(r.PathValue("eventID"))
-	if err != nil {
-		http.Error(w, "invalid event id", http.StatusBadRequest)
+	eventID, ok := parsePathID(w, r, "eventID")
+	if !ok {
 		return
 	}
 	var request shareRequest
@@ -25,105 +68,82 @@ func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	request.RecipientEmail = strings.ToLower(strings.TrimSpace(request.RecipientEmail))
-	if request.RecipientEmail == "" {
+	email := strings.ToLower(strings.TrimSpace(request.RecipientEmail))
+	if email == "" {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	recipient, err := h.Store.FindUserByEmail(r.Context(), request.RecipientEmail)
+	recipient, err := h.Store.FindUserByEmail(r.Context(), email)
 	if err != nil {
 		http.Error(w, "recipient not found", http.StatusNotFound)
 		return
 	}
-	shareID, err := h.Store.ShareEvent(r.Context(), ownerID, eventID, recipient.ID)
+	if recipient.ID == ownerID {
+		http.Error(w, "you cannot share an event with yourself", http.StatusBadRequest)
+		return
+	}
+	shareID, err := h.Store.ShareEvent(r.Context(), ownerID, eventID, recipient.ID, normalizeShareFields(request.shareFieldsRequest))
 	if err != nil {
-		http.Error(w, "event cannot be shared", http.StatusBadRequest)
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to share event"},
+			eventNotFound,
+			mappedErrorResponse{
+				cause:    db.ErrAlreadyShared,
+				response: httpErrorResponse{status: http.StatusConflict, message: db.ErrAlreadyShared.Error()},
+			},
+		)
 		return
 	}
 	writeCreated(w, shareID)
 }
 
-func (h *Handler) GetSharedEvent(w http.ResponseWriter, r *http.Request) {
-	recipientID, ok := h.requireUser(w, r)
+func (h *Handler) UpdateEventShare(w http.ResponseWriter, r *http.Request) {
+	ownerID, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
-	shareID, err := uuid.Parse(r.PathValue("shareID"))
-	if err != nil {
-		http.Error(w, "invalid share id", http.StatusBadRequest)
-		return
-	}
-	event, err := h.Store.FindSharedEvent(r.Context(), recipientID, shareID)
-	if err != nil {
-		http.Error(w, "shared event not found", http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(toSharedEventResponse(event))
-}
-
-func (h *Handler) UpdateSharedEvent(w http.ResponseWriter, r *http.Request) {
-	recipientID, ok := h.requireUser(w, r)
+	eventID, ok := parsePathID(w, r, "eventID")
 	if !ok {
 		return
 	}
-	shareID, err := uuid.Parse(r.PathValue("shareID"))
-	if err != nil {
-		http.Error(w, "invalid share id", http.StatusBadRequest)
+	shareID, ok := parsePathID(w, r, "shareID")
+	if !ok {
 		return
 	}
-	var request sharedEventOverrideRequest
+	var request shareFieldsRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	existing, err := h.Store.FindSharedEvent(r.Context(), recipientID, shareID)
-	if err != nil {
-		http.Error(w, "shared event not found", http.StatusNotFound)
-		return
-	}
-
-	// Merge only fields present in the PATCH body so editing one local field
-	// does not erase the recipient's other overrides or private note.
-	if request.Title != nil {
-		existing.LocalTitle = request.Title
-	}
-	if request.Description != nil {
-		existing.LocalDescription = request.Description
-	}
-	if request.URL != nil {
-		existing.LocalURL = request.URL
-	}
-	if request.Location != nil {
-		existing.LocalLocation = request.Location
-	}
-	if request.CustomInfo != nil {
-		existing.PrivateCustomInfo = request.CustomInfo
-	}
-
-	if err := h.Store.UpdateSharedEventOverride(r.Context(), recipientID, shareID, existing); err != nil {
-		http.Error(w, "shared event not found", http.StatusNotFound)
+	if err := h.Store.UpdateEventShare(r.Context(), ownerID, eventID, shareID, normalizeShareFields(request)); err != nil {
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update share"},
+			shareNotFound,
+		)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func toSharedEventResponse(event db.SharedEvent) sharedEventResponse {
-	return sharedEventResponse{
-		ShareID:             event.ShareID,
-		EventID:             event.EventID,
-		OriginalTitle:       event.OriginalTitle,
-		OriginalDescription: event.OriginalDescription,
-		OriginalURL:         event.OriginalURL,
-		OriginalLocation:    event.OriginalLocation,
-		StartsAt:            event.StartsAt,
-		EndsAt:              event.EndsAt,
-		IsAllDay:            event.IsAllDay,
-		Kind:                event.Kind,
-		LocalTitle:          event.LocalTitle,
-		LocalDescription:    event.LocalDescription,
-		LocalURL:            event.LocalURL,
-		LocalLocation:       event.LocalLocation,
-		PrivateCustomInfo:   event.PrivateCustomInfo,
+func (h *Handler) DeleteEventShare(w http.ResponseWriter, r *http.Request) {
+	ownerID, ok := h.requireUser(w, r)
+	if !ok {
+		return
 	}
+	eventID, ok := parsePathID(w, r, "eventID")
+	if !ok {
+		return
+	}
+	shareID, ok := parsePathID(w, r, "shareID")
+	if !ok {
+		return
+	}
+	if err := h.Store.DeleteEventShare(r.Context(), ownerID, eventID, shareID); err != nil {
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to remove share"},
+			shareNotFound,
+		)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

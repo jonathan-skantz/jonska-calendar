@@ -9,10 +9,9 @@ import (
 
 // ListTransitCardDays returns the reported days in the inclusive range for the
 // user and, when they belong to a household, every other member of it.
-// The display name falls back to the email local-part when it is not set.
 func (s *Store) ListTransitCardDays(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]TransitCardDay, error) {
 	rows, err := s.db.Query(ctx, `
-		SELECT d.day, d.user_id, COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1)), d.need
+		SELECT d.day, d.user_id, user_display_name(u.display_name, u.email), d.need
 		FROM transit_card_days AS d
 		JOIN users AS u ON u.id = d.user_id
 		WHERE d.day BETWEEN $2 AND $3

@@ -41,6 +41,12 @@ import { WeekHeader } from "./components/WeekHeader";
 import { TopBar } from "./components/TopBar";
 import { SettingsPage } from "./components/SettingsPage";
 import { HouseholdSettings } from "./components/HouseholdSettings";
+import { ShareEventDrawer } from "./components/ShareEventDrawer";
+import { SharedEventDrawer } from "./components/SharedEventDrawer";
+import {
+  useEventShareMutations,
+  useEventShares,
+} from "./features/sharing/useEventShares";
 import {
   useHousehold,
   useHouseholdMutations,
@@ -100,6 +106,11 @@ function App() {
   const householdQuery = useHousehold(Boolean(user));
   const household = householdQuery.data ?? null;
   const householdMutations = useHouseholdMutations();
+  const [sharingEvent, setSharingEvent] = useState<TimelineEntry | null>(null);
+  const [viewingSharedEvent, setViewingSharedEvent] =
+    useState<TimelineEntry | null>(null);
+  const eventSharesQuery = useEventShares(sharingEvent?.id ?? null);
+  const shareMutations = useEventShareMutations(sharingEvent?.id ?? null);
   const composer = useComposer({
     tags,
     selectedDate,
@@ -122,8 +133,17 @@ function App() {
     setMainTagId: setComposerMainTagId,
     openNew: openNewComposer,
     edit: editItem,
-    close: closeComposer,
+    close: closeComposerDrawer,
   } = composer;
+  // The share drawer is stacked on the composer, so it closes with it.
+  const closeComposer = () => {
+    setSharingEvent(null);
+    closeComposerDrawer();
+  };
+
+  // Events shared with the user are read-only, so they open a details view.
+  const openEntry = (entry: TimelineEntry) =>
+    entry.is_shared ? setViewingSharedEvent(entry) : editItem(entry);
 
   const submitAuth = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -248,7 +268,7 @@ function App() {
         continuesToNextDay={layout.continuesToNextDay}
         commuteSegments={commuteSegments}
         showBody={showBody}
-        onEdit={editItem}
+        onEdit={openEntry}
         onToggleTask={toggleTask}
       />
     );
@@ -298,7 +318,7 @@ function App() {
   };
   const renderAllDayEntries = () =>
     allDayEventSpans.map((span) => (
-      <AllDayEvent key={span.entry.id} {...span} onEdit={editItem} />
+      <AllDayEvent key={span.entry.id} {...span} onEdit={openEntry} />
     ));
   const emailName = user.email.split("@")[0];
   const userDisplayName = user.display_name || emailName;
@@ -425,6 +445,14 @@ function App() {
           onTypeChange={setComposerType}
           onSelectedTagIdsChange={setComposerTagIds}
           onMainTagIdChange={setComposerMainTagId}
+          onShare={
+            editingItem?.type === "event"
+              ? () => setSharingEvent(editingItem)
+              : undefined
+          }
+          shareCount={
+            entries.find((entry) => entry.id === editingItem?.id)?.share_count
+          }
         />
       )}
       {showComposer && editingItem && (
@@ -435,6 +463,30 @@ function App() {
         >
           Delete item
         </button>
+      )}
+      {/* Opened from the composer; closeComposer also clears it. */}
+      {sharingEvent && (
+        <ShareEventDrawer
+          event={sharingEvent}
+          shares={eventSharesQuery.data}
+          onAdd={shareMutations.add}
+          onUpdate={shareMutations.update}
+          onRemove={async (share) =>
+            window.confirm(
+              `Stop sharing “${sharingEvent.title}” with ${share.recipient_display_name}?`,
+            )
+              ? shareMutations.remove(share.id)
+              : null
+          }
+          onClose={() => setSharingEvent(null)}
+        />
+      )}
+      {viewingSharedEvent && (
+        <SharedEventDrawer
+          entry={viewingSharedEvent}
+          timeFormat={preferences.timeFormat}
+          onClose={() => setViewingSharedEvent(null)}
+        />
       )}
       {showTransitCard && (
         <TransitCardDrawer
