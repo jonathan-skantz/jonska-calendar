@@ -5,10 +5,13 @@ import {
   getCalendarEntryLayout,
   getCommuteSegments,
   getEntriesForDate,
+  getElapsedOverlayState,
+  getEventAdjacency,
   getEventOverlapDepth,
   getEventPreview,
   getGatheringSegment,
 } from "./timelineView";
+import { gridOffset } from "../../lib/calendar";
 import type { TimelineEntry } from "../../types";
 
 const event = (overrides: Partial<TimelineEntry> = {}): TimelineEntry => ({
@@ -349,5 +352,62 @@ describe("new event preview", () => {
     expect(
       getEventPreview("2026-10-15T09:00:00", new Date(2026, 9, 16)),
     ).toBeNull();
+  });
+});
+
+// Exact adjacency compares instants, so these fixtures use UTC times.
+const utcEvent = (overrides: Partial<TimelineEntry> = {}) =>
+  event({
+    starts_at: "2026-10-15T10:00:00.000Z",
+    ends_at: "2026-10-15T11:00:00.000Z",
+    ...overrides,
+  });
+
+describe("adjacency and elapsed overlay", () => {
+  it("trims only exactly adjacent event edges", () => {
+    const previous = utcEvent({ ends_at: "2026-10-15T10:00:00Z" });
+    const current = utcEvent({ starts_at: "2026-10-15T10:00:00.000Z" });
+    const next = utcEvent({ starts_at: "2026-10-15T11:00:00Z" });
+    expect(getEventAdjacency(current, previous, next)).toEqual({
+      trimTop: true,
+      trimBottom: true,
+    });
+    expect(
+      getEventAdjacency(
+        current,
+        utcEvent({ ends_at: "2026-10-15T09:59:00Z" }),
+        utcEvent({ starts_at: "2026-10-15T11:01:00Z" }),
+      ),
+    ).toEqual({ trimTop: false, trimBottom: false });
+    expect(
+      getEventAdjacency({ ...current, type: "task" }, previous, next).trimTop,
+    ).toBe(false);
+  });
+
+  it("returns past, current, and future elapsed overlay states", () => {
+    const today = new Date(2026, 9, 15, 9, 30);
+    const label = (value: Date) => `${value.getHours()}:${value.getMinutes()}`;
+    expect(getElapsedOverlayState(new Date(2026, 9, 14), today, label)).toEqual(
+      {
+        kind: "past",
+      },
+    );
+    expect(getElapsedOverlayState(new Date(2026, 9, 15), today, label)).toEqual(
+      {
+        kind: "today",
+        height: gridOffset(9.5 * 60),
+        label: "9:30",
+      },
+    );
+    expect(getElapsedOverlayState(new Date(2026, 9, 16), today, label)).toEqual(
+      { kind: "none" },
+    );
+    expect(
+      getElapsedOverlayState(
+        new Date(2026, 9, 15),
+        new Date(2026, 9, 15),
+        label,
+      ),
+    ).toEqual({ kind: "none" });
   });
 });

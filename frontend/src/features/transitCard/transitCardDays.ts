@@ -5,7 +5,7 @@ import type {
   TransitCardNeed,
 } from "../../types";
 
-export type TransitCardDayState =
+type TransitCardDayState =
   "past" | "not_reported" | "not_needed" | "maybe" | "resolved" | "conflict";
 
 export type TransitCardMemberAnswer = HouseholdMember & {

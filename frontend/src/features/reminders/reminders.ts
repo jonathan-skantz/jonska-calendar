@@ -52,7 +52,7 @@ export const isReminderDue = (reminder: Reminder, now: Date) =>
 export const isReminderUpcoming = (reminder: Reminder, now: Date) =>
   !reminder.event_is_skipped && new Date(reminder.remind_at) > now;
 
-export type ReminderGroup = {
+type ReminderGroup = {
   label: "Earlier" | "Today" | "Tomorrow" | "Later";
   reminders: Reminder[];
 };

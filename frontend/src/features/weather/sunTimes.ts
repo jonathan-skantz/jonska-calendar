@@ -5,7 +5,7 @@ import type { SunDisplayPreferences } from "../calendar/calendarPreferences";
 const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 
 export type SunLine = { top: string; label: string };
-export type NightBand = { top: string; height: string };
+type NightBand = { top: string; height: string };
 
 export type SunIndicators = {
   sunrise?: SunLine;

@@ -5,7 +5,7 @@ import { getRequestErrorMessage } from "../../lib/requestErrors";
 import {
   buildTimelineItemRequest,
   getEventTagChanges,
-} from "../../lib/timeline";
+} from "./timelineRequests";
 import type { Tag, TimelineEntry } from "../../types";
 
 export const useTimelineMutations = (onError: (message: string) => void) => {

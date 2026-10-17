@@ -63,7 +63,7 @@ The frontend is a separate development server. Vite proxies `/api` to the Go ser
 - [frontend/src/main.tsx](../frontend/src/main.tsx)
   - Creates the React root and the TanStack Query client provider.
 - [frontend/src/App.tsx](../frontend/src/App.tsx)
-  - Application shell and coordination for workspace, calendar, and drawers. Authentication query and actions live in `frontend/src/features/auth/useAuth.ts`. Event/task mutations live in `frontend/src/features/timeline/useTimelineMutations.ts`. Tag mutations live in `frontend/src/features/tags/useTagMutations.ts`. Calendar state and derived calculations live under `frontend/src/features/calendar/`. Presentational components live under `frontend/src/components/`; shared state helpers live under `frontend/src/hooks/`.
+  - Application shell and coordination for workspace, calendar, and drawers. Authentication query and actions live in `frontend/src/features/auth/useAuth.ts`. Event/task mutations live in `frontend/src/features/timeline/useTimelineMutations.ts`. Tag mutations live in `frontend/src/features/tags/useTagMutations.ts`. Event/task form payloads are built in `frontend/src/features/timeline/timelineRequests.ts`. Calendar state, grid components, and derived calculations live under `frontend/src/features/calendar/`. Each feature folder under `frontend/src/features/` holds its components, hooks, and logic; `frontend/src/components/` holds only shared UI and the app shell, and `frontend/src/hooks/` only generic hooks.
 - [frontend/src/App.css](../frontend/src/App.css)
   - Imports feature styles from `frontend/src/styles/`, including tokens, base rules, auth, calendar, sidebar, and drawers.
 - [frontend/src/index.css](../frontend/src/index.css)
@@ -295,11 +295,11 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Change quick add parsing                      | `backend/internal/quickadd/`                                                                                          | `frontend/src/features/quickAdd/`                      |
 | Change households or card conflicts           | `backend/db/households.go`, `backend/internal/timeline/household.go`                                                  | migration 15, `frontend/src/features/household/`       |
 | Change timeline JSON shape                    | `db.TimelineEntry` in `backend/db/models.go`                                                                          | frontend `TimelineEntry` type and grid rendering       |
-| Change week navigation/date math              | `frontend/src/App.tsx` date helpers and week state                                                                    | `date-fns` imports                                     |
+| Change week navigation/date math              | `frontend/src/lib/calendar.ts` and `frontend/src/features/calendar/useCalendarState.ts`                               | `date-fns` imports                                     |
 | Change event block placement                  | `frontend/src/App.tsx` `renderGridEntry`/`renderDayEntries` (busy and not-busy layers, `isBusy` in `lib/timeline.ts`) | `.grid-entry` in `frontend/src/styles/calendar.css`    |
 | Change hour grid dimensions                   | `--hour-height` and related layout tokens in `frontend/src/styles/tokens.css`                                         | `gridOffset` in `lib/calendar.ts`                      |
-| Change create-item fields                     | composer in `frontend/src/App.tsx`                                                                                    | backend request structs and validation                 |
-| Change client caching/loading                 | TanStack Query setup in `frontend/src/main.tsx` and workspace query in `App.tsx`                                      | API wrapper                                            |
+| Change create-item fields                     | `frontend/src/features/composer/` and `frontend/src/features/timeline/timelineRequests.ts`                            | backend request structs and validation                 |
+| Change client caching/loading                 | TanStack Query setup in `frontend/src/main.tsx` and `features/timeline/useWorkspace.ts`                               | API wrapper                                            |
 | Change colors, spacing, or layout             | `frontend/src/styles/`                                                                                                | `frontend/src/index.css` for global rules              |
 
 ## Maintainability Rules

@@ -26,7 +26,7 @@ export const gridOffset = (minutes: number) =>
 type LocaleWeekInfo = { firstDay: number };
 export type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type TimeFormatPreference = "browser" | "12-hour" | "24-hour";
-export type TimeFormatOptions = {
+type TimeFormatOptions = {
   locale?: string;
   preference?: TimeFormatPreference;
 };
@@ -129,8 +129,3 @@ export const minutesIntoDay = (value?: string | Date) => {
   const date = value instanceof Date ? value : new Date(value);
   return getHours(date) * MINUTES_PER_HOUR + getMinutes(date);
 };
-
-export const sameInstant = (left?: string, right?: string) =>
-  Boolean(
-    left && right && new Date(left).getTime() === new Date(right).getTime(),
-  );

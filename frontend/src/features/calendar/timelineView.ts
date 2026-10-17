@@ -21,7 +21,6 @@ import {
   getDrawnStart,
   getGathering,
   getGatheringStart,
-  getElapsedOverlayState,
   getEntryMinutes,
   getOccupiedRange,
   getTimelineEntryDate,
@@ -56,7 +55,7 @@ export type GatheringSegment = {
   endsAtEventStart: boolean;
 };
 
-export type AllDayEventSpan = {
+type AllDayEventSpan = {
   entry: TimelineEntry;
   startIndex: number;
   endIndex: number;
@@ -214,11 +213,30 @@ export const getEventPreview = (
   };
 };
 
-export const getDayElapsedOverlay = (
+export type ElapsedOverlayState =
+  | { kind: "past" }
+  | { kind: "today"; height: string; label: string }
+  | { kind: "none" };
+
+export const getElapsedOverlayState = (
   date: Date,
   today: Date,
-  formatLabel: (value: Date) => string,
-) => getElapsedOverlayState(date, today, formatLabel);
+  formatTimeLabel: (value: Date) => string,
+): ElapsedOverlayState => {
+  const dayKey = dateKey(date);
+  const todayKey = dateKey(today);
+  if (dayKey < todayKey) return { kind: "past" };
+  if (dayKey !== todayKey) return { kind: "none" };
+
+  const currentMinutes =
+    today.getHours() * MINUTES_PER_HOUR + today.getMinutes();
+  if (currentMinutes === 0) return { kind: "none" };
+  return {
+    kind: "today",
+    height: gridOffset(currentMinutes),
+    label: formatTimeLabel(today),
+  };
+};
 
 const occupiedEdgesTouch = (earlier: TimelineEntry, later: TimelineEntry) =>
   getOccupiedRange(earlier).end.getTime() ===

@@ -1,4 +1,4 @@
-import type { ElapsedOverlayState } from "../../lib/timeline";
+import type { ElapsedOverlayState } from "./timelineView";
 import type { EventPreview } from "./timelineView";
 
 type CalendarDayIndicatorsProps = {

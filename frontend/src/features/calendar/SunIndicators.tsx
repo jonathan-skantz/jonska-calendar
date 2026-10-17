@@ -1,4 +1,4 @@
-import { Sun } from "../../components/WeatherIcons";
+import { Sun } from "../weather/WeatherIcons";
 import type {
   SunIndicators as SunIndicatorsState,
   SunLine,

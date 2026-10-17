@@ -10,16 +10,16 @@ import {
   formatTime,
 } from "./lib/calendar";
 import { PHONE_MEDIA_QUERY } from "./lib/layout";
-import { getComposerFieldErrors } from "./lib/formValidation";
+import { getComposerFieldErrors } from "./features/composer/formValidation";
 import { isBusy } from "./lib/timeline";
-import type { ComposerFieldErrors } from "./lib/formValidation";
+import type { ComposerFieldErrors } from "./features/composer/formValidation";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useSidebarState } from "./hooks/useSidebarState";
-import { useComposer } from "./hooks/useComposer";
-import { useTagVisibility } from "./hooks/useTagVisibility";
-import { useWorkspace } from "./hooks/useWorkspace";
+import { useComposer } from "./features/composer/useComposer";
+import { useTagVisibility } from "./features/tags/useTagVisibility";
+import { useWorkspace } from "./features/timeline/useWorkspace";
 import { useAuth } from "./features/auth/useAuth";
 import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
 import { useTagMutations } from "./features/tags/useTagMutations";
@@ -30,7 +30,7 @@ import {
   getCalendarEntryLayout,
   getCalendarDates,
   getClickedEventStart,
-  getDayElapsedOverlay,
+  getElapsedOverlayState,
   getEntriesForDate,
   entriesOverlap,
   getCommuteSegments,
@@ -47,23 +47,23 @@ import type {
   GatheringSegment,
 } from "./features/calendar/timelineView";
 import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
-import { AuthScreen } from "./components/AuthScreen";
-import { ComposerDrawer } from "./components/ComposerDrawer";
-import { QuickAddBar } from "./components/QuickAddBar";
+import { AuthScreen } from "./features/auth/AuthScreen";
+import { ComposerDrawer } from "./features/composer/ComposerDrawer";
+import { QuickAddBar } from "./features/quickAdd/QuickAddBar";
 import { parseEvent } from "./features/quickAdd/parseEvent";
 import { resolveDraft } from "./features/quickAdd/resolveDraft";
 import { getRequestErrorMessage } from "./lib/requestErrors";
-import { CalendarEntry } from "./components/CalendarEntry";
-import { AllDayEvent } from "./components/AllDayEvent";
+import { CalendarEntry } from "./features/calendar/CalendarEntry";
+import { AllDayEvent } from "./features/calendar/AllDayEvent";
 import { Sidebar } from "./components/Sidebar";
-import { TagEditorDrawer } from "./components/TagEditorDrawer";
-import { WeekCalendar } from "./components/WeekCalendar";
-import { WeekHeader } from "./components/WeekHeader";
+import { TagEditorDrawer } from "./features/tags/TagEditorDrawer";
+import { WeekCalendar } from "./features/calendar/WeekCalendar";
+import { WeekHeader } from "./features/calendar/WeekHeader";
 import { TopBar } from "./components/TopBar";
-import { SettingsPage } from "./components/SettingsPage";
-import { HouseholdSettings } from "./components/HouseholdSettings";
-import { ShareEventDrawer } from "./components/ShareEventDrawer";
-import { SharedEventDrawer } from "./components/SharedEventDrawer";
+import { SettingsPage } from "./features/settings/SettingsPage";
+import { HouseholdSettings } from "./features/household/HouseholdSettings";
+import { ShareEventDrawer } from "./features/sharing/ShareEventDrawer";
+import { SharedEventDrawer } from "./features/sharing/SharedEventDrawer";
 import {
   useEventShareMutations,
   useEventShares,
@@ -72,8 +72,8 @@ import {
   useHousehold,
   useHouseholdMutations,
 } from "./features/household/useHousehold";
-import { TransitCardPill } from "./components/TransitCardPill";
-import { TransitCardDrawer } from "./components/TransitCardDrawer";
+import { TransitCardPill } from "./features/transitCard/TransitCardPill";
+import { TransitCardDrawer } from "./features/transitCard/TransitCardDrawer";
 import {
   getTransitCardDayViews,
   getTransitCardPillVariant,
@@ -94,8 +94,8 @@ import {
   getRemindersByEvent,
   isReminderUpcoming,
 } from "./features/reminders/reminders";
-import { RemindersDrawer } from "./components/RemindersDrawer";
-import { ReminderToasts } from "./components/ReminderToasts";
+import { RemindersDrawer } from "./features/reminders/RemindersDrawer";
+import { ReminderToasts } from "./features/reminders/ReminderToasts";
 import type { Reminder } from "./types";
 import "./App.css";
 
@@ -590,7 +590,7 @@ function App() {
                           )
                         : null
                     }
-                    elapsed={getDayElapsedOverlay(date, today, (value) =>
+                    elapsed={getElapsedOverlayState(date, today, (value) =>
                       formatTime(value, { preference: preferences.timeFormat }),
                     )}
                   />
