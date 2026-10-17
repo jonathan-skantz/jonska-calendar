@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { ChangeEvent } from "react";
 import type { ShareFieldsUpdate } from "./useEventShares";
 import type { EventShare, ShareFields, TimelineEntry } from "../../types";
+import { Drawer } from "../../components/Drawer";
+import { cx } from "../../lib/classNames";
 
 type ShareEventDrawerProps = {
   event: TimelineEntry;
@@ -69,7 +71,7 @@ const RecipientCard = ({
           <strong>{share.recipient_display_name}</strong>
           <small>{share.recipient_email}</small>
         </button>
-        <span className={`share-badge ${custom ? "custom" : ""}`}>
+        <span className={cx("share-badge", custom > 0 && "custom")}>
           {custom ? `${custom} custom` : "Same as event"}
         </span>
         <button
@@ -142,91 +144,81 @@ export const ShareEventDrawer = ({
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
 
   return (
-    <div
-      className="drawer-backdrop share-drawer-backdrop"
-      onMouseDown={(mouseEvent) =>
-        mouseEvent.target === mouseEvent.currentTarget && onClose()
-      }
+    <Drawer
+      eyebrow="Share event"
+      title={`Share “${event.title}”`}
+      className="share-drawer"
+      backdropClassName="share-drawer-backdrop"
+      onClose={onClose}
     >
-      <aside className="composer drawer share-drawer">
-        <div className="modal-heading">
-          <div>
-            <p className="eyebrow">Share event</p>
-            <h2>Share “{event.title}”</h2>
-          </div>
-          <button className="icon-button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-        <form
-          className="share-add"
-          onSubmit={async (formEvent) => {
-            formEvent.preventDefault();
-            const form = formEvent.currentTarget;
-            const email = String(new FormData(form).get("recipient-email"))
-              .trim()
-              .toLowerCase();
-            const addError = await onAdd(email);
-            setError(addError ?? "");
-            if (!addError) {
-              form.reset();
-              setExpandedEmail(email);
-            }
-          }}
-        >
-          <label>
-            Add recipient
-            <input
-              name="recipient-email"
-              type="email"
-              placeholder="name@example.com"
-              required
-            />
-          </label>
-          <button className="primary-button compact" type="submit">
-            Add
-          </button>
-        </form>
-        <p className="form-hint">
-          Leave a field empty to show the event’s own value. Changes to the
-          event still reach everyone. Tags are never shared.
+      {error && (
+        <p className="error" role="alert">
+          {error}
         </p>
-        {shares && shares.length === 0 && (
-          <p className="form-hint">Not shared with anyone yet.</p>
-        )}
-        <ul className="share-recipients">
-          {shares?.map((share) => (
-            <RecipientCard
-              // Saved values are part of the key so the draft resets to what
-              // the server stored after each save.
-              key={`${share.id}:${FIELDS.map(({ name }) => share[name] ?? "").join("\u0000")}`}
-              event={event}
-              share={share}
-              expanded={expandedEmail === share.recipient_email}
-              onToggle={() =>
-                setExpandedEmail((current) =>
-                  current === share.recipient_email
-                    ? null
-                    : share.recipient_email,
-                )
-              }
-              onSave={async (fields) => {
-                const saveError = await onUpdate(share.id, fields);
-                setError(saveError ?? "");
-                return saveError;
-              }}
-              onRemove={async () => {
-                setError((await onRemove(share)) ?? "");
-              }}
-            />
-          ))}
-        </ul>
-      </aside>
-    </div>
+      )}
+      <form
+        className="share-add"
+        onSubmit={async (formEvent) => {
+          formEvent.preventDefault();
+          const form = formEvent.currentTarget;
+          const email = String(new FormData(form).get("recipient-email"))
+            .trim()
+            .toLowerCase();
+          const addError = await onAdd(email);
+          setError(addError ?? "");
+          if (!addError) {
+            form.reset();
+            setExpandedEmail(email);
+          }
+        }}
+      >
+        <label>
+          Add recipient
+          <input
+            name="recipient-email"
+            type="email"
+            placeholder="name@example.com"
+            required
+          />
+        </label>
+        <button className="primary-button compact" type="submit">
+          Add
+        </button>
+      </form>
+      <p className="form-hint">
+        Leave a field empty to show the event’s own value. Changes to the event
+        still reach everyone. Tags are never shared.
+      </p>
+      {shares && shares.length === 0 && (
+        <p className="form-hint">Not shared with anyone yet.</p>
+      )}
+      <ul className="share-recipients">
+        {shares?.map((share) => (
+          <RecipientCard
+            // Saved values are part of the key so the draft resets to what
+            // the server stored after each save.
+            key={`${share.id}:${FIELDS.map(({ name }) => share[name] ?? "").join("\u0000")}`}
+            event={event}
+            share={share}
+            expanded={expandedEmail === share.recipient_email}
+            onToggle={() =>
+              setExpandedEmail((current) =>
+                current === share.recipient_email
+                  ? null
+                  : share.recipient_email,
+              )
+            }
+            onSave={async (fields) => {
+              const saveError = await onUpdate(share.id, fields);
+              setError(saveError ?? "");
+              return saveError;
+            }}
+            onRemove={async () => {
+              setError((await onRemove(share)) ?? "");
+            }}
+          />
+        ))}
+      </ul>
+    </Drawer>
   );
 };

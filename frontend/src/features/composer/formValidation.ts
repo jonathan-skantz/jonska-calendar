@@ -1,6 +1,6 @@
 type ComposerType = "event" | "task";
 
-type ComposerField =
+export type ComposerField =
   | "title"
   | "description"
   | "url"

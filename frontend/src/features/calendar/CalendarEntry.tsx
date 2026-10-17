@@ -18,6 +18,7 @@ import {
 import type { CommuteSegment, GatheringSegment } from "./timelineView";
 import type { Reminder, TimelineEntry } from "../../types";
 import { describeReminders } from "../reminders/reminders";
+import { cx } from "../../lib/classNames";
 
 type CalendarEntryProps = {
   entry: TimelineEntry;
@@ -248,7 +249,11 @@ export const CalendarEntry = ({
     return (
       <div
         key={segment.position}
-        className={`commute-band ${segment.position} ${hasEarlierOverlap ? "overlapping-later-event" : ""}`}
+        className={cx(
+          "commute-band",
+          segment.position,
+          hasEarlierOverlap && "overlapping-later-event",
+        )}
         role="img"
         aria-label={description}
         title={description}
@@ -284,7 +289,12 @@ export const CalendarEntry = ({
   // other entries instead of part of the event block.
   const renderOptionalGathering = (segment: GatheringSegment) => (
     <div
-      className={`gathering-band optional ${startIsApproximate && !segment.continuesFromPreviousDay ? "approximate-start" : ""}`}
+      className={cx(
+        "gathering-band optional",
+        startIsApproximate &&
+          !segment.continuesFromPreviousDay &&
+          "approximate-start",
+      )}
       role="img"
       aria-label={gatheringDescription}
       title={gatheringDescription}
@@ -320,7 +330,21 @@ export const CalendarEntry = ({
       {showBody && (
         <article
           ref={entryRef}
-          className={`grid-entry ${entry.type} ${entry.is_completed ? "completed" : ""} ${hasEarlierOverlap ? "overlapping-later-event" : ""} ${continuesFromPreviousDay ? "continues-from-previous-day" : ""} ${continuesToNextDay ? "continues-to-next-day" : ""} ${commuteBefore ? "has-commute-before" : ""} ${optionalGathering ? "has-optional-gathering" : ""} ${commuteAfter ? "has-commute-after" : ""} ${articleFadesStart ? "approximate-start" : ""} ${isGhost ? `not-busy ${entry.is_skipped ? "skipped" : "heads-up"}` : ""} ${articleFadesEnd ? "approximate-end" : ""}`}
+          className={cx(
+            "grid-entry",
+            entry.type,
+            entry.is_completed && "completed",
+            hasEarlierOverlap && "overlapping-later-event",
+            continuesFromPreviousDay && "continues-from-previous-day",
+            continuesToNextDay && "continues-to-next-day",
+            commuteBefore && "has-commute-before",
+            optionalGathering && "has-optional-gathering",
+            commuteAfter && "has-commute-after",
+            articleFadesStart && "approximate-start",
+            isGhost &&
+              (entry.is_skipped ? "not-busy skipped" : "not-busy heads-up"),
+            articleFadesEnd && "approximate-end",
+          )}
           style={
             {
               top: gridOffset(startMinutes),

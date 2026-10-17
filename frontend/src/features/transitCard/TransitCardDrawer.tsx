@@ -9,6 +9,8 @@ import type {
 import type { TransitCardSubmission } from "./useTransitCard";
 import type { TransitCardNeed } from "../../types";
 import { TransitCardPill } from "./TransitCardPill";
+import { Drawer } from "../../components/Drawer";
+import { cx } from "../../lib/classNames";
 
 type TransitCardDrawerProps = {
   views: TransitCardDayView[];
@@ -72,100 +74,90 @@ export const TransitCardDrawer = ({
     setAnswers((current) => new Map(current).set(key, need));
 
   return (
-    <div
-      className="drawer-backdrop"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    <Drawer
+      eyebrow="Shared transit card"
+      title="Which days do you need it?"
+      className="transit-card-editor"
+      onClose={onClose}
     >
-      <aside className="composer drawer transit-card-editor">
-        <div className="modal-heading">
-          <div>
-            <p className="eyebrow">Shared transit card</p>
-            <h2>Which days do you need it?</h2>
-          </div>
-          <button className="icon-button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        {error && <p className="error">{error}</p>}
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (submission) onSave(submission);
-          }}
-        >
-          <div className="transit-card-days">
-            {views.map((view) => {
-              const past = view.state === "past";
-              const selected = past ? view.day?.need : answers.get(view.key);
-              const capacity =
-                cardCount === undefined
-                  ? null
-                  : getDayCapacity(view, selected, cardCount);
-              return (
-                <div
-                  className={`transit-card-day ${view.state}`}
-                  key={view.key}
-                  role="group"
-                  aria-label={formatDate(view.date)}
-                >
-                  <span>{formatDate(view.date)}</span>
-                  <small>{dayHint(view)}</small>
-                  <div className="transit-card-choices">
-                    {NEED_OPTIONS.map(([need, label]) => (
-                      <button
-                        type="button"
-                        key={need}
-                        className={`${need} ${selected === need ? "selected" : ""}`}
-                        aria-pressed={selected === need}
-                        disabled={past}
-                        onClick={() => choose(view.key, need)}
-                      >
-                        {label}
-                      </button>
+      {error && <p className="error">{error}</p>}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (submission) onSave(submission);
+        }}
+      >
+        <div className="transit-card-days">
+          {views.map((view) => {
+            const past = view.state === "past";
+            const selected = past ? view.day?.need : answers.get(view.key);
+            const capacity =
+              cardCount === undefined
+                ? null
+                : getDayCapacity(view, selected, cardCount);
+            return (
+              <div
+                className={`transit-card-day ${view.state}`}
+                key={view.key}
+                role="group"
+                aria-label={formatDate(view.date)}
+              >
+                <span>{formatDate(view.date)}</span>
+                <small>{dayHint(view)}</small>
+                <div className="transit-card-choices">
+                  {NEED_OPTIONS.map(([need, label]) => (
+                    <button
+                      type="button"
+                      key={need}
+                      className={cx(need, selected === need && "selected")}
+                      aria-pressed={selected === need}
+                      disabled={past}
+                      onClick={() => choose(view.key, need)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {view.others.length > 0 && (
+                  <div
+                    className="transit-card-others"
+                    aria-label="Other household members"
+                  >
+                    {view.others.map((member) => (
+                      <TransitCardPill
+                        key={member.user_id}
+                        name={member.display_name}
+                        variant={memberVariant(member)}
+                        compact
+                      />
                     ))}
                   </div>
-                  {view.others.length > 0 && (
-                    <div
-                      className="transit-card-others"
-                      aria-label="Other household members"
+                )}
+                {capacity &&
+                  cardCount !== undefined &&
+                  capacity.yesCount > 0 && (
+                    <p
+                      className={cx(
+                        "transit-card-capacity",
+                        capacity.overCapacity && "over",
+                      )}
+                      role={capacity.overCapacity ? "alert" : undefined}
                     >
-                      {view.others.map((member) => (
-                        <TransitCardPill
-                          key={member.user_id}
-                          name={member.display_name}
-                          variant={memberVariant(member)}
-                          compact
-                        />
-                      ))}
-                    </div>
+                      {capacityText(capacity.yesCount, cardCount)}
+                    </p>
                   )}
-                  {capacity &&
-                    cardCount !== undefined &&
-                    capacity.yesCount > 0 && (
-                      <p
-                        className={`transit-card-capacity ${capacity.overCapacity ? "over" : ""}`}
-                        role={capacity.overCapacity ? "alert" : undefined}
-                      >
-                        {capacityText(capacity.yesCount, cardCount)}
-                      </p>
-                    )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="form-hint">
-            Saving records every remaining day shown here. Days without an
-            answer are reported as not needed.
-          </p>
-          <button
-            className="primary-button"
-            type="submit"
-            disabled={!submission}
-          >
-            {nothingNeeded ? "Save – no days needed" : "Save"}
-          </button>
-        </form>
-      </aside>
-    </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="form-hint">
+          Saving records every remaining day shown here. Days without an answer
+          are reported as not needed.
+        </p>
+        <button className="primary-button" type="submit" disabled={!submission}>
+          {nothingNeeded ? "Save – no days needed" : "Save"}
+        </button>
+      </form>
+    </Drawer>
   );
 };

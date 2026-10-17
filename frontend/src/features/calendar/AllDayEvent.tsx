@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { getMainTag, isBusy } from "../../lib/timeline";
 import type { Reminder, TimelineEntry } from "../../types";
 import { describeReminders } from "../reminders/reminders";
+import { cx } from "../../lib/classNames";
 
 export function AllDayEvent({
   entry,
@@ -44,7 +45,11 @@ export function AllDayEvent({
       )}
       <button
         type="button"
-        className={`all-day-event ${continuesToNextWeek ? "continues-to-next-week" : ""} ${isGhost ? "not-busy" : ""}`}
+        className={cx(
+          "all-day-event",
+          continuesToNextWeek && "continues-to-next-week",
+          isGhost && "not-busy",
+        )}
         style={
           isGhost
             ? ({ "--tag-color": backgroundColor } as CSSProperties)
@@ -60,7 +65,10 @@ export function AllDayEvent({
         title={entry.title}
       >
         <span
-          className={`all-day-title ${continuesToNextWeek ? "continues-to-next-week" : ""}`}
+          className={cx(
+            "all-day-title",
+            continuesToNextWeek && "continues-to-next-week",
+          )}
         >
           {reminders.length > 0 && (
             <i

@@ -1,5 +1,6 @@
 import type { TransitCardPillVariant } from "./transitCardDays";
 import { BusIcon } from "./BusIcon";
+import { cx } from "../../lib/classNames";
 
 type TransitCardPillProps = {
   name: string;
@@ -31,7 +32,7 @@ export const TransitCardPill = ({
   compact = false,
 }: TransitCardPillProps) => (
   <span
-    className={`transit-card-pill ${variant} ${compact ? "compact" : ""}`}
+    className={cx("transit-card-pill", variant, compact && "compact")}
     style={column === undefined ? undefined : { gridColumn: column + 1 }}
     title={describe(name, variant)}
   >

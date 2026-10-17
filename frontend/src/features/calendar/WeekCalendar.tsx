@@ -13,6 +13,7 @@ import {
 } from "../../lib/layout";
 import type { WeatherDay } from "../../types";
 import { WeatherIcons } from "../weather/WeatherIcons";
+import { cx } from "../../lib/classNames";
 
 type WeekCalendarProps = {
   dates: Date[];
@@ -108,7 +109,7 @@ export const WeekCalendar = ({
   return (
     <div
       ref={scrollerRef}
-      className={`week-calendar ${onSwipe ? "swipeable" : ""}`}
+      className={cx("week-calendar", onSwipe && "swipeable")}
       aria-label="Week calendar"
       style={{ "--day-count": dates.length } as CSSProperties}
       onPointerDown={handlePointerDown}
@@ -120,7 +121,7 @@ export const WeekCalendar = ({
           <span />
           {dates.map((date) => (
             <div
-              className={`day-heading ${isWeekend(date) ? "weekend" : ""}`}
+              className={cx("day-heading", isWeekend(date) && "weekend")}
               key={dateKey(date)}
             >
               <strong>{date.getDate()}</strong>
@@ -160,7 +161,7 @@ export const WeekCalendar = ({
         </div>
         {dates.map((date) => (
           <div
-            className={`day-column ${isWeekend(date) ? "weekend" : ""}`}
+            className={cx("day-column", isWeekend(date) && "weekend")}
             key={dateKey(date)}
             onClick={(event) => onDayClick(event, date)}
           >

@@ -5,6 +5,7 @@ import type { TimeFormatPreference } from "../../lib/calendar";
 import type { TimelineEntry } from "../../types";
 import { ReminderEditor } from "../reminders/ReminderEditor";
 import type { ReminderItem } from "../reminders/ReminderEditor";
+import { Drawer } from "../../components/Drawer";
 
 type SharedEventDrawerProps = {
   entry: TimelineEntry;
@@ -55,63 +56,54 @@ export const SharedEventDrawer = ({
   onAddReminder,
   onRemoveReminder,
 }: SharedEventDrawerProps) => (
-  <div
-    className="drawer-backdrop"
-    onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+  <Drawer
+    eyebrow={`Shared by ${entry.shared_by}`}
+    title={entry.title}
+    className="shared-event-view"
+    onClose={onClose}
   >
-    <aside className="composer drawer shared-event-view">
-      <div className="modal-heading">
-        <div>
-          <p className="eyebrow">Shared by {entry.shared_by}</p>
-          <h2>{entry.title}</h2>
-        </div>
-        <button className="icon-button" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-      </div>
-      <dl>
-        <dt>When</dt>
-        <dd>{formatRange(entry, timeFormat)}</dd>
-        <dt>Kind</dt>
-        <dd>{entry.kind === "attendable" ? "Attend" : "Heads-up"}</dd>
-        {entry.location && (
-          <>
-            <dt>Location</dt>
-            <dd>{entry.location}</dd>
-          </>
-        )}
-        {entry.url && (
-          <>
-            <dt>URL</dt>
-            <dd>
-              {/* The URL comes from another user, so only web links are clickable. */}
-              {/^https?:\/\//i.test(entry.url) ? (
-                <a href={entry.url} target="_blank" rel="noreferrer">
-                  {entry.url}
-                </a>
-              ) : (
-                entry.url
-              )}
-            </dd>
-          </>
-        )}
-        {entry.description && (
-          <>
-            <dt>Details</dt>
-            <dd className="shared-event-description">{entry.description}</dd>
-          </>
-        )}
-      </dl>
-      {onAddReminder && onRemoveReminder && (
-        <ReminderEditor
-          reminders={reminders ?? []}
-          isAllDay={Boolean(entry.is_all_day)}
-          error={reminderError}
-          onAdd={onAddReminder}
-          onRemove={onRemoveReminder}
-        />
+    <dl>
+      <dt>When</dt>
+      <dd>{formatRange(entry, timeFormat)}</dd>
+      <dt>Kind</dt>
+      <dd>{entry.kind === "attendable" ? "Attend" : "Heads-up"}</dd>
+      {entry.location && (
+        <>
+          <dt>Location</dt>
+          <dd>{entry.location}</dd>
+        </>
       )}
-      <p className="form-hint">Only {entry.shared_by} can change this event.</p>
-    </aside>
-  </div>
+      {entry.url && (
+        <>
+          <dt>URL</dt>
+          <dd>
+            {/* The URL comes from another user, so only web links are clickable. */}
+            {/^https?:\/\//i.test(entry.url) ? (
+              <a href={entry.url} target="_blank" rel="noreferrer">
+                {entry.url}
+              </a>
+            ) : (
+              entry.url
+            )}
+          </dd>
+        </>
+      )}
+      {entry.description && (
+        <>
+          <dt>Details</dt>
+          <dd className="shared-event-description">{entry.description}</dd>
+        </>
+      )}
+    </dl>
+    {onAddReminder && onRemoveReminder && (
+      <ReminderEditor
+        reminders={reminders ?? []}
+        isAllDay={Boolean(entry.is_all_day)}
+        error={reminderError}
+        onAdd={onAddReminder}
+        onRemove={onRemoveReminder}
+      />
+    )}
+    <p className="form-hint">Only {entry.shared_by} can change this event.</p>
+  </Drawer>
 );
