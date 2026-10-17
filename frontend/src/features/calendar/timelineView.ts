@@ -1,7 +1,6 @@
 import { addDays, startOfDay } from "date-fns";
 import type { MouseEvent } from "react";
 import {
-  CALENDAR_GRID_SCALE,
   DEFAULT_EVENT_DURATION_MINUTES,
   HOURS_PER_DAY,
   LAST_EVENT_START_HOUR,
@@ -12,6 +11,7 @@ import {
   WEEK_DAY_COUNT,
   dateKey,
   formatTime,
+  gridOffset,
   localDateKey,
   minutesIntoDay,
 } from "../../lib/calendar";
@@ -32,6 +32,7 @@ import type { TimeFormatPreference } from "../../lib/calendar";
 
 export type EventPreview = {
   top: string;
+  height: string;
   startsAt: string;
   endsAt: string;
 };
@@ -64,10 +65,10 @@ export type AllDayEventSpan = {
   continuesToNextWeek: boolean;
 };
 
-export const getCalendarDates = (weekStart: Date) =>
-  Array.from({ length: WEEK_DAY_COUNT }, (_, index) =>
-    addDays(weekStart, index),
-  );
+export const getCalendarDates = (
+  rangeStart: Date,
+  dayCount: number = WEEK_DAY_COUNT,
+) => Array.from({ length: dayCount }, (_, index) => addDays(rangeStart, index));
 
 const eventOverlapsRange = (
   entry: TimelineEntry,
@@ -210,7 +211,8 @@ export const getEventPreview = (
       DEFAULT_EVENT_DURATION_MINUTES * MINUTES_PER_HOUR * 60 * 1000,
   ).toISOString();
   return {
-    top: `${(minutesIntoDay(startAt) / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
+    top: gridOffset(minutesIntoDay(startAt)),
+    height: gridOffset(DEFAULT_EVENT_DURATION_MINUTES),
     startsAt: formatTime(startAt, { preference: timeFormat }),
     endsAt: formatTime(end, { preference: timeFormat }),
   };

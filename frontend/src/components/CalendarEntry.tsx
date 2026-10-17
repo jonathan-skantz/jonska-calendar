@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
-  CALENDAR_GRID_SCALE,
   EVENT_OVERLAP_INSET_PIXELS,
   EVENT_SEPARATOR_PIXELS,
-  MINUTES_PER_HOUR,
   formatEventTime,
+  gridOffset,
 } from "../lib/calendar";
 import type { TimeFormatPreference } from "../lib/calendar";
 import { tagTextColor } from "../lib/colors";
@@ -48,9 +47,6 @@ const CONTINUATION_MARKER_HEIGHT = 6;
 const CONTINUATION_MARKER_SPACING = 12;
 const COMMUTE_LABEL_MIN_MINUTES = 15;
 const GHOST_EDGE_PIXELS = 8;
-
-const gridOffset = (minutes: number) =>
-  `${(minutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`;
 
 const ContinuationMarkers = ({
   position,

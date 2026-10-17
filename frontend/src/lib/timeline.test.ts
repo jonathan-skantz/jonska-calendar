@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getEventAdjacency } from "../features/calendar/timelineView";
+import { gridOffset } from "./calendar";
 import {
   getElapsedOverlayState,
   getEventTagChanges,
@@ -241,7 +242,7 @@ describe("timeline behavior", () => {
     expect(getElapsedOverlayState(new Date(2026, 9, 15), today, label)).toEqual(
       {
         kind: "today",
-        height: "19rem",
+        height: gridOffset(9.5 * 60),
         label: "9:30",
       },
     );

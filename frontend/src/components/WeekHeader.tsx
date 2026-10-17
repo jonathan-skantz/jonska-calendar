@@ -40,8 +40,12 @@ export const WeekHeader = ({
       <div className="week-actions">
         {quickAdd}
         <span className="item-count">{itemCount} items</span>
-        <button className="primary-button compact" onClick={onAddItem}>
-          Add item <span>＋</span>
+        <button
+          className="primary-button compact"
+          onClick={onAddItem}
+          aria-label="Add item"
+        >
+          <span className="add-item-label">Add item</span> <span>＋</span>
         </button>
       </div>
     </div>

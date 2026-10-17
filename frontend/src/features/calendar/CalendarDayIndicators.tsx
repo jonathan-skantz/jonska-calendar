@@ -14,7 +14,7 @@ export const CalendarDayIndicators = ({
     {preview && (
       <div
         className="grid-entry event preview"
-        style={{ top: preview.top, height: "4rem" }}
+        style={{ top: preview.top, height: preview.height }}
         aria-hidden="true"
       >
         <strong>New event</strong>

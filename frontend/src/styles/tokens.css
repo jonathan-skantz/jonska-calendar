@@ -12,3 +12,29 @@
   --transit-pending: #a3aca6;
   --transit-maybe: #f0a04b;
 }
+
+/* Layout. The phone breakpoint (max-width: 640px) can't be a custom property
+   inside @media; keep it in sync with PHONE_MEDIA_QUERY in lib/layout.ts. */
+:root {
+  --topbar-height: 52px;
+  --gutter: clamp(12px, 2vw, 24px);
+  --sidebar-width: 240px;
+  --drawer-width: 420px;
+  --hour-label-width: 56px;
+
+  /* Week grid: --visible-hours fill the space under the day headings
+     (see --hour-height in calendar.css), clamped so hours stay readable on
+     short screens and compact on huge ones. */
+  --visible-hours: 24;
+  --hour-height-min: 2rem;
+  --hour-height-max: 5rem;
+
+  --z-calendar-header: 6;
+  --z-sidebar-drawer: 20;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --hour-label-width: 40px;
+  }
+}

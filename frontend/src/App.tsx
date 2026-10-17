@@ -1,11 +1,22 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { dateKey, formatDate, formatTime } from "./lib/calendar";
+import {
+  DEFAULT_SCROLL_HOUR,
+  PHONE_DAY_COUNT,
+  WEEK_DAY_COUNT,
+  dateKey,
+  formatDate,
+  formatShortDate,
+  formatTime,
+} from "./lib/calendar";
+import { PHONE_MEDIA_QUERY } from "./lib/layout";
 import { getComposerFieldErrors } from "./lib/formValidation";
 import { isBusy } from "./lib/timeline";
 import type { ComposerFieldErrors } from "./lib/formValidation";
 import type { AuthMode, Tag, TimelineEntry } from "./types";
 import { useCurrentTime } from "./hooks/useCurrentTime";
+import { useMediaQuery } from "./hooks/useMediaQuery";
+import { useSidebarState } from "./hooks/useSidebarState";
 import { useComposer } from "./hooks/useComposer";
 import { useTagVisibility } from "./hooks/useTagVisibility";
 import { useWorkspace } from "./hooks/useWorkspace";
@@ -116,14 +127,17 @@ function App() {
     useTagVisibility();
   const today = useCurrentTime();
   const weekStartsOn = getEffectiveWeekStart(preferences.weekStartsOn);
-  const { weekStart, selectedDate, setSelectedDate, moveWeek } =
-    useCalendarState(today, weekStartsOn);
+  const isPhone = useMediaQuery(PHONE_MEDIA_QUERY);
+  const dayCount = isPhone ? PHONE_DAY_COUNT : WEEK_DAY_COUNT;
+  const sidebar = useSidebarState(isPhone);
+  const { rangeStart, selectedDate, setSelectedDate, moveRange } =
+    useCalendarState(today, weekStartsOn, dayCount);
   const [actionError, setActionError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
   const tagMutations = useTagMutations(setActionError, removeHiddenTag);
   const { toggleTask, deleteItem, saveItem } =
     useTimelineMutations(setActionError);
-  const dates = getCalendarDates(weekStart);
+  const dates = getCalendarDates(rangeStart, dayCount);
   const transitCardQuery = useTransitCardDays(
     dateKey(dates[0]),
     dateKey(dates[dates.length - 1]),
@@ -445,21 +459,33 @@ function App() {
       />
     ) : null;
   });
+  const openSettings = () => {
+    setShowSettings(true);
+    setShowTagEditor(false);
+    setShowTransitCard(false);
+    closeComposer();
+    if (isPhone) sidebar.close();
+  };
+  const rangeIncludesToday = dates.some(
+    (date) => dateKey(date) === dateKey(today),
+  );
+  // Keep the previous hour visible so the current time isn't at the very top.
+  const scrollToHour = rangeIncludesToday
+    ? Math.max(DEFAULT_SCROLL_HOUR, today.getHours() - 1)
+    : DEFAULT_SCROLL_HOUR;
+  const formatRangeDate = isPhone ? formatShortDate : formatDate;
   return (
     <main className="app-shell">
       <TopBar
         email={user.email}
+        sidebarOpen={sidebar.open}
+        onToggleSidebar={sidebar.toggle}
         upcomingReminderCount={
           reminders.filter((reminder) => isReminderUpcoming(reminder, today))
             .length
         }
         onOpenReminders={() => setShowReminders(true)}
-        onOpenSettings={() => {
-          setShowSettings(true);
-          setShowTagEditor(false);
-          setShowTransitCard(false);
-          closeComposer();
-        }}
+        onOpenSettings={openSettings}
         onLogout={logout}
       />
       {showSettings ? (
@@ -486,12 +512,37 @@ function App() {
         </SettingsPage>
       ) : (
         <section className="content-grid">
+          <Sidebar
+            open={sidebar.open}
+            variant={isPhone ? "drawer" : "rail"}
+            onClose={sidebar.close}
+            drawerFooter={
+              <div className="sidebar-account">
+                <span className="user-email">{user.email}</span>
+                <button className="text-button" onClick={openSettings}>
+                  Settings
+                </button>
+                <button className="text-button" onClick={logout}>
+                  Sign out
+                </button>
+              </div>
+            }
+            openTaskCount={openTasks}
+            tags={tags}
+            hiddenTagIds={hiddenTagIds}
+            onToggleTagVisibility={toggleTagVisibility}
+            onAddTag={createTag}
+            onEditTags={() => {
+              setActionError("");
+              setShowTagEditor(true);
+            }}
+          />
           <div className="timeline-column">
             <WeekHeader
-              title={`${formatDate(dates[0])} – ${formatDate(dates[6])}`}
+              title={`${formatRangeDate(dates[0])} – ${formatRangeDate(dates[dates.length - 1])}`}
               itemCount={weekEntries.length}
-              onPrevious={() => moveWeek(-7)}
-              onNext={() => moveWeek(7)}
+              onPrevious={() => moveRange(-1)}
+              onNext={() => moveRange(1)}
               onAddItem={() => openNewComposer()}
               quickAdd={<QuickAddBar onSubmit={quickAddEvent} />}
             >
@@ -513,6 +564,8 @@ function App() {
               }
               renderAllDay={renderAllDayEntries}
               onDayClick={openNewEventAt}
+              scrollToHour={scrollToHour}
+              onSwipe={isPhone ? moveRange : undefined}
               renderDay={(date) => (
                 <>
                   <SunIndicators
@@ -545,17 +598,6 @@ function App() {
               )}
             />
           </div>
-          <Sidebar
-            openTaskCount={openTasks}
-            tags={tags}
-            hiddenTagIds={hiddenTagIds}
-            onToggleTagVisibility={toggleTagVisibility}
-            onAddTag={createTag}
-            onEditTags={() => {
-              setActionError("");
-              setShowTagEditor(true);
-            }}
-          />
         </section>
       )}
       {showComposer && (

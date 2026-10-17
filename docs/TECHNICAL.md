@@ -273,9 +273,9 @@ The frontend uses:
 - `date-fns` for week arithmetic, local formatting, and hour extraction;
 - TanStack Query for current-user and workspace server state;
 - a small `api<T>()` wrapper for JSON requests and cookie credentials;
-- a custom CSS grid for the seven-day week view.
+- a custom CSS grid for the week view (seven days, or three on phone-width screens).
 
-The week grid is not a pre-built calendar component. It derives each item's vertical position from minutes after local midnight and renders static blocks. Dragging is intentionally absent. An item's position changes only after saving an edited event through the API.
+The week grid is not a pre-built calendar component. It derives each item's vertical position from minutes after local midnight (`gridOffset` in `lib/calendar.ts` scales by the `--hour-height` CSS variable, so the grid grows with the viewport) and renders static blocks. Dragging is intentionally absent. An item's position changes only after saving an edited event through the API.
 
 The workspace query returns both owned and shared timeline entries. Shared entries already contain the effective per-recipient values, so the UI does not need to reconstruct sharing rules, and the owner's original values for customized fields never reach the recipient. Shared entries never include the owner's commute durations, because commute is the owner's personal travel. Gathering describes the event itself, so it is shared.
 
@@ -297,7 +297,7 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Change timeline JSON shape                    | `db.TimelineEntry` in `backend/db/models.go`                                                                          | frontend `TimelineEntry` type and grid rendering       |
 | Change week navigation/date math              | `frontend/src/App.tsx` date helpers and week state                                                                    | `date-fns` imports                                     |
 | Change event block placement                  | `frontend/src/App.tsx` `renderGridEntry`/`renderDayEntries` (busy and not-busy layers, `isBusy` in `lib/timeline.ts`) | `.grid-entry` in `frontend/src/styles/calendar.css`    |
-| Change hour grid dimensions                   | `frontend/src/App.css` `.week-grid`, `.hour-labels`, `.day-column`                                                    | `renderGridEntry` positioning                          |
+| Change hour grid dimensions                   | `--hour-height` and related layout tokens in `frontend/src/styles/tokens.css`                                         | `gridOffset` in `lib/calendar.ts`                      |
 | Change create-item fields                     | composer in `frontend/src/App.tsx`                                                                                    | backend request structs and validation                 |
 | Change client caching/loading                 | TanStack Query setup in `frontend/src/main.tsx` and workspace query in `App.tsx`                                      | API wrapper                                            |
 | Change colors, spacing, or layout             | `frontend/src/styles/`                                                                                                | `frontend/src/index.css` for global rules              |

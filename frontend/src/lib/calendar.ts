@@ -1,12 +1,15 @@
 import { format, getHours, getMinutes, startOfWeek } from "date-fns";
 
 export const WEEK_DAY_COUNT = 7;
+// Days shown at once on phone-width screens.
+export const PHONE_DAY_COUNT = 3;
+// Hour the week grid scrolls to when it first renders a range.
+export const DEFAULT_SCROLL_HOUR = 7;
 export const HOURS_PER_DAY = 24;
 export const MINUTES_PER_HOUR = 60;
 export const SECONDS_PER_MINUTE = 60;
 export const MAX_GATHERING_LABEL_LENGTH = 40;
 export const MAX_COMMUTE_MINUTES = 24 * 60;
-export const CALENDAR_GRID_SCALE = 2;
 export const TASK_DISPLAY_DURATION_MINUTES = 45;
 export const MINIMUM_ENTRY_DURATION_MINUTES = 90;
 export const DEFAULT_EVENT_DURATION_MINUTES = 120;
@@ -14,6 +17,11 @@ export const CLOCK_UPDATE_INTERVAL_MS = 60_000;
 export const EVENT_SEPARATOR_PIXELS = 1;
 export const EVENT_OVERLAP_INSET_PIXELS = 6;
 export const LAST_EVENT_START_HOUR = 22;
+
+// Vertical grid positions scale with the --hour-height CSS variable so the
+// week grid can grow with the viewport (see styles/tokens.css).
+export const gridOffset = (minutes: number) =>
+  `calc(${minutes / MINUTES_PER_HOUR} * var(--hour-height))`;
 
 type LocaleWeekInfo = { firstDay: number };
 export type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -99,6 +107,7 @@ export const formatEventTime = (
 export const formatHour = (hour: number, options?: TimeFormatOptions) =>
   formatTimeValue(new Date(2020, 0, 1, hour), options);
 export const formatDate = (value: Date) => format(value, "EEE, MMM d");
+export const formatShortDate = (value: Date) => format(value, "MMM d");
 export const dateKey = (value: Date) => format(value, "yyyy-MM-dd");
 export const inputDateTime = (value?: string) =>
   value ? format(new Date(value), "yyyy-MM-dd'T'HH:mm") : "";

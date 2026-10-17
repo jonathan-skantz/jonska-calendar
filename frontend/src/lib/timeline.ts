@@ -1,8 +1,8 @@
 import {
-  CALENDAR_GRID_SCALE,
   MINUTES_PER_HOUR,
   SECONDS_PER_MINUTE,
   dateKey,
+  gridOffset,
   localDateTime,
   minutesIntoDay,
 } from "./calendar";
@@ -85,7 +85,7 @@ export const getElapsedOverlayState = (
   if (currentMinutes === 0) return { kind: "none" };
   return {
     kind: "today",
-    height: `${(currentMinutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`,
+    height: gridOffset(currentMinutes),
     label: formatTimeLabel(today),
   };
 };

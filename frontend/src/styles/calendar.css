@@ -1,5 +1,13 @@
 .week-heading {
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 10px var(--gutter);
+}
+
+.week-heading + .action-error {
+  margin: 0 var(--gutter) 10px;
 }
 
 .week-title,
@@ -25,7 +33,7 @@
 }
 
 .quick-add input {
-  width: min(320px, 40vw);
+  width: min(320px, 30vw);
 }
 
 .quick-add-status {
@@ -42,16 +50,44 @@
   max-width: 320px;
 }
 
+/* The only scroller in the calendar view. WeekCalendar sets --day-count from
+   the rendered dates and --grid-available-height from the measured space
+   under the sticky header; isolation keeps grid z-indexes below drawers. */
 .week-calendar {
-  min-width: 760px;
-  overflow: auto;
-  border: 1px solid var(--line);
+  --day-count: 7;
+  --hour-height: clamp(
+    var(--hour-height-min),
+    var(--grid-available-height, 0px) / var(--visible-hours),
+    var(--hour-height-max)
+  );
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  isolation: isolate;
+  border-top: 1px solid var(--line);
+  background: #fffefa;
+}
+
+/* Let the browser handle vertical scrolling but leave horizontal gestures
+   to the swipe handler. */
+.week-calendar.swipeable {
+  touch-action: pan-y pinch-zoom;
+}
+
+.week-calendar-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-calendar-header);
   background: #fffefa;
 }
 
 .week-day-headings {
   display: grid;
-  grid-template-columns: 56px repeat(7, minmax(110px, 1fr));
+  grid-template-columns: var(--hour-label-width) repeat(
+      var(--day-count),
+      minmax(0, 1fr)
+    );
   border-bottom: 1px solid var(--line);
 }
 
@@ -115,7 +151,7 @@
 
 .all-day-row {
   display: grid;
-  grid-template-columns: 56px 1fr;
+  grid-template-columns: var(--hour-label-width) minmax(0, 1fr);
   border-bottom: 1px solid var(--line);
 }
 
@@ -132,7 +168,7 @@
 
 .all-day-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  grid-template-columns: repeat(var(--day-count), minmax(0, 1fr));
   grid-auto-rows: 25px;
   gap: 0;
   padding: 5px 0;
@@ -229,7 +265,7 @@
 
 .transit-card-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  grid-template-columns: repeat(var(--day-count), minmax(0, 1fr));
   grid-auto-rows: 25px;
   align-items: center;
   min-height: 35px;
@@ -293,14 +329,18 @@
 }
 
 .week-grid {
+  --hours-per-day: 24;
   display: grid;
-  grid-template-columns: 56px repeat(7, minmax(110px, 1fr));
-  height: 48rem;
+  grid-template-columns: var(--hour-label-width) repeat(
+      var(--day-count),
+      minmax(0, 1fr)
+    );
+  height: calc(var(--hours-per-day) * var(--hour-height));
 }
 
 .hour-labels {
   display: grid;
-  grid-template-rows: repeat(24, 2rem);
+  grid-template-rows: repeat(var(--hours-per-day), var(--hour-height));
   color: var(--muted);
   font:
     9px "DM Mono",
@@ -313,15 +353,21 @@
   transform: translateY(-6px);
 }
 
+/* Labels are centred on their hour line, so midnight's would poke up under
+   the sticky header; the top edge of the grid already marks it. */
+.hour-labels span:first-child {
+  visibility: hidden;
+}
+
 .day-column {
   position: relative;
   border-left: 1px solid var(--line);
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
-    transparent calc(2rem - 1px),
-    #e8ece4 calc(2rem - 1px),
-    #e8ece4 2rem
+    transparent calc(var(--hour-height) - 1px),
+    #e8ece4 calc(var(--hour-height) - 1px),
+    #e8ece4 var(--hour-height)
   );
   cursor: crosshair;
 }
@@ -476,7 +522,8 @@
   position: absolute;
   left: 3px;
   right: 3px;
-  min-height: 3rem;
+  /* Matches MINIMUM_ENTRY_DURATION_MINUTES (90) in lib/calendar.ts. */
+  min-height: calc(1.5 * var(--hour-height));
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -742,4 +789,49 @@
   width: 13px;
   height: 13px;
   accent-color: var(--moss);
+}
+
+/* Keep in sync with PHONE_MEDIA_QUERY in lib/layout.ts. */
+@media (max-width: 640px) {
+  .week-heading .section-kicker,
+  .week-heading .item-count,
+  .add-item-label {
+    display: none;
+  }
+
+  .week-title {
+    gap: 8px;
+  }
+
+  .week-title h2 {
+    font-size: 18px;
+  }
+
+  .week-actions {
+    flex: 1 1 100%;
+    gap: 8px;
+  }
+
+  .quick-add {
+    flex: 1;
+  }
+
+  .quick-add input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .week-actions .primary-button.compact {
+    min-width: 0;
+    padding: 10px 14px;
+  }
+
+  .day-heading {
+    padding: 6px 4px;
+  }
+
+  .grid-entry {
+    padding: 3px 4px;
+    font-size: 10px;
+  }
 }

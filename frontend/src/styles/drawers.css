@@ -112,7 +112,7 @@
 }
 
 .composer {
-  width: min(420px, 92vw);
+  width: min(var(--drawer-width), 100vw);
   padding: 30px;
   background: var(--paper);
   box-shadow: -12px 0 35px rgba(39, 52, 47, 0.16);
@@ -530,4 +530,20 @@
   background: #fbf4e4;
   color: #7a5a1c;
   font-size: 12px;
+}
+
+/* Keep in sync with PHONE_MEDIA_QUERY in lib/layout.ts. */
+@media (max-width: 640px) {
+  .composer {
+    padding: var(--gutter);
+  }
+
+  .composer.drawer:not(.tag-editor) {
+    padding-top: var(--gutter);
+  }
+
+  .drawer-delete-action {
+    right: var(--gutter);
+    bottom: var(--gutter);
+  }
 }

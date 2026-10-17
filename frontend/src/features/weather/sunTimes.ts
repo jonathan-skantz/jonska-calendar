@@ -1,4 +1,4 @@
-import { CALENDAR_GRID_SCALE, MINUTES_PER_HOUR } from "../../lib/calendar";
+import { MINUTES_PER_HOUR, gridOffset } from "../../lib/calendar";
 import type { WeatherDay } from "../../types";
 import type { SunDisplayPreferences } from "../calendar/calendarPreferences";
 
@@ -12,9 +12,6 @@ export type SunIndicators = {
   sunset?: SunLine;
   night: NightBand[];
 };
-
-const toRem = (minutes: number) =>
-  `${(minutes / MINUTES_PER_HOUR) * CALENDAR_GRID_SCALE}rem`;
 
 // Sun times are local wall-clock "HH:MM" strings, so they are read directly
 // instead of through Date, which would apply a time zone.
@@ -40,7 +37,7 @@ export const getSunIndicators = (
       0,
       0,
     );
-    return { top: toRem(minutes), label: formatTimeLabel(value) };
+    return { top: gridOffset(minutes), label: formatTimeLabel(value) };
   };
 
   // Without either time the day is polar day or night (or outside the
@@ -48,11 +45,11 @@ export const getSunIndicators = (
   const night: NightBand[] = [];
   if (preferences.showNight) {
     if (sunrise !== undefined && sunrise > 0)
-      night.push({ top: toRem(0), height: toRem(sunrise) });
+      night.push({ top: gridOffset(0), height: gridOffset(sunrise) });
     if (sunset !== undefined && sunset < MINUTES_PER_DAY)
       night.push({
-        top: toRem(sunset),
-        height: toRem(MINUTES_PER_DAY - sunset),
+        top: gridOffset(sunset),
+        height: gridOffset(MINUTES_PER_DAY - sunset),
       });
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getSunIndicators } from "./sunTimes";
 import type { WeatherDay } from "../../types";
+import { gridOffset } from "../../lib/calendar";
 
 const date = new Date(2026, 9, 17);
 const allOn = { showSunrise: true, showSunset: true, showNight: true };
@@ -16,11 +17,11 @@ const label = (value: Date) =>
 describe("getSunIndicators", () => {
   it("places sun lines and night bands by local clock time", () => {
     expect(getSunIndicators(date, day, allOn, label)).toEqual({
-      sunrise: { top: "15rem", label: "7:30" },
-      sunset: { top: "36rem", label: "18:00" },
+      sunrise: { top: gridOffset(7.5 * 60), label: "7:30" },
+      sunset: { top: gridOffset(18 * 60), label: "18:00" },
       night: [
-        { top: "0rem", height: "15rem" },
-        { top: "36rem", height: "12rem" },
+        { top: gridOffset(0), height: gridOffset(7.5 * 60) },
+        { top: gridOffset(18 * 60), height: gridOffset(6 * 60) },
       ],
     });
   });
@@ -33,7 +34,9 @@ describe("getSunIndicators", () => {
       label,
     );
     expect(result.sunset).toBeUndefined();
-    expect(result.night).toEqual([{ top: "0rem", height: "15rem" }]);
+    expect(result.night).toEqual([
+      { top: gridOffset(0), height: gridOffset(7.5 * 60) },
+    ]);
   });
 
   it("shows nothing without sun times", () => {

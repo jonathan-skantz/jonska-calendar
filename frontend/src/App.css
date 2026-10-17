@@ -69,17 +69,29 @@
 }
 
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--paper);
 }
 
 .topbar {
-  height: 72px;
+  height: var(--topbar-height);
   border-bottom: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 clamp(20px, 5vw, 76px);
+  gap: var(--gutter);
+  padding: 0 var(--gutter);
+}
+
+.topbar-start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-toggle {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .brand {
@@ -117,7 +129,8 @@
   text-align: center;
 }
 
-.topbar-actions {
+.topbar-actions,
+.topbar-account {
   display: flex;
   align-items: center;
   gap: 20px;
@@ -149,13 +162,22 @@
   margin: 0 0 15px;
 }
 
+/* The calendar view fills the viewport below the top bar and only the week
+   grid scrolls, so the calendar grows with the window. */
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 42px;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 28px clamp(20px, 5vw, 76px) 70px;
+  grid-template-columns: auto minmax(0, 1fr);
+  height: calc(100dvh - var(--topbar-height));
+}
+
+/* Always the second column, so it fills the width when the rail is hidden
+   or the sidebar is a drawer. */
+.timeline-column {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
 .section-heading {
@@ -181,9 +203,9 @@
     monospace;
 }
 
-@media (max-width: 800px) {
-  .content-grid {
-    display: block;
-    padding-top: 10px;
+/* Keep in sync with PHONE_MEDIA_QUERY in lib/layout.ts. */
+@media (max-width: 640px) {
+  .topbar-account {
+    display: none;
   }
 }
