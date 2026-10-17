@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
-  EVENT_OVERLAP_INSET_PIXELS,
   EVENT_SEPARATOR_PIXELS,
   formatEventTime,
   gridOffset,
@@ -19,6 +18,13 @@ import type { CommuteSegment, GatheringSegment } from "./timelineView";
 import type { Reminder, TimelineEntry } from "../../types";
 import { describeReminders } from "../reminders/reminders";
 import { cx } from "../../lib/classNames";
+import {
+  describeApproximateEdges,
+  getEntryBackground,
+  getHorizontalInsets,
+  getTagStripImage,
+  getVerticalInsets,
+} from "./entryStyle";
 
 type CalendarEntryProps = {
   entry: TimelineEntry;
@@ -41,10 +47,8 @@ type CalendarEntryProps = {
   onToggleTask: (entry: TimelineEntry) => void;
 };
 
-const CONTINUATION_MARKER_HEIGHT = 6;
 const CONTINUATION_MARKER_SPACING = 12;
 const COMMUTE_LABEL_MIN_MINUTES = 15;
-const GHOST_EDGE_PIXELS = 8;
 
 const ContinuationMarkers = ({
   position,
@@ -87,27 +91,9 @@ export const CalendarEntry = ({
   const entryRef = useRef<HTMLElement>(null);
   const [continuationMarkerCount, setContinuationMarkerCount] = useState(1);
   const mainTag = getMainTag(entry);
-  const stripTags = getOrderedStripTags(entry).filter(
-    (tag) => tag.id !== mainTag?.id,
-  );
-  const additionalStripWidth = stripTags.length ? 50 / stripTags.length : 0;
-  const stripStops = stripTags.length
-    ? [
-        `${mainTag?.color} 0%, ${mainTag?.color} 50%`,
-        ...stripTags.map(
-          (tag, index) =>
-            `${tag.color} ${50 + index * additionalStripWidth}%, ${tag.color} ${50 + (index + 1) * additionalStripWidth}%`,
-        ),
-      ]
-    : mainTag
-      ? [`${mainTag.color} 0%, ${mainTag.color} 100%`]
-      : [];
+  const accentColor = mainTag?.color ?? "var(--yellow)";
   const hasEarlierOverlap = overlapDepth > 0;
-  const overlapInset = hasEarlierOverlap
-    ? `${3 + overlapDepth * EVENT_OVERLAP_INSET_PIXELS}px`
-    : undefined;
-  const leftInset =
-    overlapInset ?? (overlapsGhost ? `${3 + GHOST_EDGE_PIXELS}px` : undefined);
+  const insets = getHorizontalInsets(overlapDepth, overlapsGhost);
   // Heads-up and skipped events don't take up time: an outlined ghost that
   // busy blocks draw over, marked with why it is not busy.
   const isGhost = entry.type === "event" && !isBusy(entry);
@@ -127,17 +113,15 @@ export const CalendarEntry = ({
   const optionalGathering = gatheringSegment?.isOptional
     ? gatheringSegment
     : null;
-  // The separator from an adjacent event belongs to the outermost block,
-  // which is the commute band or optional gathering band when there is one.
-  const outerBandTrim = trimTop && !commuteBefore ? EVENT_SEPARATOR_PIXELS : 0;
-  const topInset =
-    (trimTop && !commuteBefore && !optionalGathering
-      ? EVENT_SEPARATOR_PIXELS
-      : 0) + (continuesFromPreviousDay ? CONTINUATION_MARKER_HEIGHT : 0);
-  const bottomInset =
-    (trimBottom && !commuteAfter ? EVENT_SEPARATOR_PIXELS : 0) +
-    (continuesToNextDay ? CONTINUATION_MARKER_HEIGHT : 0);
-  const commuteColor = mainTag?.color ?? "var(--yellow)";
+  const vertical = getVerticalInsets({
+    trimTop,
+    trimBottom,
+    hasCommuteBefore: Boolean(commuteBefore),
+    hasCommuteAfter: Boolean(commuteAfter),
+    hasOptionalGathering: Boolean(optionalGathering),
+    continuesFromPreviousDay,
+    continuesToNextDay,
+  });
   const startIsApproximate =
     entry.type === "event" && Boolean(entry.start_is_approximate);
   const endIsApproximate =
@@ -171,47 +155,8 @@ export const CalendarEntry = ({
   // measured from the block top, which the separator and continuation insets
   // push down.
   const gatheringHeight = mandatoryGathering
-    ? `calc(${gridOffset(mandatoryGathering.startMinutes + mandatoryGathering.durationMinutes - startMinutes)} - ${topInset}px)`
+    ? `calc(${gridOffset(mandatoryGathering.startMinutes + mandatoryGathering.durationMinutes - startMinutes)} - ${vertical.top}px)`
     : undefined;
-  // Approximate edges fade into the paper color. The tag strip is the first
-  // layer so it stays crisp above the fade.
-  const backgroundLayers = [
-    ...(stripStops.length
-      ? [
-          {
-            image: `linear-gradient(to right, ${stripStops.join(", ")})`,
-            size: "100% 3px",
-            position: "top",
-          },
-        ]
-      : []),
-    ...(articleFadesStart
-      ? [
-          {
-            image: "linear-gradient(to bottom, var(--paper), transparent)",
-            size: "100% var(--approximate-fade)",
-            position: "top",
-          },
-        ]
-      : []),
-    ...(articleFadesEnd
-      ? [
-          {
-            image: "linear-gradient(to top, var(--paper), transparent)",
-            size: "100% var(--approximate-fade)",
-            position: "bottom",
-          },
-        ]
-      : []),
-  ];
-  const approximateDescription =
-    startIsApproximate && endIsApproximate
-      ? "Approximate start and end"
-      : startIsApproximate
-        ? "Approximate start"
-        : endIsApproximate
-          ? "Approximate end"
-          : undefined;
   // Shared entries open a read-only view; App decides which drawer to show.
   const openEditor = () => onEdit(entry);
 
@@ -237,14 +182,9 @@ export const CalendarEntry = ({
   }, [continuesFromPreviousDay, continuesToNextDay]);
 
   const renderCommuteBand = (segment: CommuteSegment) => {
-    const trim =
-      segment.position === "before"
-        ? trimTop
-          ? EVENT_SEPARATOR_PIXELS
-          : 0
-        : trimBottom
-          ? EVENT_SEPARATOR_PIXELS
-          : 0;
+    const trim = (segment.position === "before" ? trimTop : trimBottom)
+      ? EVENT_SEPARATOR_PIXELS
+      : 0;
     const description = `Commute ${segment.minutes} min ${segment.position} ${entry.title}`;
     return (
       <div
@@ -259,11 +199,10 @@ export const CalendarEntry = ({
         title={description}
         style={
           {
-            "--commute-color": commuteColor,
+            "--commute-color": accentColor,
             top: gridOffset(segment.startMinutes),
             height: `calc(${gridOffset(segment.durationMinutes)} - ${trim}px)`,
-            left: leftInset,
-            right: overlapInset,
+            ...insets,
             zIndex: hasEarlierOverlap ? 2 : undefined,
             transform:
               segment.position === "before" && trim
@@ -300,13 +239,12 @@ export const CalendarEntry = ({
       title={gatheringDescription}
       style={
         {
-          "--gathering-color": mainTag?.color ?? "var(--yellow)",
+          "--gathering-color": accentColor,
           top: gridOffset(segment.startMinutes),
-          height: `calc(${gridOffset(segment.durationMinutes)} - ${outerBandTrim}px)`,
-          left: leftInset,
-          right: overlapInset,
-          transform: outerBandTrim
-            ? `translateY(${outerBandTrim}px)`
+          height: `calc(${gridOffset(segment.durationMinutes)} - ${vertical.outerBandTop}px)`,
+          ...insets,
+          transform: vertical.outerBandTop
+            ? `translateY(${vertical.outerBandTop}px)`
             : undefined,
         } as CSSProperties
       }
@@ -348,11 +286,12 @@ export const CalendarEntry = ({
           style={
             {
               top: gridOffset(startMinutes),
-              height: `calc(${gridOffset(durationMinutes)} - ${topInset + bottomInset}px)`,
-              left: leftInset,
-              right: overlapInset,
+              height: `calc(${gridOffset(durationMinutes)} - ${vertical.top + vertical.bottom}px)`,
+              ...insets,
               zIndex: hasEarlierOverlap && !isGhost ? 2 : undefined,
-              transform: topInset ? `translateY(${topInset}px)` : undefined,
+              transform: vertical.top
+                ? `translateY(${vertical.top}px)`
+                : undefined,
               ...(entry.type === "event" && mainTag
                 ? {
                     ...(isGhost
@@ -361,16 +300,16 @@ export const CalendarEntry = ({
                           backgroundColor: mainTag.color,
                           color: tagTextColor(mainTag.color),
                         }),
-                    backgroundImage: backgroundLayers
-                      .map((layer) => layer.image)
-                      .join(", "),
-                    backgroundSize: backgroundLayers
-                      .map((layer) => layer.size)
-                      .join(", "),
-                    backgroundPosition: backgroundLayers
-                      .map((layer) => layer.position)
-                      .join(", "),
-                    backgroundRepeat: "no-repeat",
+                    ...getEntryBackground(
+                      getTagStripImage(
+                        mainTag,
+                        getOrderedStripTags(entry).filter(
+                          (tag) => tag.id !== mainTag.id,
+                        ),
+                      ),
+                      articleFadesStart,
+                      articleFadesEnd,
+                    ),
                   }
                 : {}),
             } as CSSProperties
@@ -384,7 +323,7 @@ export const CalendarEntry = ({
             <ContinuationMarkers
               position="top"
               count={continuationMarkerCount}
-              color={mainTag?.color ?? "var(--yellow)"}
+              color={accentColor}
             />
           )}
           {mandatoryGathering && showGatheringChip && (
@@ -437,7 +376,12 @@ export const CalendarEntry = ({
             ) : null}
             {entry.title}
           </strong>
-          <span title={approximateDescription}>
+          <span
+            title={describeApproximateEdges(
+              startIsApproximate,
+              endIsApproximate,
+            )}
+          >
             {entry.is_skipped && "Skipping · "}
             {entry.type === "event"
               ? [
@@ -458,7 +402,7 @@ export const CalendarEntry = ({
             <ContinuationMarkers
               position="bottom"
               count={continuationMarkerCount}
-              color={mainTag?.color ?? "var(--yellow)"}
+              color={accentColor}
             />
           )}
           {entry.type === "task" && (

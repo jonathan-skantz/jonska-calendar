@@ -383,43 +383,28 @@ export const getCalendarEntryLayout = (
     entry.type === "event" &&
     Boolean(entry.ends_at && getOccupiedRange(entry).end <= now);
 
-  if (entry.type === "event") {
-    if (!entry.starts_at || !entry.ends_at) {
-      return {
-        startMinutes,
-        durationMinutes: MINIMUM_ENTRY_DURATION_MINUTES,
-        fullyElapsed,
-        continuesFromPreviousDay: false,
-        continuesToNextDay: false,
-      };
-    }
-
-    const segment = clipToDay(
-      getBodyStart(entry),
-      new Date(entry.ends_at),
-      date,
-    );
-    if (segment) return { ...segment, fullyElapsed };
-
-    return {
-      startMinutes,
-      durationMinutes: MINIMUM_ENTRY_DURATION_MINUTES,
-      fullyElapsed,
-      continuesFromPreviousDay: false,
-      continuesToNextDay: false,
-    };
-  }
-
-  return {
+  // Tasks, and events without a span on this day, get a fixed-size block.
+  const fixedBlock = {
     startMinutes,
-    durationMinutes: Math.max(
-      TASK_DISPLAY_DURATION_MINUTES,
-      MINIMUM_ENTRY_DURATION_MINUTES,
-    ),
-    fullyElapsed: false,
+    durationMinutes: MINIMUM_ENTRY_DURATION_MINUTES,
+    fullyElapsed,
     continuesFromPreviousDay: false,
     continuesToNextDay: false,
   };
+  if (entry.type === "task") {
+    return {
+      ...fixedBlock,
+      durationMinutes: Math.max(
+        TASK_DISPLAY_DURATION_MINUTES,
+        MINIMUM_ENTRY_DURATION_MINUTES,
+      ),
+    };
+  }
+  const segment =
+    entry.starts_at && entry.ends_at
+      ? clipToDay(getBodyStart(entry), new Date(entry.ends_at), date)
+      : null;
+  return segment ? { ...segment, fullyElapsed } : fixedBlock;
 };
 
 // One timed entry placed in a day column. The fields match CalendarEntry's
