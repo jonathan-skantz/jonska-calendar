@@ -4,7 +4,9 @@ import { BusIcon } from "./BusIcon";
 type TransitCardPillProps = {
   name: string;
   variant: TransitCardPillVariant;
-  column: number;
+  // Grid column in the week's Card row; omitted for inline pills.
+  column?: number;
+  compact?: boolean;
 };
 
 const describe = (name: string, variant: TransitCardPillVariant) => {
@@ -26,10 +28,11 @@ export const TransitCardPill = ({
   name,
   variant,
   column,
+  compact = false,
 }: TransitCardPillProps) => (
   <span
-    className={`transit-card-pill ${variant}`}
-    style={{ gridColumn: column + 1 }}
+    className={`transit-card-pill ${variant} ${compact ? "compact" : ""}`}
+    style={column === undefined ? undefined : { gridColumn: column + 1 }}
     title={describe(name, variant)}
   >
     <BusIcon crossed={variant === "not_needed"} />

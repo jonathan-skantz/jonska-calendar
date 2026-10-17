@@ -70,6 +70,11 @@ func main() {
 	mux.HandleFunc("PATCH /api/shared-events/{shareID}", timelineHandler.UpdateSharedEvent)
 	mux.HandleFunc("GET /api/transit-card/days", timelineHandler.ListTransitCardDays)
 	mux.HandleFunc("PUT /api/transit-card/days", timelineHandler.SetTransitCardDays)
+	mux.HandleFunc("GET /api/household", timelineHandler.GetHousehold)
+	mux.HandleFunc("POST /api/household", timelineHandler.CreateHousehold)
+	mux.HandleFunc("PATCH /api/household", timelineHandler.UpdateHousehold)
+	mux.HandleFunc("POST /api/household/members", timelineHandler.AddHouseholdMember)
+	mux.HandleFunc("DELETE /api/household/members/me", timelineHandler.LeaveHousehold)
 
 	server := &http.Server{
 		Addr:    ":8080",

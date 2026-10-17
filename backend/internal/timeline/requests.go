@@ -89,6 +89,15 @@ type transitCardDayResponse struct {
 	Status      string    `json:"status"`
 }
 
+type householdRequest struct {
+	Name             string `json:"name"`
+	TransitCardCount int    `json:"transit_card_count"`
+}
+
+type householdMemberRequest struct {
+	Email string `json:"email"`
+}
+
 type createResponse struct {
 	ID uuid.UUID `json:"id"`
 }

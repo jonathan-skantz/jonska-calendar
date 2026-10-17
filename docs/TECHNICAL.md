@@ -13,7 +13,7 @@ The demo is a small family calendar. It currently supports:
 - personal tags;
 - direct event sharing between registered users;
 - recipient-local event presentation overrides and private custom info;
-- per-day shared transit-card declarations and user display names.
+- per-day shared transit-card declarations, households with conflict detection, and user display names.
 
 The product intentionally does not implement uncertain timing, recurrence, reminders, conflict detection, automatic task scheduling, external calendars, advanced sharing policies, triggers, templates, or backup/import.
 
@@ -122,16 +122,25 @@ A shared event is a projection, not a copy. The source fields are read from the 
 
 ```text
 users 1 --- n transit_card_days (user_id, day DATE, need)
+users n --- 1 households (via household_members, user_id UNIQUE)
 ```
 
 Declarations are not timeline items. A row is one user's answer for one local
 calendar date: `need` is `yes`, `maybe`, or `no`. A missing row means "not
 reported" and `no` is an explicit "not needed". Saving writes a row for every day in the submitted
 range in one statement, so an empty selection is still a report. `day` is a
-`DATE`, so time zones never shift it. The partial index on `day WHERE
-need <> 'no'` is there for future conflict detection across users; `status` is
-computed in `transitCardStatus` (`backend/internal/timeline/transit_card.go`)
-and is always `resolved` until households and conflicts exist.
+`DATE`, so time zones never shift it.
+
+A household has a name and a `transit_card_count`. Because a user belongs to
+at most one household, declarations stay keyed by user and the household is
+derived through `household_members`; leaving a household keeps the user's
+answers. Household queries never take a household ID from the client, only the
+caller's own membership. Listing days returns the caller's rows plus those of
+every other member of their household. `status` is computed per request in
+`transitCardStatuses` (`backend/internal/timeline/transit_card.go`): a `yes`
+row is `conflict` when more members said `yes` that day than the household has
+cards. `maybe` never conflicts, and a user without a household never sees a
+conflict.
 
 `users.display_name` is optional. Readers fall back to the email local-part.
 
@@ -185,6 +194,11 @@ All API routes use JSON request and response bodies unless the response is `204 
 | `PATCH /api/shared-events/{shareID}`         | Any supplied override fields below          | `204`                                                |
 | `GET /api/transit-card/days?from=&to=`       | None                                        | Array of reported transit-card days                  |
 | `PUT /api/transit-card/days`                 | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                |
+| `GET /api/household`                         | None                                        | Household or `null`                                  |
+| `POST /api/household`                        | `name`, `transit_card_count`                | `201`; `409` if already in a household               |
+| `PATCH /api/household`                       | `name`, `transit_card_count`                | `204`; `404` without a household                     |
+| `POST /api/household/members`                | `email`                                     | `204`; `404` unknown email; `409` already a member   |
+| `DELETE /api/household/members/me`           | None                                        | `204`; deletes the household when it becomes empty   |
 
 Event request fields are `title`, `description`, `url`, `starts_at`, `ends_at`, `is_all_day`, `kind`, `location`, `commute_before_seconds`, `commute_after_seconds`, and `main_tag_id`. `title`, `starts_at`, `ends_at`, and `kind` must be valid. `starts_at` and `ends_at` are timestamps, and the end must be later than the start. For all-day events, the end timestamp is exclusive and starts at midnight after the last displayed date. The `kind` value is `attendable` or `informational`. Commute durations are seconds in whole minutes, from 0 up to 24 hours, and must be 0 unless the event is a timed (not all-day) `attendable` event. Migration 14 enforces the same rules in the database. The week grid draws commute as hatched bands next to the event block. If `main_tag_id` is omitted when creating an event, the user's default tag is used. If it is omitted when updating an event, the existing main tag is kept.
 
@@ -196,7 +210,9 @@ Timeline entries contain `id`, `type`, `title`, and `is_completed`. Optional fie
 
 Shared event responses contain `share_id`, `event_id`, `original_title`, `starts_at`, `ends_at`, `is_all_day`, and `kind`. Optional fields are `original_description`, `original_url`, `original_location`, `local_title`, `local_description`, `local_url`, `local_location`, and `private_custom_info`. The patch accepts any subset of the local fields: `title`, `description`, `url`, `location`, and `custom_info`.
 
-Transit-card dates use `YYYY-MM-DD`. Ranges are inclusive and cover at most 62 days; `needed_dates` and `maybe_dates` must be inside the range, and no date may appear twice across them; every other day in the range is saved as `no`. The server does not know the user's time zone, so it rejects a `from` earlier than yesterday in UTC, and the frontend enforces the exact local day. Day responses contain `date`, `user_id`, `display_name`, `need`, and `status` (`resolved` or the reserved `conflict`). Only reported days are returned.
+Transit-card dates use `YYYY-MM-DD`. Ranges are inclusive and cover at most 62 days; `needed_dates` and `maybe_dates` must be inside the range, and no date may appear twice across them; every other day in the range is saved as `no`. The server does not know the user's time zone, so it rejects a `from` earlier than yesterday in UTC, and the frontend enforces the exact local day. Day responses contain `date`, `user_id`, `display_name`, `need`, and `status` (`resolved` or `conflict`). Only reported days are returned, for the caller and the other members of their household.
+
+Household responses contain `id`, `name`, `transit_card_count` (1 to 20), and `members`, each with `user_id` and `display_name`.
 
 ## Frontend Data Flow
 
@@ -222,6 +238,7 @@ The workspace query returns both owned and shared timeline entries. Shared entri
 | Change sharing ownership or overrides         | `backend/db/sharing.go` and `backend/db/timeline.go`                             | migrations 4/5, timeline handlers                      |
 | Change tag ownership, defaults, or attachment | `backend/db/tags.go`                                                             | migrations 6-8, timeline handlers                      |
 | Change transit-card declarations              | `backend/db/transit_card.go`, `backend/internal/timeline/transit_card.go`        | migration 12, `frontend/src/features/transitCard/`     |
+| Change households or card conflicts           | `backend/db/households.go`, `backend/internal/timeline/household.go`             | migration 15, `frontend/src/features/household/`       |
 | Change timeline JSON shape                    | `db.TimelineEntry` in `backend/db/models.go`                                     | frontend `TimelineEntry` type and grid rendering       |
 | Change week navigation/date math              | `frontend/src/App.tsx` date helpers and week state                               | `date-fns` imports                                     |
 | Change event block placement                  | `frontend/src/App.tsx` `renderGridEntry`                                         | `.grid-entry` in `frontend/src/App.css`                |

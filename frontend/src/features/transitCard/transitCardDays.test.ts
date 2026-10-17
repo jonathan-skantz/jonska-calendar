@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getDayCapacity,
   getTransitCardDayViews,
   getTransitCardPillVariant,
   getTransitCardSubmission,
@@ -26,6 +27,7 @@ describe("getTransitCardDayViews", () => {
         reported("2026-10-23", "maybe"),
       ],
       new Date(2026, 9, 21, 23, 30),
+      "user-1",
     );
 
     expect(views.map((view) => view.state)).toEqual([
@@ -52,6 +54,7 @@ describe("getTransitCardPillVariant", () => {
         reported("2026-10-23", "maybe"),
       ],
       new Date(2026, 9, 21, 9),
+      "user-1",
     );
 
     expect(views.map(getTransitCardPillVariant)).toEqual([
@@ -70,6 +73,7 @@ describe("getTransitCardPillVariant", () => {
       dates,
       [{ ...reported("2026-10-22", "yes"), status: "conflict" }],
       new Date(2026, 9, 19),
+      "user-1",
     );
     expect(getTransitCardPillVariant(views[3])).toBe("conflict");
   });
@@ -77,7 +81,12 @@ describe("getTransitCardPillVariant", () => {
 
 describe("getTransitCardSubmission", () => {
   it("submits only days that have not ended, including an empty selection", () => {
-    const views = getTransitCardDayViews(dates, [], new Date(2026, 9, 22, 9));
+    const views = getTransitCardDayViews(
+      dates,
+      [],
+      new Date(2026, 9, 22, 9),
+      "user-1",
+    );
     expect(getTransitCardSubmission(views, new Map())).toEqual({
       from: "2026-10-22",
       to: "2026-10-25",
@@ -103,7 +112,77 @@ describe("getTransitCardSubmission", () => {
   });
 
   it("returns null when every day has ended", () => {
-    const views = getTransitCardDayViews(dates, [], new Date(2026, 9, 27));
+    const views = getTransitCardDayViews(
+      dates,
+      [],
+      new Date(2026, 9, 27),
+      "user-1",
+    );
     expect(getTransitCardSubmission(views, new Map())).toBeNull();
+  });
+});
+
+describe("household members", () => {
+  const members = [
+    { user_id: "user-1", display_name: "Jonathan" },
+    { user_id: "user-2", display_name: "Anna" },
+    { user_id: "user-3", display_name: "Erik" },
+  ];
+  const memberDay = (
+    user_id: string,
+    date: string,
+    need: TransitCardNeed,
+  ): TransitCardDay => ({
+    ...reported(date, need),
+    user_id,
+    display_name: members.find((member) => member.user_id === user_id)!
+      .display_name,
+  });
+  const days = [
+    memberDay("user-2", "2026-10-22", "yes"),
+    memberDay("user-3", "2026-10-22", "maybe"),
+    memberDay("user-1", "2026-10-23", "no"),
+  ];
+
+  it("builds the user's own view and lists everyone else separately", () => {
+    const views = getTransitCardDayViews(
+      dates,
+      days,
+      new Date(2026, 9, 19),
+      "user-1",
+      members,
+    );
+
+    expect(views[3].state).toBe("not_reported");
+    expect(views[3].day).toBeUndefined();
+    expect(views[3].others).toEqual([
+      { user_id: "user-2", display_name: "Anna", need: "yes" },
+      { user_id: "user-3", display_name: "Erik", need: "maybe" },
+    ]);
+    expect(views[4].state).toBe("not_needed");
+    expect(views[4].others.map((member) => member.need)).toEqual([
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it("counts the live choice against the card count", () => {
+    const [view] = getTransitCardDayViews(
+      [dates[3]],
+      days,
+      new Date(2026, 9, 19),
+      "user-1",
+      members,
+    );
+
+    expect(getDayCapacity(view, "maybe", 1)).toEqual({
+      yesCount: 1,
+      overCapacity: false,
+    });
+    expect(getDayCapacity(view, "yes", 1)).toEqual({
+      yesCount: 2,
+      overCapacity: true,
+    });
+    expect(getDayCapacity(view, "yes", 2).overCapacity).toBe(false);
   });
 });

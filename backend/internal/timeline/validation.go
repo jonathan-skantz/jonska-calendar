@@ -20,12 +20,15 @@ var (
 	ErrInvalidDateRange        = errors.New("date range must cover 1 to 62 days")
 	ErrInvalidTransitCardDates = errors.New("needed and maybe dates must be unique and inside the range")
 	ErrPastTransitCardDay      = errors.New("days that have ended cannot be changed")
+	ErrHouseholdNameRequired   = errors.New("household name cannot be empty")
+	ErrInvalidTransitCardCount = errors.New("a household must have between 1 and 20 transit cards")
 )
 
 const (
 	dateLayout              = "2006-01-02"
 	maxTransitCardRangeDays = 62
 	maxCommuteSeconds       = 24 * 60 * 60
+	maxTransitCardCount     = 20
 )
 
 func validCommuteSeconds(seconds int) bool {
@@ -161,4 +164,15 @@ func validateTransitCardDaysRequest(request transitCardDaysRequest, todayUTC tim
 		return transitCardSubmission{}, err
 	}
 	return transitCardSubmission{days: days, needed: needed, maybe: maybe}, nil
+}
+
+func validateHouseholdRequest(request *householdRequest) error {
+	request.Name = strings.TrimSpace(request.Name)
+	if request.Name == "" {
+		return ErrHouseholdNameRequired
+	}
+	if request.TransitCardCount < 1 || request.TransitCardCount > maxTransitCardCount {
+		return ErrInvalidTransitCardCount
+	}
+	return nil
 }

@@ -10,4 +10,6 @@ var (
 	ErrTagNotFound         = errors.New("tag not found")
 	ErrLastTag             = errors.New("at least one tag is required")
 	ErrDefaultTagNotFound  = errors.New("default tag not found")
+	ErrHouseholdNotFound   = errors.New("household not found")
+	ErrAlreadyInHousehold  = errors.New("user already belongs to a household")
 )

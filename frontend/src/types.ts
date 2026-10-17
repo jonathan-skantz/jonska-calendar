@@ -43,4 +43,16 @@ export type TransitCardDay = {
   status: "resolved" | "conflict";
 };
 
+export type HouseholdMember = {
+  user_id: string;
+  display_name: string;
+};
+
+export type Household = {
+  id: string;
+  name: string;
+  transit_card_count: number;
+  members: HouseholdMember[];
+};
+
 export type AuthMode = "login" | "register";

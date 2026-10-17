@@ -228,6 +228,10 @@
   color: var(--ink);
 }
 
+.transit-card-pill.compact {
+  margin: 0;
+}
+
 .bus-icon {
   flex: none;
 }

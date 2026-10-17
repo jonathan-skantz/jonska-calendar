@@ -21,6 +21,18 @@ type TransitCardDay struct {
 	Need        string
 }
 
+type HouseholdMember struct {
+	UserID      uuid.UUID `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+}
+
+type Household struct {
+	ID               uuid.UUID         `json:"id"`
+	Name             string            `json:"name"`
+	TransitCardCount int               `json:"transit_card_count"`
+	Members          []HouseholdMember `json:"members"`
+}
+
 type Event struct {
 	ID                   uuid.UUID
 	Title                string

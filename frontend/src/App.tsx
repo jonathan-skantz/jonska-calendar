@@ -40,6 +40,11 @@ import { WeekCalendar } from "./components/WeekCalendar";
 import { WeekHeader } from "./components/WeekHeader";
 import { TopBar } from "./components/TopBar";
 import { SettingsPage } from "./components/SettingsPage";
+import { HouseholdSettings } from "./components/HouseholdSettings";
+import {
+  useHousehold,
+  useHouseholdMutations,
+} from "./features/household/useHousehold";
 import { TransitCardPill } from "./components/TransitCardPill";
 import { TransitCardDrawer } from "./components/TransitCardDrawer";
 import {
@@ -92,6 +97,9 @@ function App() {
     Boolean(user),
   );
   const saveTransitCardDays = useSaveTransitCardDays(setActionError);
+  const householdQuery = useHousehold(Boolean(user));
+  const household = householdQuery.data ?? null;
+  const householdMutations = useHouseholdMutations();
   const composer = useComposer({
     tags,
     selectedDate,
@@ -200,7 +208,13 @@ function App() {
   const weekEntries = getVisibleWeekEntries(entries, dates, hiddenTagIds);
   // Until the days load, every day would look unreported, so show nothing.
   const transitCardViews = transitCardQuery.data
-    ? getTransitCardDayViews(dates, transitCardQuery.data, today)
+    ? getTransitCardDayViews(
+        dates,
+        transitCardQuery.data,
+        today,
+        user.id,
+        household?.members,
+      )
     : [];
   const allDayEventSpans = getAllDayEventSpans(weekEntries, dates);
   const openTransitCard = () => {
@@ -322,7 +336,16 @@ function App() {
             updatePreferences({ weekStartsOn })
           }
           onBack={() => setShowSettings(false)}
-        />
+        >
+          <HouseholdSettings
+            household={household}
+            currentUserId={user.id}
+            onCreate={householdMutations.create}
+            onUpdate={householdMutations.update}
+            onAddMember={householdMutations.addMember}
+            onLeave={householdMutations.leave}
+          />
+        </SettingsPage>
       ) : (
         <section className="content-grid">
           <div className="timeline-column">
@@ -416,6 +439,7 @@ function App() {
       {showTransitCard && (
         <TransitCardDrawer
           views={transitCardViews}
+          cardCount={household?.transit_card_count}
           error={actionError}
           onClose={() => setShowTransitCard(false)}
           onSave={async (submission) => {

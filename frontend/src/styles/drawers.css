@@ -267,3 +267,23 @@
 .transit-card-day.conflict small {
   color: var(--transit-conflict);
 }
+
+.transit-card-others {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: -4px;
+}
+
+.transit-card-capacity {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.transit-card-capacity.over {
+  color: var(--transit-conflict);
+  font-weight: 600;
+}

@@ -4,7 +4,7 @@ import { api } from "../../lib/api";
 import {
   clearWorkspace,
   invalidateCurrentUserAndWorkspace,
-  invalidateTransitCard,
+  invalidateHousehold,
 } from "../../lib/queryInvalidation";
 import { getRequestErrorMessage } from "../../lib/requestErrors";
 import { queryKeys } from "../../lib/queryKeys";
@@ -57,7 +57,7 @@ export const useAuth = () => {
         body: JSON.stringify({ display_name: displayName }),
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
-      await invalidateTransitCard(queryClient);
+      await invalidateHousehold(queryClient);
       return null;
     } catch (requestError) {
       return getRequestErrorMessage(

@@ -128,8 +128,8 @@ Events have an exact start date/time and end date/time in the first demo.
 
 ### Shared transit card (Demo)
 
-The family shares one physical transit card. Declarations are separate from
-events and tasks.
+A household shares one or more physical transit cards. Declarations are
+separate from events and tasks.
 
 - [x] Each user answers yes, maybe, or no for each day. Selections do not carry
       over; a day without an answer is "not reported".
@@ -143,8 +143,17 @@ events and tasks.
       = maybe. Days that ended without an answer have no pill. Clicking anywhere in the row opens the declaration editor.
 - [x] Users can set a display name in Settings; the email local-part is the
       fallback.
-- [ ] Seeing other family members' declarations and conflict detection (red)
-      when several users need the card on the same day are **Future**.
+- [x] Users form a household (a family or group). A user belongs to at most
+      one household. Any member can add registered users by email, set how
+      many transit cards the household shares, or leave.
+- [x] The "Card" row still shows only the user's own pill. It turns red when
+      the user said yes and more members said yes that day than the household
+      has cards. "Maybe" never causes a conflict.
+- [x] The declaration editor shows the other members' answers for each day,
+      and warns before saving when the user's choice would need more cards
+      than the household has.
+- [ ] Removing other members, invitations that must be accepted, and several
+      households per user are **Future**.
 
 ## Future Features
 

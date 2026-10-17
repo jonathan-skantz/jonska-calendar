@@ -6,7 +6,12 @@ import { getTransitCardDayViews } from "../features/transitCard/transitCardDays"
 const dates = [19, 20, 21, 22, 23, 24, 25].map((day) => new Date(2026, 9, day));
 
 const renderDrawer = (onSave = vi.fn()) => {
-  const views = getTransitCardDayViews(dates, [], new Date(2026, 9, 21, 9));
+  const views = getTransitCardDayViews(
+    dates,
+    [],
+    new Date(2026, 9, 21, 9),
+    "user-1",
+  );
   render(
     <TransitCardDrawer
       views={views}
@@ -61,5 +66,52 @@ describe("TransitCardDrawer", () => {
       needed_dates: ["2026-10-22"],
       maybe_dates: ["2026-10-23"],
     });
+  });
+});
+
+describe("TransitCardDrawer with a household", () => {
+  afterEach(cleanup);
+
+  it("shows other members' answers and warns before overbooking", () => {
+    const views = getTransitCardDayViews(
+      dates,
+      [
+        {
+          date: "2026-10-22",
+          user_id: "user-2",
+          display_name: "Anna",
+          need: "yes",
+          status: "resolved",
+        },
+      ],
+      new Date(2026, 9, 21, 9),
+      "user-1",
+      [
+        { user_id: "user-1", display_name: "Jonathan" },
+        { user_id: "user-2", display_name: "Anna" },
+      ],
+    );
+    render(
+      <TransitCardDrawer
+        views={views}
+        cardCount={1}
+        error=""
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    );
+
+    const thursday = screen.getByRole("group", { name: "Thu, Oct 22" });
+    expect(
+      thursday.querySelector(".transit-card-pill.resolved")?.textContent,
+    ).toBe("Anna");
+    expect(thursday.textContent).toContain("1 of 1 card needed");
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Yes" })[3]);
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "2 need it, but there is only 1 card",
+    );
   });
 });

@@ -10,14 +10,27 @@ import (
 
 const (
 	transitCardResolved = "resolved"
-	// transitCardConflict is reserved for when several users need the shared
-	// card on the same day. Only the requesting user's days are listed today,
-	// so it is never returned yet.
 	transitCardConflict = "conflict"
 )
 
-func transitCardStatus(db.TransitCardDay) string {
-	return transitCardResolved
+// transitCardStatuses marks every "yes" on a date as a conflict when more
+// household members said yes than the household has cards. Without a
+// household cardCount is 0 and nothing is ever a conflict.
+func transitCardStatuses(days []db.TransitCardDay, cardCount int) []string {
+	yesByDate := map[time.Time]int{}
+	for _, day := range days {
+		if day.Need == "yes" {
+			yesByDate[day.Day]++
+		}
+	}
+	statuses := make([]string, len(days))
+	for i, day := range days {
+		statuses[i] = transitCardResolved
+		if cardCount > 0 && day.Need == "yes" && yesByDate[day.Day] > cardCount {
+			statuses[i] = transitCardConflict
+		}
+	}
+	return statuses
 }
 
 func (h *Handler) ListTransitCardDays(w http.ResponseWriter, r *http.Request) {
@@ -36,14 +49,24 @@ func (h *Handler) ListTransitCardDays(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list transit card days", http.StatusInternalServerError)
 		return
 	}
+	household, err := h.Store.GetHousehold(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "failed to list transit card days", http.StatusInternalServerError)
+		return
+	}
+	cardCount := 0
+	if household != nil {
+		cardCount = household.TransitCardCount
+	}
+	statuses := transitCardStatuses(reported, cardCount)
 	response := make([]transitCardDayResponse, 0, len(reported))
-	for _, day := range reported {
+	for i, day := range reported {
 		response = append(response, transitCardDayResponse{
 			Date:        day.Day.Format(dateLayout),
 			UserID:      day.UserID,
 			DisplayName: day.DisplayName,
 			Need:        day.Need,
-			Status:      transitCardStatus(day),
+			Status:      statuses[i],
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")

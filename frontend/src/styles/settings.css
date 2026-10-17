@@ -97,3 +97,14 @@
 .settings-inline-form .primary-button {
   margin: 0;
 }
+
+.household-members {
+  margin: 18px 0 0;
+  padding-left: 18px;
+  color: var(--moss-dark);
+  font-size: 13px;
+}
+
+.household-leave {
+  margin-top: 18px;
+}

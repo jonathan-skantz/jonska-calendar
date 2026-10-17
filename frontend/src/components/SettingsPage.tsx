@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type {
   CalendarPreferences,
   WeekStartPreference,
@@ -14,6 +15,7 @@ type SettingsPageProps = {
   onTimeFormatChange: (value: TimeFormatPreference) => void;
   onWeekStartChange: (value: WeekStartPreference) => void;
   onBack: () => void;
+  children?: ReactNode;
 };
 
 export function SettingsPage({
@@ -24,6 +26,7 @@ export function SettingsPage({
   onTimeFormatChange,
   onWeekStartChange,
   onBack,
+  children,
 }: SettingsPageProps) {
   const [displayNameMessage, setDisplayNameMessage] = useState("");
   const weekOptions: { value: WeekStartPreference; label: string }[] = [
@@ -78,6 +81,8 @@ export function SettingsPage({
           )}
         </form>
       </section>
+
+      {children}
 
       <section
         className="settings-section"

@@ -1,12 +1,22 @@
 import { useState } from "react";
 import { formatDate } from "../lib/calendar";
-import { getTransitCardSubmission } from "../features/transitCard/transitCardDays";
-import type { TransitCardDayView } from "../features/transitCard/transitCardDays";
+import {
+  getDayCapacity,
+  getTransitCardSubmission,
+} from "../features/transitCard/transitCardDays";
+import type {
+  TransitCardDayView,
+  TransitCardMemberAnswer,
+  TransitCardPillVariant,
+} from "../features/transitCard/transitCardDays";
 import type { TransitCardSubmission } from "../features/transitCard/useTransitCard";
 import type { TransitCardNeed } from "../types";
+import { TransitCardPill } from "./TransitCardPill";
 
 type TransitCardDrawerProps = {
   views: TransitCardDayView[];
+  // The household's card count; undefined when the user has no household.
+  cardCount?: number;
   error: string;
   onClose: () => void;
   onSave: (submission: TransitCardSubmission) => void;
@@ -21,12 +31,26 @@ const NEED_OPTIONS: [TransitCardNeed, string][] = [
 const dayHint = (view: TransitCardDayView) => {
   if (view.state === "past") return "Ended";
   if (view.state === "not_reported") return "Not reported";
-  if (view.state === "conflict") return "Conflict";
   return "";
 };
 
+const memberVariant = (
+  member: TransitCardMemberAnswer,
+): TransitCardPillVariant => {
+  if (member.need === "yes") return "resolved";
+  if (member.need === "maybe") return "maybe";
+  if (member.need === "no") return "not_needed";
+  return "pending";
+};
+
+const capacityText = (yesCount: number, cardCount: number) =>
+  yesCount > cardCount
+    ? `${yesCount} need it, but there ${cardCount === 1 ? "is only 1 card" : `are only ${cardCount} cards`}`
+    : `${yesCount} of ${cardCount} ${cardCount === 1 ? "card" : "cards"} needed`;
+
 export const TransitCardDrawer = ({
   views,
+  cardCount,
   error,
   onClose,
   onSave,
@@ -76,6 +100,10 @@ export const TransitCardDrawer = ({
             {views.map((view) => {
               const past = view.state === "past";
               const selected = past ? view.day?.need : answers.get(view.key);
+              const capacity =
+                cardCount === undefined
+                  ? null
+                  : getDayCapacity(view, selected, cardCount);
               return (
                 <div
                   className={`transit-card-day ${view.state}`}
@@ -99,6 +127,31 @@ export const TransitCardDrawer = ({
                       </button>
                     ))}
                   </div>
+                  {view.others.length > 0 && (
+                    <div
+                      className="transit-card-others"
+                      aria-label="Other household members"
+                    >
+                      {view.others.map((member) => (
+                        <TransitCardPill
+                          key={member.user_id}
+                          name={member.display_name}
+                          variant={memberVariant(member)}
+                          compact
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {capacity &&
+                    cardCount !== undefined &&
+                    capacity.yesCount > 0 && (
+                      <p
+                        className={`transit-card-capacity ${capacity.overCapacity ? "over" : ""}`}
+                        role={capacity.overCapacity ? "alert" : undefined}
+                      >
+                        {capacityText(capacity.yesCount, cardCount)}
+                      </p>
+                    )}
                 </div>
               );
             })}

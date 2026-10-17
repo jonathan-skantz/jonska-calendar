@@ -14,7 +14,15 @@ export const invalidateCurrentUserAndWorkspace = async (
 export const invalidateTransitCard = (queryClient: QueryClient) =>
   queryClient.invalidateQueries({ queryKey: queryKeys.transitCard });
 
+// Membership and card count change which declarations are visible and
+// whether a day is a conflict, so household changes refresh both.
+export const invalidateHousehold = async (queryClient: QueryClient) => {
+  await queryClient.invalidateQueries({ queryKey: queryKeys.household });
+  await invalidateTransitCard(queryClient);
+};
+
 export const clearWorkspace = (queryClient: QueryClient) => {
   queryClient.removeQueries({ queryKey: queryKeys.workspace });
   queryClient.removeQueries({ queryKey: queryKeys.transitCard });
+  queryClient.removeQueries({ queryKey: queryKeys.household });
 };
