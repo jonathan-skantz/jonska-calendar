@@ -925,3 +925,27 @@ func TestShareEventWithPerRecipientFields(t *testing.T) {
 		t.Fatalf("expected x to lose the event, got %+v", xEntries)
 	}
 }
+
+func TestStoreFailuresAreNotReportedAsNotFound(t *testing.T) {
+	store, userID := setupTestStore(t)
+	handler := New(store, func(*http.Request) (uuid.UUID, error) { return userID, nil })
+	setDefault := func(ctx context.Context, tagID uuid.UUID) *httptest.ResponseRecorder {
+		request := httptest.NewRequestWithContext(ctx, http.MethodPut, "/api/tags/default",
+			bytes.NewBufferString(`{"tag_id":"`+tagID.String()+`"}`))
+		response := httptest.NewRecorder()
+		handler.SetDefaultTag(response, request)
+		return response
+	}
+
+	if response := setDefault(context.Background(), uuid.New()); response.Code != http.StatusNotFound {
+		t.Fatalf("unknown tag: expected status %d, got %d", http.StatusNotFound, response.Code)
+	}
+
+	// A cancelled request makes the store fail for a reason other than a
+	// missing tag, which must surface as a server error.
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if response := setDefault(cancelled, uuid.New()); response.Code != http.StatusInternalServerError {
+		t.Fatalf("store failure: expected status %d, got %d", http.StatusInternalServerError, response.Code)
+	}
+}

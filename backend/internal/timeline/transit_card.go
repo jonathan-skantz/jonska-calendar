@@ -45,12 +45,12 @@ func (h *Handler) ListTransitCardDays(w http.ResponseWriter, r *http.Request) {
 
 	reported, err := h.Store.ListTransitCardDays(r.Context(), userID, days.from, days.to)
 	if err != nil {
-		http.Error(w, "failed to list transit card days", http.StatusInternalServerError)
+		writeServerError(w, "failed to list transit card days", err)
 		return
 	}
 	household, err := h.Store.GetHousehold(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "failed to list transit card days", http.StatusInternalServerError)
+		writeServerError(w, "failed to list transit card days", err)
 		return
 	}
 	cardCount := 0
@@ -87,7 +87,7 @@ func (h *Handler) SetTransitCardDays(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Store.SetTransitCardDays(r.Context(), userID, submission.days.from, submission.days.to, submission.needed, submission.maybe); err != nil {
-		http.Error(w, "failed to save transit card days", http.StatusInternalServerError)
+		writeServerError(w, "failed to save transit card days", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

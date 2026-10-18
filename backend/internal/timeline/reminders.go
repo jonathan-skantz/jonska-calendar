@@ -19,7 +19,7 @@ func (h *Handler) ListReminders(w http.ResponseWriter, r *http.Request) {
 	}
 	reminders, err := h.Store.ListReminders(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "failed to list reminders", http.StatusInternalServerError)
+		writeServerError(w, "failed to list reminders", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, reminders)

@@ -28,7 +28,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		DeadlineAt:  request.DeadlineAt,
 	})
 	if err != nil {
-		http.Error(w, "failed to create task", http.StatusInternalServerError)
+		writeServerError(w, "failed to create task", err)
 		return
 	}
 	writeCreated(w, id)

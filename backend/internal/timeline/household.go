@@ -25,7 +25,7 @@ func (h *Handler) GetHousehold(w http.ResponseWriter, r *http.Request) {
 	}
 	household, err := h.Store.GetHousehold(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "failed to load household", http.StatusInternalServerError)
+		writeServerError(w, "failed to load household", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, household)

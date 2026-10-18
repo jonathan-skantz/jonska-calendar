@@ -1,6 +1,7 @@
 package timeline
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -20,8 +21,8 @@ func New(store *db.Store, currentUser CurrentUser) *Handler {
 }
 
 // findUserByEmail finds another user by the email they signed up with. On
-// failure it answers 400 for an empty email or 404 with notFoundMessage, and
-// returns false.
+// failure it answers 400 for an empty email, 404 with notFoundMessage for an
+// unknown one, or 500, and returns false.
 func (h *Handler) findUserByEmail(w http.ResponseWriter, r *http.Request, rawEmail, notFoundMessage string) (db.User, bool) {
 	email := strings.ToLower(strings.TrimSpace(rawEmail))
 	if email == "" {
@@ -29,8 +30,12 @@ func (h *Handler) findUserByEmail(w http.ResponseWriter, r *http.Request, rawEma
 		return db.User{}, false
 	}
 	user, err := h.Store.FindUserByEmail(r.Context(), email)
-	if err != nil {
+	if errors.Is(err, db.ErrUserNotFound) {
 		http.Error(w, notFoundMessage, http.StatusNotFound)
+		return db.User{}, false
+	}
+	if err != nil {
+		writeServerError(w, "failed to find user", err)
 		return db.User{}, false
 	}
 	return user, true
@@ -75,7 +80,7 @@ func (h *Handler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 
 	entries, err := h.Store.ListTimeline(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "failed to list timeline", http.StatusInternalServerError)
+		writeServerError(w, "failed to list timeline", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, entries)
