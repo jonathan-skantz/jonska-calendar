@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // ListTransitCardDays returns the reported days in the inclusive range for the
@@ -28,17 +29,11 @@ func (s *Store) ListTransitCardDays(ctx context.Context, userID uuid.UUID, from,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	days := []TransitCardDay{}
-	for rows.Next() {
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (TransitCardDay, error) {
 		var day TransitCardDay
-		if err := rows.Scan(&day.Day, &day.UserID, &day.DisplayName, &day.Need); err != nil {
-			return nil, err
-		}
-		days = append(days, day)
-	}
-	return days, rows.Err()
+		err := row.Scan(&day.Day, &day.UserID, &day.DisplayName, &day.Need)
+		return day, err
+	})
 }
 
 // SetTransitCardDays records an explicit answer for every day in the inclusive

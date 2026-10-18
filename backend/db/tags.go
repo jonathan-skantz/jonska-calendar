@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func (s *Store) CreateTag(ctx context.Context, userID uuid.UUID, name string) (Tag, error) {
@@ -30,17 +31,11 @@ func (s *Store) ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	tags := make([]Tag, 0)
-	for rows.Next() {
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Tag, error) {
 		var tag Tag
-		if err := rows.Scan(&tag.ID, &tag.Name, &tag.Color, &tag.IsDefault); err != nil {
-			return nil, err
-		}
-		tags = append(tags, tag)
-	}
-	return tags, rows.Err()
+		err := row.Scan(&tag.ID, &tag.Name, &tag.Color, &tag.IsDefault)
+		return tag, err
+	})
 }
 
 func (s *Store) CountItemTags(ctx context.Context, userID, itemID uuid.UUID) (int, error) {
@@ -77,67 +72,60 @@ func (s *Store) RenameTag(ctx context.Context, userID, tagID uuid.UUID, name, co
 }
 
 func (s *Store) DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error {
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	var tagCount int
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM tags WHERE user_id = $1`, userID).Scan(&tagCount); err != nil {
-		return err
-	}
-	if tagCount <= 1 {
-		return ErrLastTag
-	}
-	var replacementTagID uuid.UUID
-	if err := tx.QueryRow(ctx, `
-		SELECT id FROM tags WHERE user_id = $1 AND id <> $2 ORDER BY name LIMIT 1
-	`, userID, tagID).Scan(&replacementTagID); err != nil {
-		return err
-	}
-
-	var isDefault bool
-	if err := tx.QueryRow(ctx, `SELECT default_tag_id = $2 FROM users WHERE id = $1`, userID, tagID).Scan(&isDefault); err != nil {
-		return err
-	}
-	if isDefault {
-		if _, err := tx.Exec(ctx, `
-			UPDATE users SET default_tag_id = $2 WHERE id = $1
-		`, userID, replacementTagID); err != nil {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		var tagCount int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM tags WHERE user_id = $1`, userID).Scan(&tagCount); err != nil {
 			return err
 		}
-	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO timeline_item_tags (timeline_item_id, tag_id)
-		SELECT event.timeline_item_id, $3
-		FROM events AS event
-		JOIN timeline_items AS item ON item.id = event.timeline_item_id
-		WHERE item.user_id = $1
-		  AND (event.main_tag_id = $2 OR NOT EXISTS (
-			SELECT 1 FROM timeline_item_tags AS existing
-			WHERE existing.timeline_item_id = event.timeline_item_id
-			  AND existing.tag_id <> $2
-		  ))
-		ON CONFLICT DO NOTHING
-	`, userID, tagID, replacementTagID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `
-		UPDATE events AS event
-		SET main_tag_id = $3
-		FROM timeline_items AS item
-		WHERE item.id = event.timeline_item_id
-		  AND item.user_id = $1
-		  AND event.main_tag_id = $2
-	`, userID, tagID, replacementTagID); err != nil {
-		return err
-	}
-	result, err := tx.Exec(ctx, `DELETE FROM tags WHERE id = $1 AND user_id = $2`, tagID, userID)
-	if err := requireRowsAffected(result, err, ErrTagNotFound); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+		if tagCount <= 1 {
+			return ErrLastTag
+		}
+		var replacementTagID uuid.UUID
+		if err := tx.QueryRow(ctx, `
+			SELECT id FROM tags WHERE user_id = $1 AND id <> $2 ORDER BY name LIMIT 1
+		`, userID, tagID).Scan(&replacementTagID); err != nil {
+			return err
+		}
+
+		var isDefault bool
+		if err := tx.QueryRow(ctx, `SELECT default_tag_id = $2 FROM users WHERE id = $1`, userID, tagID).Scan(&isDefault); err != nil {
+			return err
+		}
+		if isDefault {
+			if _, err := tx.Exec(ctx, `
+				UPDATE users SET default_tag_id = $2 WHERE id = $1
+			`, userID, replacementTagID); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO timeline_item_tags (timeline_item_id, tag_id)
+			SELECT event.timeline_item_id, $3
+			FROM events AS event
+			JOIN timeline_items AS item ON item.id = event.timeline_item_id
+			WHERE item.user_id = $1
+			  AND (event.main_tag_id = $2 OR NOT EXISTS (
+				SELECT 1 FROM timeline_item_tags AS existing
+				WHERE existing.timeline_item_id = event.timeline_item_id
+				  AND existing.tag_id <> $2
+			  ))
+			ON CONFLICT DO NOTHING
+		`, userID, tagID, replacementTagID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE events AS event
+			SET main_tag_id = $3
+			FROM timeline_items AS item
+			WHERE item.id = event.timeline_item_id
+			  AND item.user_id = $1
+			  AND event.main_tag_id = $2
+		`, userID, tagID, replacementTagID); err != nil {
+			return err
+		}
+		result, err := tx.Exec(ctx, `DELETE FROM tags WHERE id = $1 AND user_id = $2`, tagID, userID)
+		return requireRowsAffected(result, err, ErrTagNotFound)
+	})
 }
 
 func (s *Store) AddTagToItem(ctx context.Context, userID, itemID, tagID uuid.UUID) error {
@@ -153,46 +141,39 @@ func (s *Store) AddTagToItem(ctx context.Context, userID, itemID, tagID uuid.UUI
 }
 
 func (s *Store) RemoveTagFromItem(ctx context.Context, userID, itemID, tagID uuid.UUID) error {
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	var isEvent bool
-	if err := tx.QueryRow(ctx, `
-		SELECT EXISTS (SELECT 1 FROM events WHERE timeline_item_id = $1)
-		FROM timeline_items
-		WHERE id = $1 AND user_id = $2
-		FOR UPDATE
-	`, itemID, userID).Scan(&isEvent); err != nil {
-		if isNoRows(err) {
-			return ErrTagNotFound
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		var isEvent bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM events WHERE timeline_item_id = $1)
+			FROM timeline_items
+			WHERE id = $1 AND user_id = $2
+			FOR UPDATE
+		`, itemID, userID).Scan(&isEvent); err != nil {
+			if isNoRows(err) {
+				return ErrTagNotFound
+			}
+			return err
 		}
-		return err
-	}
-	var tagCount int
-	if err := tx.QueryRow(ctx, `
-		SELECT count(*)
-		FROM timeline_item_tags AS item_tag
-		JOIN timeline_items AS item ON item.id = item_tag.timeline_item_id
-		WHERE item_tag.timeline_item_id = $1 AND item.user_id = $2
-	`, itemID, userID).Scan(&tagCount); err != nil {
-		return err
-	}
-	if isEvent && tagCount <= 1 {
-		return ErrLastTag
-	}
-	result, err := tx.Exec(ctx, `
-		DELETE FROM timeline_item_tags AS item_tag
-		USING timeline_items AS item, tags AS tag
-		WHERE item_tag.timeline_item_id = item.id
-		  AND item_tag.tag_id = tag.id
-		  AND item.id = $1 AND tag.id = $2
-		  AND item.user_id = $3 AND tag.user_id = $3
-	`, itemID, tagID, userID)
-	if err := requireRowsAffected(result, err, ErrTagNotFound); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+		var tagCount int
+		if err := tx.QueryRow(ctx, `
+			SELECT count(*)
+			FROM timeline_item_tags AS item_tag
+			JOIN timeline_items AS item ON item.id = item_tag.timeline_item_id
+			WHERE item_tag.timeline_item_id = $1 AND item.user_id = $2
+		`, itemID, userID).Scan(&tagCount); err != nil {
+			return err
+		}
+		if isEvent && tagCount <= 1 {
+			return ErrLastTag
+		}
+		result, err := tx.Exec(ctx, `
+			DELETE FROM timeline_item_tags AS item_tag
+			USING timeline_items AS item, tags AS tag
+			WHERE item_tag.timeline_item_id = item.id
+			  AND item_tag.tag_id = tag.id
+			  AND item.id = $1 AND tag.id = $2
+			  AND item.user_id = $3 AND tag.user_id = $3
+		`, itemID, tagID, userID)
+		return requireRowsAffected(result, err, ErrTagNotFound)
+	})
 }

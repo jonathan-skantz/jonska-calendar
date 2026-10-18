@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // Reminders belong to the user who set them and are never shared. A user may
@@ -63,23 +64,17 @@ func (s *Store) ListReminders(ctx context.Context, userID uuid.UUID) ([]Reminder
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	reminders := []Reminder{}
-	for rows.Next() {
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Reminder, error) {
 		var reminder Reminder
-		if err := rows.Scan(
+		err := row.Scan(
 			&reminder.ID, &reminder.EventID, &reminder.OffsetSeconds,
 			&reminder.RemindAt, &reminder.NotifiedAt,
 			&reminder.EventTitle, &reminder.EventLocation,
 			&reminder.EventStartsAt, &reminder.EventEndsAt, &reminder.EventIsAllDay,
 			&reminder.EventIsSkipped, &reminder.IsShared,
-		); err != nil {
-			return nil, err
-		}
-		reminders = append(reminders, reminder)
-	}
-	return reminders, rows.Err()
+		)
+		return reminder, err
+	})
 }
 
 func (s *Store) DeleteReminder(ctx context.Context, userID, reminderID uuid.UUID) error {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func (s *Store) ListTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
@@ -65,8 +66,19 @@ func (s *Store) populateTimelineTags(ctx context.Context, userID uuid.UUID, entr
 }
 
 func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
-	entries := make([]TimelineEntry, 0)
-	eventRows, err := s.db.Query(ctx, `
+	events, err := s.listOwnedEvents(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	tasks, err := s.listOwnedTasks(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return append(events, tasks...), nil
+}
+
+func (s *Store) listOwnedEvents(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
+	rows, err := s.db.Query(ctx, `
 		SELECT item.id, item.title, item.description, item.url,
 			event.starts_at, event.ends_at, event.is_all_day, event.kind, event.location,
 			event.start_is_approximate, event.end_is_approximate, event.gathering_seconds,
@@ -81,29 +93,22 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 	if err != nil {
 		return nil, err
 	}
-	for eventRows.Next() {
-		var entry TimelineEntry
-		entry.Type = "event"
-		if err := eventRows.Scan(
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (TimelineEntry, error) {
+		entry := TimelineEntry{Type: "event"}
+		err := row.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
 			&entry.StartIsApproximate, &entry.EndIsApproximate, &entry.GatheringSeconds,
 			&entry.GatheringIsOptional, &entry.GatheringLabel,
 			&entry.CommuteBeforeSeconds, &entry.CommuteAfterSeconds,
 			&entry.MainTagID, &entry.IsSkipped, &entry.ShareCount,
-		); err != nil {
-			eventRows.Close()
-			return nil, err
-		}
-		entries = append(entries, entry)
-	}
-	if err := eventRows.Err(); err != nil {
-		eventRows.Close()
-		return nil, err
-	}
-	eventRows.Close()
+		)
+		return entry, err
+	})
+}
 
-	taskRows, err := s.db.Query(ctx, `
+func (s *Store) listOwnedTasks(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
+	rows, err := s.db.Query(ctx, `
 		SELECT item.id, item.title, item.description, item.url,
 			task.deadline_at, task.is_completed
 		FROM timeline_items AS item
@@ -113,24 +118,14 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 	if err != nil {
 		return nil, err
 	}
-	for taskRows.Next() {
-		var entry TimelineEntry
-		entry.Type = "task"
-		if err := taskRows.Scan(
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (TimelineEntry, error) {
+		entry := TimelineEntry{Type: "task"}
+		err := row.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.DeadlineAt, &entry.IsCompleted,
-		); err != nil {
-			taskRows.Close()
-			return nil, err
-		}
-		entries = append(entries, entry)
-	}
-	if err := taskRows.Err(); err != nil {
-		taskRows.Close()
-		return nil, err
-	}
-	taskRows.Close()
-	return entries, nil
+		)
+		return entry, err
+	})
 }
 
 func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
@@ -159,29 +154,36 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	entries := make([]TimelineEntry, 0)
-	for rows.Next() {
-		var entry TimelineEntry
-		entry.Type = "event"
-		entry.IsShared = true
-		if err := rows.Scan(
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (TimelineEntry, error) {
+		entry := TimelineEntry{Type: "event", IsShared: true}
+		err := row.Scan(
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind,
 			&entry.StartIsApproximate, &entry.EndIsApproximate, &entry.GatheringSeconds,
 			&entry.GatheringIsOptional, &entry.GatheringLabel,
 			&entry.Location,
 			&entry.SharedBy,
-		); err != nil {
-			return nil, err
-		}
-		entries = append(entries, entry)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return entries, nil
+		)
+		return entry, err
+	})
+}
+
+// insertTimelineItem creates the parent row that owns an event or task. The
+// caller inserts the subtype row in the same transaction.
+func insertTimelineItem(ctx context.Context, tx pgx.Tx, userID uuid.UUID, title string, description, url *string) (uuid.UUID, error) {
+	var itemID uuid.UUID
+	err := tx.QueryRow(ctx, `
+		INSERT INTO timeline_items (user_id, title, description, url)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`, userID, title, description, url).Scan(&itemID)
+	return itemID, err
+}
+
+func tagOwnedBy(ctx context.Context, tx pgx.Tx, tagID, userID uuid.UUID) (bool, error) {
+	var owned bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tags WHERE id = $1 AND user_id = $2)`, tagID, userID).Scan(&owned)
+	return owned, err
 }
 
 func (s *Store) DeleteTimelineItem(ctx context.Context, userID, itemID uuid.UUID) error {

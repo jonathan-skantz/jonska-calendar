@@ -5,36 +5,32 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
+// Register creates the user together with their first tag, which becomes
+// their default tag.
 func (s *Store) Register(ctx context.Context, email, passwordHash string) (uuid.UUID, error) {
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	defer tx.Rollback(ctx)
-
 	userID := uuid.New()
 	tagID := uuid.New()
-	_, err = tx.Exec(ctx, `
-		INSERT INTO users (id, email, password_hash, default_tag_id)
-		VALUES ($1, $2, $3, $4)
-	`, userID, email, passwordHash, tagID)
-	if err != nil {
-		if isUniqueViolation(err) {
-			return uuid.Nil, ErrEmailAlreadyExists
+	err := s.withTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO users (id, email, password_hash, default_tag_id)
+			VALUES ($1, $2, $3, $4)
+		`, userID, email, passwordHash, tagID); err != nil {
+			if isUniqueViolation(err) {
+				return ErrEmailAlreadyExists
+			}
+			return err
 		}
+		_, err := tx.Exec(ctx, `
+			INSERT INTO tags (id, user_id, name) VALUES ($1, $2, 'general')
+		`, tagID, userID)
+		return err
+	})
+	if err != nil {
 		return uuid.Nil, err
 	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO tags (id, user_id, name) VALUES ($1, $2, 'general')
-	`, tagID, userID); err != nil {
-		return uuid.Nil, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return uuid.Nil, err
-	}
-
 	return userID, nil
 }
 
