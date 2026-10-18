@@ -35,7 +35,7 @@ import {
 } from "./features/calendar/timelineView";
 import { usePreferences } from "./features/calendar/preferencesContext";
 import { useCalendarState } from "./features/calendar/useCalendarState";
-import { ComposerDrawer } from "./features/composer/ComposerDrawer";
+import { ComposerPanel } from "./features/composer/ComposerPanel";
 import { useComposer } from "./features/composer/useComposer";
 import { HouseholdSettings } from "./features/household/HouseholdSettings";
 import {
@@ -51,12 +51,7 @@ import { isReminderUpcoming } from "./features/reminders/reminders";
 import { useReminderActions } from "./features/reminders/useReminderActions";
 import { useReminderDelivery } from "./features/reminders/useReminderNotifications";
 import { SettingsPage } from "./features/settings/SettingsPage";
-import { ShareEventDrawer } from "./features/sharing/ShareEventDrawer";
 import { SharedEventDrawer } from "./features/sharing/SharedEventDrawer";
-import {
-  useEventShareMutations,
-  useEventShares,
-} from "./features/sharing/useEventShares";
 import { TagEditorDrawer } from "./features/tags/TagEditorDrawer";
 import { useTagMutations } from "./features/tags/useTagMutations";
 import { useTagVisibility } from "./features/tags/useTagVisibility";
@@ -73,7 +68,7 @@ import { getSunIndicators } from "./features/weather/sunTimes";
 import { useWeather } from "./features/weather/useWeather";
 
 // The drawers opened from the calendar. Only one is open at a time; the
-// composer and the share drawer stacked on it are tracked separately.
+// composer is tracked separately.
 type OpenDrawer =
   | { kind: "tags" }
   | { kind: "transitCard" }
@@ -89,7 +84,6 @@ export function CalendarApp({ user }: { user: User }) {
   const tags = workspaceQuery.data?.tags ?? [];
   const [showSettings, setShowSettings] = useState(false);
   const [drawer, setDrawer] = useState<OpenDrawer | null>(null);
-  const [sharingEvent, setSharingEvent] = useState<TimelineEntry | null>(null);
   const { preferences } = usePreferences();
   const { timeFormat } = preferences;
   const formatTimeLabel = (value: Date) =>
@@ -116,17 +110,10 @@ export function CalendarApp({ user }: { user: User }) {
   const householdMutations = useHouseholdMutations();
   const reminders = useReminderActions();
   const reminderDelivery = useReminderDelivery();
-  const eventSharesQuery = useEventShares(sharingEvent?.id ?? null);
-  const shareMutations = useEventShareMutations(sharingEvent?.id ?? null);
   const composer = useComposer({
     tags,
     selectedDate,
     onSelectedDateChange: setSelectedDate,
-    onResetErrors: () => {
-      timeline.saveItem.reset();
-      timeline.deleteItem.reset();
-      reminders.clearError();
-    },
   });
   const { editingItem } = composer;
 
@@ -153,11 +140,6 @@ export function CalendarApp({ user }: { user: User }) {
       return getRequestErrorMessage(error, "Couldn't read that");
     }
   };
-  // The share drawer is stacked on the composer, so it closes with it.
-  const closeComposer = () => {
-    setSharingEvent(null);
-    composer.close();
-  };
   // Events shared with the user are read-only, so they open a details view.
   const openEntry = (entry: TimelineEntry) => {
     reminders.clearError();
@@ -171,27 +153,6 @@ export function CalendarApp({ user }: { user: User }) {
     setDrawer(null);
     openEntry(entry);
   };
-  const deleteItem = (entry: TimelineEntry) => {
-    if (!window.confirm(`Delete “${entry.title}”?`)) return;
-    timeline.deleteItem.mutate(entry, {
-      onSuccess: () => {
-        closeComposer();
-        composer.setDraftEventStart(null);
-      },
-    });
-  };
-  const saveComposerItem = (form: FormData) =>
-    timeline.saveItem.mutate(
-      {
-        type: composer.type,
-        editingItem,
-        form,
-        mainTagId: composer.mainTagId,
-        selectedTagIds: composer.selectedTagIds,
-        tags,
-      },
-      { onSuccess: closeComposer },
-    );
   const createTag = () => {
     const name = window.prompt("Tag name")?.trim();
     if (name) tagMutations.createTag.mutate(name);
@@ -214,7 +175,7 @@ export function CalendarApp({ user }: { user: User }) {
   const openSettings = () => {
     setShowSettings(true);
     setDrawer(null);
-    closeComposer();
+    composer.close();
     if (isPhone) sidebar.close();
   };
   const signOut = () => logout.mutate();
@@ -379,68 +340,10 @@ export function CalendarApp({ user }: { user: User }) {
         </section>
       )}
       {composer.showComposer && (
-        <ComposerDrawer
+        <ComposerPanel
           key={`${editingItem?.id ?? "new"}-${composer.type}`}
-          type={composer.type}
-          editingItem={editingItem}
+          composer={composer}
           selectedDate={selectedDate}
-          draftEventStart={composer.draftEventStart}
-          tags={tags}
-          selectedTagIds={composer.selectedTagIds}
-          mainTagId={composer.mainTagId}
-          error={getErrorText(
-            timeline.saveItem.error ?? timeline.deleteItem.error,
-            "Unable to save item",
-          )}
-          pending={timeline.saveItem.isPending}
-          onSave={saveComposerItem}
-          onClose={closeComposer}
-          onTypeChange={composer.setType}
-          onSelectedTagIdsChange={composer.setSelectedTagIds}
-          onMainTagIdChange={composer.setMainTagId}
-          onShare={
-            editingItem?.type === "event"
-              ? () => setSharingEvent(editingItem)
-              : undefined
-          }
-          shareCount={
-            entries.find((entry) => entry.id === editingItem?.id)?.share_count
-          }
-          reminders={editingItem ? reminders.itemsFor(editingItem.id) : []}
-          reminderError={reminders.error}
-          onAddReminder={(offset) =>
-            editingItem && reminders.add(editingItem.id, offset)
-          }
-          onRemoveReminder={(reminder) => reminders.remove(reminder.id)}
-          draftValues={composer.draft?.values}
-          draftReminderOffsets={composer.draft?.reminderOffsets}
-          draftWarnings={composer.draft?.warnings}
-        />
-      )}
-      {composer.showComposer && editingItem && (
-        <button
-          className="danger-button drawer-delete-action"
-          type="button"
-          onClick={() => deleteItem(editingItem)}
-        >
-          Delete item
-        </button>
-      )}
-      {/* Opened from the composer; closeComposer also clears it. */}
-      {sharingEvent && (
-        <ShareEventDrawer
-          event={sharingEvent}
-          shares={eventSharesQuery.data}
-          onAdd={shareMutations.add}
-          onUpdate={shareMutations.update}
-          onRemove={async (share) =>
-            window.confirm(
-              `Stop sharing “${sharingEvent.title}” with ${share.recipient_display_name}?`,
-            )
-              ? shareMutations.remove(share.id)
-              : null
-          }
-          onClose={() => setSharingEvent(null)}
         />
       )}
       {drawer?.kind === "sharedEvent" && (

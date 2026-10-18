@@ -8,14 +8,12 @@ type UseComposerOptions = {
   tags: Tag[];
   selectedDate: string;
   onSelectedDateChange: (date: string) => void;
-  onResetErrors: () => void;
 };
 
 export const useComposer = ({
   tags,
   selectedDate,
   onSelectedDateChange,
-  onResetErrors,
 }: UseComposerOptions) => {
   const [showComposer, setShowComposer] = useState(false);
   const [type, setType] = useState<"event" | "task">("event");
@@ -44,7 +42,6 @@ export const useComposer = ({
       (draftStart ? new Date(draftStart) : new Date(`${selectedDate}T09:00`));
     onSelectedDateChange(dateKey(start));
     setDraftEventStart(start.toISOString());
-    onResetErrors();
     setShowComposer(true);
   };
 
@@ -53,7 +50,6 @@ export const useComposer = ({
     setType(entry.type);
     setDraft(null);
     setDraftEventStart(null);
-    onResetErrors();
     setSelectedTagIds(entry.tags?.map((tag) => tag.id) ?? []);
     setMainTagId(entry.main_tag_id ?? entry.tags?.[0]?.id ?? null);
     setShowComposer(true);
@@ -73,7 +69,6 @@ export const useComposer = ({
     draftEventStart,
     draft,
     setType,
-    setDraftEventStart,
     setSelectedTagIds,
     setMainTagId,
     openNew,
@@ -81,3 +76,5 @@ export const useComposer = ({
     close,
   };
 };
+
+export type Composer = ReturnType<typeof useComposer>;
