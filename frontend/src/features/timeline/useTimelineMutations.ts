@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { invalidateWorkspace } from "../../lib/queryInvalidation";
+import { queryKeys } from "../../lib/queryKeys";
 import {
   buildTimelineItemRequest,
   getEventTagChanges,
 } from "./timelineRequests";
 import type { Tag, TimelineEntry } from "../../types";
+import type { Workspace } from "./useWorkspace";
 
 export type SaveItemInput = {
   type: "event" | "task";
@@ -76,14 +78,17 @@ const saveItem = async ({
 
 export const useTimelineMutations = () => {
   const queryClient = useQueryClient();
-  const onSuccess = () => invalidateWorkspace(queryClient);
+  const refreshWorkspace = () => invalidateWorkspace(queryClient);
 
   return {
-    saveItem: useMutation({ mutationFn: saveItem, onSuccess }),
+    saveItem: useMutation({
+      mutationFn: saveItem,
+      onSuccess: refreshWorkspace,
+    }),
     deleteItem: useMutation({
       mutationFn: (entry: TimelineEntry) =>
         api(`/api/timeline/${entry.id}`, { method: "DELETE" }),
-      onSuccess,
+      onSuccess: refreshWorkspace,
     }),
     toggleTask: useMutation({
       mutationFn: (entry: TimelineEntry) =>
@@ -91,7 +96,33 @@ export const useTimelineMutations = () => {
           method: "PATCH",
           body: JSON.stringify({ is_completed: !entry.is_completed }),
         }),
-      onSuccess,
+      // The checkbox flips at once; a failed request puts the old workspace
+      // back, and either way the workspace is refetched afterwards.
+      onMutate: async (entry) => {
+        await queryClient.cancelQueries({ queryKey: queryKeys.workspace });
+        const previous = queryClient.getQueryData<Workspace>(
+          queryKeys.workspace,
+        );
+        queryClient.setQueryData<Workspace>(
+          queryKeys.workspace,
+          (workspace) =>
+            workspace && {
+              ...workspace,
+              entries: workspace.entries.map((item) =>
+                item.id === entry.id
+                  ? { ...item, is_completed: !entry.is_completed }
+                  : item,
+              ),
+            },
+        );
+        return { previous };
+      },
+      onError: (_error, _entry, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(queryKeys.workspace, context.previous);
+        }
+      },
+      onSettled: refreshWorkspace,
     }),
   };
 };

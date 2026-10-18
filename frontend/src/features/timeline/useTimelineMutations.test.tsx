@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/queryKeys";
+import type { TimelineEntry } from "../../types";
 import { useTimelineMutations } from "./useTimelineMutations";
 
 vi.mock("../../lib/api", () => ({ api: vi.fn() }));
@@ -96,6 +98,49 @@ describe("useTimelineMutations", () => {
       method: "POST",
       body: JSON.stringify({ offset_seconds: 86400 }),
     });
+    queryClient.clear();
+  });
+
+  it("completes a task at once and rolls back when the request fails", async () => {
+    const task: TimelineEntry = {
+      id: "task-1",
+      type: "task",
+      title: "Follow up",
+      deadline_at: "2026-10-16T15:00:00Z",
+      is_completed: false,
+    };
+    let rejectToggle: (error: Error) => void = () => {};
+    mockedApi.mockImplementation((path, options) => {
+      if (path === "/api/tasks/task-1" && options?.method === "PATCH") {
+        return new Promise((_, reject) => {
+          rejectToggle = reject;
+        });
+      }
+      // The refetch after the failure returns the server's unchanged data.
+      if (path === "/api/timeline") return Promise.resolve([task]);
+      return Promise.resolve([]);
+    });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(queryKeys.workspace, { entries: [task], tags });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useTimelineMutations(), { wrapper });
+    const completed = () =>
+      queryClient.getQueryData<{ entries: TimelineEntry[] }>(
+        queryKeys.workspace,
+      )?.entries[0].is_completed;
+
+    act(() => result.current.toggleTask.mutate(task));
+    await waitFor(() => expect(completed()).toBe(true));
+
+    await act(async () => rejectToggle(new Error("Task update failed")));
+    await waitFor(() =>
+      expect(result.current.toggleTask.error?.message).toBe(
+        "Task update failed",
+      ),
+    );
+    expect(completed()).toBe(false);
     queryClient.clear();
   });
 });
