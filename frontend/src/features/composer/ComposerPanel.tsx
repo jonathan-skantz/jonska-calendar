@@ -62,9 +62,13 @@ export const ComposerPanel = ({
         editingItem={editingItem}
         selectedDate={selectedDate}
         draftEventStart={composer.draftEventStart}
-        tags={tags}
-        selectedTagIds={composer.selectedTagIds}
-        mainTagId={composer.mainTagId}
+        tagSelection={{
+          tags,
+          selectedTagIds: composer.selectedTagIds,
+          mainTagId: composer.mainTagId,
+          onSelectedTagIdsChange: composer.setSelectedTagIds,
+          onMainTagIdChange: composer.setMainTagId,
+        }}
         error={getErrorText(
           saveItem.error ?? deleteItem.error,
           "Unable to save item",
@@ -73,8 +77,6 @@ export const ComposerPanel = ({
         onSave={save}
         onClose={close}
         onTypeChange={composer.setType}
-        onSelectedTagIdsChange={composer.setSelectedTagIds}
-        onMainTagIdChange={composer.setMainTagId}
         onShare={
           editingItem?.type === "event"
             ? () => setSharingEvent(editingItem)
@@ -83,15 +85,17 @@ export const ComposerPanel = ({
         shareCount={
           entries.find((entry) => entry.id === editingItem?.id)?.share_count
         }
-        reminders={editingItem ? reminders.itemsFor(editingItem.id) : []}
-        reminderError={reminders.error}
-        onAddReminder={(offset) =>
-          editingItem && reminders.add(editingItem.id, offset)
+        savedReminders={
+          editingItem?.type === "event"
+            ? {
+                items: reminders.itemsFor(editingItem.id),
+                error: reminders.error,
+                onAdd: (offset) => reminders.add(editingItem.id, offset),
+                onRemove: (reminder) => reminders.remove(reminder.id),
+              }
+            : undefined
         }
-        onRemoveReminder={(reminder) => reminders.remove(reminder.id)}
-        draftValues={composer.draft?.values}
-        draftReminderOffsets={composer.draft?.reminderOffsets}
-        draftWarnings={composer.draft?.warnings}
+        draft={composer.draft}
       />
       {editingItem && (
         <button

@@ -6,6 +6,14 @@ import { renderWithPreferences } from "../../test/renderWithPreferences";
 
 afterEach(cleanup);
 
+const noTags = {
+  tags: [],
+  selectedTagIds: [],
+  mainTagId: null,
+  onSelectedTagIdsChange: vi.fn(),
+  onMainTagIdChange: vi.fn(),
+};
+
 describe("ComposerDrawer validation state", () => {
   it("exposes invalid fields to assistive technology", () => {
     const onSave = vi.fn();
@@ -15,14 +23,10 @@ describe("ComposerDrawer validation state", () => {
         editingItem={null}
         selectedDate="2026-10-15"
         draftEventStart={null}
-        tags={[]}
-        selectedTagIds={[]}
-        mainTagId={null}
+        tagSelection={noTags}
         onSave={onSave}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
-        onSelectedTagIdsChange={vi.fn()}
-        onMainTagIdChange={vi.fn()}
       />,
     );
     // An empty title and an end before the start.
@@ -68,14 +72,10 @@ describe("ComposerDrawer saving", () => {
         editingItem={null}
         selectedDate="2026-10-15"
         draftEventStart={null}
-        tags={[]}
-        selectedTagIds={[]}
-        mainTagId={null}
+        tagSelection={noTags}
         onSave={onSave}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
-        onSelectedTagIdsChange={vi.fn()}
-        onMainTagIdChange={vi.fn()}
         {...props}
       />,
     );
@@ -115,14 +115,10 @@ describe("ComposerDrawer commute fields", () => {
         editingItem={editingItem}
         selectedDate="2026-10-15"
         draftEventStart={null}
-        tags={[]}
-        selectedTagIds={[]}
-        mainTagId={null}
+        tagSelection={noTags}
         onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
-        onSelectedTagIdsChange={vi.fn()}
-        onMainTagIdChange={vi.fn()}
       />,
     );
 
@@ -246,14 +242,10 @@ describe("ComposerDrawer approximate fields", () => {
         editingItem={editingItem}
         selectedDate="2026-10-15"
         draftEventStart={null}
-        tags={[]}
-        selectedTagIds={[]}
-        mainTagId={null}
+        tagSelection={noTags}
         onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
-        onSelectedTagIdsChange={vi.fn()}
-        onMainTagIdChange={vi.fn()}
       />,
     );
 
@@ -289,14 +281,10 @@ describe("ComposerDrawer reminders", () => {
     type: "event" as const,
     selectedDate: "2026-10-15",
     draftEventStart: null,
-    tags: [],
-    selectedTagIds: [],
-    mainTagId: null,
+    tagSelection: noTags,
     onSave: vi.fn(),
     onClose: vi.fn(),
     onTypeChange: vi.fn(),
-    onSelectedTagIdsChange: vi.fn(),
-    onMainTagIdChange: vi.fn(),
   };
 
   it("queues reminders on a new event as form values", () => {
@@ -338,9 +326,11 @@ describe("ComposerDrawer reminders", () => {
           ends_at: "2026-10-15T12:00:00",
           is_completed: false,
         }}
-        reminders={[{ id: "reminder-1", offsetSeconds: 86400 }]}
-        onAddReminder={onAddReminder}
-        onRemoveReminder={onRemoveReminder}
+        savedReminders={{
+          items: [{ id: "reminder-1", offsetSeconds: 86400 }],
+          onAdd: onAddReminder,
+          onRemove: onRemoveReminder,
+        }}
       />,
     );
     fireEvent.change(
@@ -369,25 +359,24 @@ describe("ComposerDrawer quick add draft", () => {
         editingItem={null}
         selectedDate="2026-10-15"
         draftEventStart={null}
-        tags={[]}
-        selectedTagIds={[]}
-        mainTagId={null}
+        tagSelection={noTags}
         onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
-        onSelectedTagIdsChange={vi.fn()}
-        onMainTagIdChange={vi.fn()}
-        draftValues={{
-          title: "Middag",
-          starts_at: new Date(2026, 9, 17, 18, 0).toISOString(),
-          ends_at: new Date(2026, 9, 17, 21, 0).toISOString(),
-          start_is_approximate: true,
-          location: "mormor",
-          kind: "attendable",
-          commute_before_seconds: 1800,
+        draft={{
+          values: {
+            title: "Middag",
+            starts_at: new Date(2026, 9, 17, 18, 0).toISOString(),
+            ends_at: new Date(2026, 9, 17, 21, 0).toISOString(),
+            start_is_approximate: true,
+            location: "mormor",
+            kind: "attendable",
+            commute_before_seconds: 1800,
+          },
+          tagIds: [],
+          reminderOffsets: [3600],
+          warnings: ['Couldn\'t place "after work"'],
         }}
-        draftReminderOffsets={[3600]}
-        draftWarnings={['Couldn\'t place "after work"']}
       />,
     );
 
