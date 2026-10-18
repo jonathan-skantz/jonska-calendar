@@ -166,6 +166,17 @@ func (s *Store) RemoveTagFromItem(ctx context.Context, userID, itemID, tagID uui
 		if isEvent && tagCount <= 1 {
 			return ErrLastTag
 		}
+		if isEvent {
+			var isMainTag bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM events WHERE timeline_item_id = $1 AND main_tag_id = $2)
+			`, itemID, tagID).Scan(&isMainTag); err != nil {
+				return err
+			}
+			if isMainTag {
+				return ErrMainTag
+			}
+		}
 		result, err := tx.Exec(ctx, `
 			DELETE FROM timeline_item_tags AS item_tag
 			USING timeline_items AS item, tags AS tag

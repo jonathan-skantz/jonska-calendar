@@ -101,6 +101,48 @@ describe("useTimelineMutations", () => {
     queryClient.clear();
   });
 
+  it("moves the main tag before removing the old one when editing an event", async () => {
+    mockedApi.mockImplementation(async () => undefined);
+    const queryClient = new QueryClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useTimelineMutations(), { wrapper });
+    const editingItem: TimelineEntry = {
+      id: "event-1",
+      type: "event",
+      title: "Dinner",
+      kind: "informational",
+      tags: [tags[0]],
+      is_completed: false,
+    };
+    const form = new FormData();
+    form.set("title", "Dinner");
+    form.set("kind", "informational");
+    form.set("starts_at", "2026-10-15T18:00");
+    form.set("ends_at", "2026-10-15T19:00");
+
+    await act(async () => {
+      await result.current.saveItem.mutateAsync({
+        type: "event",
+        editingItem,
+        form,
+        mainTagId: "home",
+        selectedTagIds: ["home"],
+        tags,
+      });
+    });
+
+    expect(
+      mockedApi.mock.calls.map(([path, options]) => [path, options?.method]),
+    ).toEqual([
+      ["/api/timeline/event-1/tags", "POST"],
+      ["/api/events/event-1", "PUT"],
+      ["/api/timeline/event-1/tags/work", "DELETE"],
+    ]);
+    queryClient.clear();
+  });
+
   it("completes a task at once and rolls back when the request fails", async () => {
     const task: TimelineEntry = {
       id: "task-1",

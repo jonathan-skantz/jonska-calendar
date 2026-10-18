@@ -184,6 +184,10 @@ func (h *Handler) RemoveTagFromItem(w http.ResponseWriter, r *http.Request) {
 				cause:    db.ErrLastTag,
 				response: httpErrorResponse{status: http.StatusConflict, message: "events must have at least one tag"},
 			},
+			mappedErrorResponse{
+				cause:    db.ErrMainTag,
+				response: httpErrorResponse{status: http.StatusConflict, message: "choose another main tag before removing this one"},
+			},
 		)
 		return
 	}

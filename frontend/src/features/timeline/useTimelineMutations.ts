@@ -18,24 +18,24 @@ export type SaveItemInput = {
   tags: Tag[];
 };
 
-const saveEventTags = async (
-  itemID: string,
-  previous: Tag[],
-  next: string[],
-) => {
-  const changes = getEventTagChanges(previous, next);
-  await Promise.all([
-    ...changes.add.map((tagID) =>
+type EventTagChanges = ReturnType<typeof getEventTagChanges>;
+
+const addEventTags = (itemID: string, changes: EventTagChanges) =>
+  Promise.all(
+    changes.add.map((tagID) =>
       api(`/api/timeline/${itemID}/tags`, {
         method: "POST",
         body: JSON.stringify({ tag_id: tagID }),
       }),
     ),
-    ...changes.remove.map((tag) =>
+  );
+
+const removeEventTags = (itemID: string, changes: EventTagChanges) =>
+  Promise.all(
+    changes.remove.map((tag) =>
       api(`/api/timeline/${itemID}/tags/${tag.id}`, { method: "DELETE" }),
     ),
-  ]);
-};
+  );
 
 const saveItem = async ({
   type,
@@ -45,8 +45,16 @@ const saveItem = async ({
   selectedTagIds,
   tags,
 }: SaveItemInput) => {
-  if (type === "event" && editingItem?.type === "event") {
-    await saveEventTags(editingItem.id, editingItem.tags ?? [], selectedTagIds);
+  // Add new tags before the save so the new main tag is attached when it is
+  // saved. Remove old tags only after it, because the server refuses to
+  // remove an event's current main tag.
+  const editedEvent =
+    type === "event" && editingItem?.type === "event" ? editingItem : null;
+  const tagChanges = editedEvent
+    ? getEventTagChanges(editedEvent.tags ?? [], selectedTagIds)
+    : null;
+  if (editedEvent && tagChanges) {
+    await addEventTags(editedEvent.id, tagChanges);
   }
   const request = buildTimelineItemRequest(
     type,
@@ -58,12 +66,17 @@ const saveItem = async ({
     method: request.method,
     body: JSON.stringify(request.body),
   });
+  if (editedEvent && tagChanges) {
+    await removeEventTags(editedEvent.id, tagChanges);
+  }
   if (type === "event" && editingItem?.type !== "event") {
     // The new event starts with only its main tag (or the default tag).
     const initialTags = mainTagId
       ? tags.filter((tag) => tag.id === mainTagId)
       : tags.filter((tag) => tag.is_default);
-    await saveEventTags(response?.id ?? "", initialTags, selectedTagIds);
+    const newEventChanges = getEventTagChanges(initialTags, selectedTagIds);
+    await addEventTags(response?.id ?? "", newEventChanges);
+    await removeEventTags(response?.id ?? "", newEventChanges);
     // Reminders added while composing a new event need its id first.
     await Promise.all(
       form.getAll("reminder_offset").map((offset) =>

@@ -16,6 +16,47 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
+func TestEventMainTagCannotBeRemoved(t *testing.T) {
+	store, ownerID := setupTestStore(t)
+	ctx := context.Background()
+	mainTag, err := store.CreateTag(ctx, ownerID, "Main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	extraTag, err := store.CreateTag(ctx, ownerID, "Extra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventID, err := store.CreateEvent(ctx, ownerID, db.Event{
+		Title:     "Main tag removal",
+		StartsAt:  time.Date(2026, 10, 9, 10, 0, 0, 0, time.UTC),
+		EndsAt:    time.Date(2026, 10, 9, 11, 0, 0, 0, time.UTC),
+		Kind:      "informational",
+		MainTagID: mainTag.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddTagToItem(ctx, ownerID, eventID, extraTag.ID); err != nil {
+		t.Fatal(err)
+	}
+	handler := New(store, testutil.SignedInAs(ownerID))
+	remove := func(tagID uuid.UUID) int {
+		request := httptest.NewRequest(http.MethodDelete, "/api/timeline/"+eventID.String()+"/tags/"+tagID.String(), nil)
+		request.SetPathValue("itemID", eventID.String())
+		request.SetPathValue("tagID", tagID.String())
+		response := httptest.NewRecorder()
+		handler.RemoveTagFromItem(response, request)
+		return response.Code
+	}
+	if status := remove(mainTag.ID); status != http.StatusConflict {
+		t.Fatalf("main tag: expected status %d, got %d", http.StatusConflict, status)
+	}
+	if status := remove(extraTag.ID); status != http.StatusNoContent {
+		t.Fatalf("non-main tag: expected status %d, got %d", http.StatusNoContent, status)
+	}
+}
+
 func setupTestStore(t *testing.T) (*db.Store, uuid.UUID) {
 	ctx := context.Background()
 	store := testutil.NewStore(t)

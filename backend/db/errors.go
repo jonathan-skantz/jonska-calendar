@@ -19,6 +19,7 @@ var (
 	ErrTagAlreadyExists     = errors.New("tag already exists")
 	ErrTagNotFound          = errors.New("tag not found")
 	ErrLastTag              = errors.New("at least one tag is required")
+	ErrMainTag              = errors.New("the main tag cannot be removed")
 	ErrDefaultTagNotFound   = errors.New("default tag not found")
 	ErrHouseholdNotFound    = errors.New("household not found")
 	ErrAlreadyInHousehold   = errors.New("user already belongs to a household")
