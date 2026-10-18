@@ -2,11 +2,8 @@ package db
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (s *Store) CreateTag(ctx context.Context, userID uuid.UUID, name string) (Tag, error) {
@@ -16,7 +13,7 @@ func (s *Store) CreateTag(ctx context.Context, userID uuid.UUID, name string) (T
 		VALUES ($1, $2)
 		RETURNING id, name, color
 	`, userID, name).Scan(&tag.ID, &tag.Name, &tag.Color)
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
+	if isUniqueViolation(err) {
 		return Tag{}, ErrTagAlreadyExists
 	}
 	return tag, err
@@ -46,11 +43,14 @@ func (s *Store) ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error) {
 	return tags, rows.Err()
 }
 
-func (s *Store) CountItemTags(ctx context.Context, itemID uuid.UUID) (int, error) {
+func (s *Store) CountItemTags(ctx context.Context, userID, itemID uuid.UUID) (int, error) {
 	var count int
 	err := s.db.QueryRow(ctx, `
-		SELECT count(*) FROM timeline_item_tags WHERE timeline_item_id = $1
-	`, itemID).Scan(&count)
+		SELECT count(*)
+		FROM timeline_item_tags AS item_tag
+		JOIN timeline_items AS item ON item.id = item_tag.timeline_item_id
+		WHERE item_tag.timeline_item_id = $1 AND item.user_id = $2
+	`, itemID, userID).Scan(&count)
 	return count, err
 }
 
@@ -61,10 +61,7 @@ func (s *Store) SetDefaultTag(ctx context.Context, userID, tagID uuid.UUID) erro
 		FROM tags
 		WHERE users.id = $1 AND tags.id = $2 AND tags.user_id = $1
 	`, userID, tagID)
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrTagNotFound
-	}
-	return err
+	return requireRowsAffected(result, err, ErrTagNotFound)
 }
 
 func (s *Store) RenameTag(ctx context.Context, userID, tagID uuid.UUID, name, color string) error {
@@ -73,13 +70,10 @@ func (s *Store) RenameTag(ctx context.Context, userID, tagID uuid.UUID, name, co
 		SET name = $3, color = $4
 		WHERE id = $1 AND user_id = $2
 	`, tagID, userID, name, color)
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
+	if isUniqueViolation(err) {
 		return ErrTagAlreadyExists
 	}
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrTagNotFound
-	}
-	return err
+	return requireRowsAffected(result, err, ErrTagNotFound)
 }
 
 func (s *Store) DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error {
@@ -140,11 +134,8 @@ func (s *Store) DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error {
 		return err
 	}
 	result, err := tx.Exec(ctx, `DELETE FROM tags WHERE id = $1 AND user_id = $2`, tagID, userID)
-	if err != nil {
+	if err := requireRowsAffected(result, err, ErrTagNotFound); err != nil {
 		return err
-	}
-	if result.RowsAffected() == 0 {
-		return ErrTagNotFound
 	}
 	return tx.Commit(ctx)
 }
@@ -158,10 +149,7 @@ func (s *Store) AddTagToItem(ctx context.Context, userID, itemID, tagID uuid.UUI
 		WHERE item.id = $2 AND item.user_id = $1 AND tag.user_id = $1
 		ON CONFLICT DO NOTHING
 	`, userID, itemID, tagID)
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrTagNotFound
-	}
-	return err
+	return requireRowsAffected(result, err, ErrTagNotFound)
 }
 
 func (s *Store) RemoveTagFromItem(ctx context.Context, userID, itemID, tagID uuid.UUID) error {
@@ -178,13 +166,18 @@ func (s *Store) RemoveTagFromItem(ctx context.Context, userID, itemID, tagID uui
 		WHERE id = $1 AND user_id = $2
 		FOR UPDATE
 	`, itemID, userID).Scan(&isEvent); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return ErrTagNotFound
 		}
 		return err
 	}
 	var tagCount int
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM timeline_item_tags WHERE timeline_item_id = $1`, itemID).Scan(&tagCount); err != nil {
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*)
+		FROM timeline_item_tags AS item_tag
+		JOIN timeline_items AS item ON item.id = item_tag.timeline_item_id
+		WHERE item_tag.timeline_item_id = $1 AND item.user_id = $2
+	`, itemID, userID).Scan(&tagCount); err != nil {
 		return err
 	}
 	if isEvent && tagCount <= 1 {
@@ -198,10 +191,7 @@ func (s *Store) RemoveTagFromItem(ctx context.Context, userID, itemID, tagID uui
 		  AND item.id = $1 AND tag.id = $2
 		  AND item.user_id = $3 AND tag.user_id = $3
 	`, itemID, tagID, userID)
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrTagNotFound
-	}
-	if err != nil {
+	if err := requireRowsAffected(result, err, ErrTagNotFound); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

@@ -395,7 +395,7 @@ func TestCreateEventAndTask(t *testing.T) {
 	if len(tags) != 1 || !tags[0].IsDefault {
 		t.Fatalf("expected a default tag, got %+v", tags)
 	}
-	tagCount, err := store.CountItemTags(context.Background(), createdEventID.ID)
+	tagCount, err := store.CountItemTags(context.Background(), userID, createdEventID.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -473,8 +473,19 @@ func TestUpdateEventAndTask(t *testing.T) {
 	eventRequest.SetPathValue("eventID", eventID.String())
 	eventResponse = httptest.NewRecorder()
 	otherHandler.UpdateEvent(eventResponse, eventRequest)
-	if eventResponse.Code != http.StatusNotFound {
-		t.Fatalf("other user update: expected status %d, got %d", http.StatusNotFound, eventResponse.Code)
+	if eventResponse.Code != http.StatusNotFound || eventResponse.Body.String() != "event not found\n" {
+		t.Fatalf("other user update: expected 404 event not found, got %d %q", eventResponse.Code, eventResponse.Body.String())
+	}
+
+	taskRequest = httptest.NewRequest(http.MethodPut, "/api/tasks/"+taskID.String(), bytes.NewBufferString(`{
+		"title":"Unauthorized",
+		"deadline_at":"2026-10-09T15:00:00Z"
+	}`))
+	taskRequest.SetPathValue("taskID", taskID.String())
+	taskResponse = httptest.NewRecorder()
+	otherHandler.UpdateTask(taskResponse, taskRequest)
+	if taskResponse.Code != http.StatusNotFound || taskResponse.Body.String() != "task not found\n" {
+		t.Fatalf("other user task update: expected 404 task not found, got %d %q", taskResponse.Code, taskResponse.Body.String())
 	}
 }
 

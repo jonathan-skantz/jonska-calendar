@@ -2,10 +2,8 @@ package db
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 // Household queries never take a household ID from the client. The household
@@ -20,7 +18,7 @@ func (s *Store) GetHousehold(ctx context.Context, userID uuid.UUID) (*Household,
 		JOIN household_members AS me ON me.household_id = h.id
 		WHERE me.user_id = $1
 	`, userID).Scan(&household.ID, &household.Name, &household.TransitCardCount)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return nil, nil
 	}
 	if err != nil {
@@ -79,10 +77,7 @@ func (s *Store) UpdateHousehold(ctx context.Context, userID uuid.UUID, name stri
 		SET name = $2, transit_card_count = $3
 		WHERE id = (SELECT household_id FROM household_members WHERE user_id = $1)
 	`, userID, name, transitCardCount)
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrHouseholdNotFound
-	}
-	return err
+	return requireRowsAffected(result, err, ErrHouseholdNotFound)
 }
 
 // AddHouseholdMember adds memberID to the caller's household.
@@ -94,10 +89,7 @@ func (s *Store) AddHouseholdMember(ctx context.Context, userID, memberID uuid.UU
 	if isUniqueViolation(err) {
 		return ErrAlreadyInHousehold
 	}
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrHouseholdNotFound
-	}
-	return err
+	return requireRowsAffected(result, err, ErrHouseholdNotFound)
 }
 
 // LeaveHousehold removes the caller and deletes the household once it is empty.
@@ -112,7 +104,7 @@ func (s *Store) LeaveHousehold(ctx context.Context, userID uuid.UUID) error {
 	if err := tx.QueryRow(ctx, `
 		DELETE FROM household_members WHERE user_id = $1 RETURNING household_id
 	`, userID).Scan(&householdID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return ErrHouseholdNotFound
 		}
 		return err

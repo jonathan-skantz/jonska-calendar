@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 func (s *Store) ListTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
@@ -190,10 +189,7 @@ func (s *Store) DeleteTimelineItem(ctx context.Context, userID, itemID uuid.UUID
 		DELETE FROM timeline_items
 		WHERE id = $1 AND user_id = $2
 	`, itemID, userID)
-	if err == nil && result.RowsAffected() == 0 {
-		return pgx.ErrNoRows
-	}
-	return err
+	return requireRowsAffected(result, err, ErrTimelineItemNotFound)
 }
 
 func timelineEntryTime(entry TimelineEntry) time.Time {

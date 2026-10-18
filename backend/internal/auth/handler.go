@@ -14,7 +14,6 @@ import (
 
 	"github.com/alexedwards/argon2id"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
@@ -125,13 +124,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.Store.FindUserByEmail(r.Context(), req.Email)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		log.Printf("Failed to find user: %v", err)
-		http.Error(w, "Failed to log in", http.StatusInternalServerError)
+	if errors.Is(err, db.ErrUserNotFound) {
+		http.Error(w, ErrInvalidCredentials.Error(), http.StatusUnauthorized)
 		return
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, ErrInvalidCredentials.Error(), http.StatusUnauthorized)
+	if err != nil {
+		log.Printf("Failed to find user: %v", err)
+		http.Error(w, "Failed to log in", http.StatusInternalServerError)
 		return
 	}
 

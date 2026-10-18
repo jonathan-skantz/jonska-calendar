@@ -8,20 +8,23 @@ import (
 )
 
 var (
-	ErrEmailAlreadyExists  = errors.New("email already exists")
-	ErrSessionNotFound     = errors.New("session not found")
-	ErrSharedEventNotFound = errors.New("shared event not found")
-	ErrEventNotFound       = errors.New("event not found")
-	ErrAlreadyShared       = errors.New("event is already shared with this user")
-	ErrTagAlreadyExists    = errors.New("tag already exists")
-	ErrTagNotFound         = errors.New("tag not found")
-	ErrLastTag             = errors.New("at least one tag is required")
-	ErrDefaultTagNotFound  = errors.New("default tag not found")
-	ErrHouseholdNotFound   = errors.New("household not found")
-	ErrAlreadyInHousehold  = errors.New("user already belongs to a household")
-	ErrReminderExists      = errors.New("a reminder with that offset already exists")
-	ErrReminderNotFound    = errors.New("reminder not found")
-	ErrWeatherNotCached    = errors.New("weather forecast not cached")
+	ErrEmailAlreadyExists   = errors.New("email already exists")
+	ErrSessionNotFound      = errors.New("session not found")
+	ErrSharedEventNotFound  = errors.New("shared event not found")
+	ErrEventNotFound        = errors.New("event not found")
+	ErrTaskNotFound         = errors.New("task not found")
+	ErrTimelineItemNotFound = errors.New("timeline item not found")
+	ErrUserNotFound         = errors.New("user not found")
+	ErrAlreadyShared        = errors.New("event is already shared with this user")
+	ErrTagAlreadyExists     = errors.New("tag already exists")
+	ErrTagNotFound          = errors.New("tag not found")
+	ErrLastTag              = errors.New("at least one tag is required")
+	ErrDefaultTagNotFound   = errors.New("default tag not found")
+	ErrHouseholdNotFound    = errors.New("household not found")
+	ErrAlreadyInHousehold   = errors.New("user already belongs to a household")
+	ErrReminderExists       = errors.New("a reminder with that offset already exists")
+	ErrReminderNotFound     = errors.New("reminder not found")
+	ErrWeatherNotCached     = errors.New("weather forecast not cached")
 )
 
 func isUniqueViolation(err error) bool {
@@ -31,4 +34,16 @@ func isUniqueViolation(err error) bool {
 
 func isNoRows(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
+}
+
+// requireRowsAffected reports notFound when a write matched no row. Writes
+// filter by owner, so another user's row is also "not found".
+func requireRowsAffected(result pgconn.CommandTag, err error, notFound error) error {
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return notFound
+	}
+	return nil
 }

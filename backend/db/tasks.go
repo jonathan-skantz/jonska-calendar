@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 func (s *Store) CreateTask(ctx context.Context, userID uuid.UUID, task Task) (uuid.UUID, error) {
@@ -54,11 +53,8 @@ func (s *Store) UpdateTask(ctx context.Context, userID, taskID uuid.UUID, task T
 		WHERE tasks.timeline_item_id = item.id
 		  AND item.id = $1 AND item.user_id = $2
 	`, taskID, userID, task.Title, task.Description, task.URL)
-	if err != nil {
+	if err := requireRowsAffected(result, err, ErrTaskNotFound); err != nil {
 		return err
-	}
-	if result.RowsAffected() == 0 {
-		return pgx.ErrNoRows
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -81,8 +77,5 @@ func (s *Store) SetTaskCompleted(ctx context.Context, userID, taskID uuid.UUID, 
 		  AND task.timeline_item_id = $1
 		  AND item.user_id = $2
 	`, taskID, userID, completed)
-	if err == nil && result.RowsAffected() == 0 {
-		return pgx.ErrNoRows
-	}
-	return err
+	return requireRowsAffected(result, err, ErrTaskNotFound)
 }

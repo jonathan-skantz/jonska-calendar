@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
@@ -65,7 +64,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update task"},
 			mappedErrorResponse{
-				cause:    pgx.ErrNoRows,
+				cause:    db.ErrTaskNotFound,
 				response: httpErrorResponse{status: http.StatusNotFound, message: "task not found"},
 			},
 		)
@@ -93,7 +92,7 @@ func (h *Handler) SetTaskCompleted(w http.ResponseWriter, r *http.Request) {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update task"},
 			mappedErrorResponse{
-				cause:    pgx.ErrNoRows,
+				cause:    db.ErrTaskNotFound,
 				response: httpErrorResponse{status: http.StatusNotFound, message: "task not found"},
 			},
 		)

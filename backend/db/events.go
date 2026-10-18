@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 func (s *Store) CreateEvent(ctx context.Context, userID uuid.UUID, event Event) (uuid.UUID, error) {
@@ -76,7 +75,15 @@ func (s *Store) UpdateEvent(ctx context.Context, userID, eventID uuid.UUID, even
 	}
 	defer tx.Rollback(ctx)
 	if event.MainTagID == uuid.Nil {
-		if err := tx.QueryRow(ctx, `SELECT main_tag_id FROM events WHERE timeline_item_id = $1`, eventID).Scan(&event.MainTagID); err != nil {
+		if err := tx.QueryRow(ctx, `
+			SELECT e.main_tag_id
+			FROM events AS e
+			JOIN timeline_items AS item ON item.id = e.timeline_item_id
+			WHERE e.timeline_item_id = $1 AND item.user_id = $2
+		`, eventID, userID).Scan(&event.MainTagID); err != nil {
+			if isNoRows(err) {
+				return ErrEventNotFound
+			}
 			return err
 		}
 	}
@@ -109,11 +116,8 @@ func (s *Store) UpdateEvent(ctx context.Context, userID, eventID uuid.UUID, even
 		SET title = $3, description = $4, url = $5, updated_at = now()
 		WHERE id = $1 AND user_id = $2
 	`, eventID, userID, event.Title, event.Description, event.URL)
-	if err != nil {
+	if err := requireRowsAffected(result, err, ErrEventNotFound); err != nil {
 		return err
-	}
-	if result.RowsAffected() == 0 {
-		return pgx.ErrNoRows
 	}
 
 	// A moved event's reminders fire again at their new time, for every user.
@@ -139,11 +143,8 @@ func (s *Store) UpdateEvent(ctx context.Context, userID, eventID uuid.UUID, even
 		event.CommuteBeforeSeconds, event.CommuteAfterSeconds, event.MainTagID,
 		event.StartIsApproximate, event.EndIsApproximate, event.GatheringSeconds,
 		event.GatheringIsOptional, event.GatheringLabel, event.IsSkipped)
-	if err != nil {
+	if err := requireRowsAffected(result, err, ErrEventNotFound); err != nil {
 		return err
-	}
-	if result.RowsAffected() == 0 {
-		return pgx.ErrNoRows
 	}
 	return tx.Commit(ctx)
 }

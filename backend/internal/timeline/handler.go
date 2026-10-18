@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
 
@@ -43,7 +42,7 @@ func (h *Handler) DeleteTimelineItem(w http.ResponseWriter, r *http.Request) {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to delete timeline item"},
 			mappedErrorResponse{
-				cause:    pgx.ErrNoRows,
+				cause:    db.ErrTimelineItemNotFound,
 				response: httpErrorResponse{status: http.StatusNotFound, message: "timeline item not found"},
 			},
 		)

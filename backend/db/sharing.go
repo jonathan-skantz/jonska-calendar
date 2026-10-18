@@ -89,10 +89,7 @@ func (s *Store) UpdateEventShare(ctx context.Context, ownerID, eventID, shareID 
 		  AND item.user_id = $1
 	`, ownerID, eventID, shareID,
 		fields.Title, fields.Description, fields.URL, fields.Location)
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrSharedEventNotFound
-	}
-	return err
+	return requireRowsAffected(result, err, ErrSharedEventNotFound)
 }
 
 // DeleteEventShare also deletes the recipient's own reminders for the event,

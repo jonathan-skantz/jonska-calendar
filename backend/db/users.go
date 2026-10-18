@@ -2,12 +2,9 @@ package db
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (s *Store) Register(ctx context.Context, email, passwordHash string) (uuid.UUID, error) {
@@ -24,7 +21,7 @@ func (s *Store) Register(ctx context.Context, email, passwordHash string) (uuid.
 		VALUES ($1, $2, $3, $4)
 	`, userID, email, passwordHash, tagID)
 	if err != nil {
-		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
+		if isUniqueViolation(err) {
 			return uuid.Nil, ErrEmailAlreadyExists
 		}
 		return uuid.Nil, err
@@ -52,6 +49,9 @@ func (s *Store) FindUserByEmail(ctx context.Context, email string) (User, error)
 		`,
 		email,
 	).Scan(&user.ID, &user.Email, &user.PasswordHash)
+	if isNoRows(err) {
+		return User{}, ErrUserNotFound
+	}
 	return user, err
 }
 
@@ -81,7 +81,7 @@ func (s *Store) FindUserBySession(ctx context.Context, tokenHash []byte) (User, 
 		`,
 		tokenHash,
 	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return User{}, ErrSessionNotFound
 	}
 	return user, err

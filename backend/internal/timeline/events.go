@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
@@ -96,7 +95,7 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 				response: httpErrorResponse{status: http.StatusNotFound, message: "main tag not found"},
 			},
 			mappedErrorResponse{
-				cause:    pgx.ErrNoRows,
+				cause:    db.ErrEventNotFound,
 				response: httpErrorResponse{status: http.StatusNotFound, message: "event not found"},
 			},
 		)

@@ -86,10 +86,7 @@ func (s *Store) DeleteReminder(ctx context.Context, userID, reminderID uuid.UUID
 	result, err := s.db.Exec(ctx, `
 		DELETE FROM event_reminders WHERE id = $2 AND user_id = $1
 	`, userID, reminderID)
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrReminderNotFound
-	}
-	return err
+	return requireRowsAffected(result, err, ErrReminderNotFound)
 }
 
 // MarkReminderNotified is idempotent: the first delivery time is kept.
@@ -99,8 +96,5 @@ func (s *Store) MarkReminderNotified(ctx context.Context, userID, reminderID uui
 		SET notified_at = COALESCE(notified_at, $3)
 		WHERE id = $2 AND user_id = $1
 	`, userID, reminderID, at)
-	if err == nil && result.RowsAffected() == 0 {
-		return ErrReminderNotFound
-	}
-	return err
+	return requireRowsAffected(result, err, ErrReminderNotFound)
 }
