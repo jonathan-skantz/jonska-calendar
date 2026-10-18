@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   getEffectiveTimeFormat,
   type TimeFormatPreference,
@@ -35,7 +35,17 @@ export function DateTimeField({
   const [date, setDate] = useState(initial.date);
   const [hourOfDay, setHourOfDay] = useState(initial.hour);
   const [minute, setMinute] = useState(initial.minute);
-  const wasDateOnly = useRef(dateOnly);
+  // Leaving all-day mode starts a timed field at the day's edge. Adjusted
+  // while rendering, so the field never shows the old time for a frame.
+  const [previousDateOnly, setPreviousDateOnly] = useState(dateOnly);
+  if (previousDateOnly !== dateOnly) {
+    setPreviousDateOnly(dateOnly);
+    if (!dateOnly) {
+      const isEnd = name === "ends_at";
+      setHourOfDay(isEnd ? 23 : 0);
+      setMinute(isEnd ? "59" : "00");
+    }
+  }
   const format = getEffectiveTimeFormat(preference);
   const period = hourOfDay >= 12 ? "PM" : "AM";
   const displayedHour = format === "12-hour" ? hourOfDay % 12 || 12 : hourOfDay;
@@ -98,15 +108,6 @@ export function DateTimeField({
       )}
     </>
   );
-
-  useEffect(() => {
-    if (wasDateOnly.current && !dateOnly) {
-      const isEnd = name === "ends_at";
-      setHourOfDay(isEnd ? 23 : 0);
-      setMinute(isEnd ? "59" : "00");
-    }
-    wasDateOnly.current = dateOnly;
-  }, [dateOnly, name]);
 
   return (
     <div className="datetime-field">

@@ -10,6 +10,8 @@ const BASE_INSET_PIXELS = 3;
 // A busy block over a not-busy ghost leaves this much of the ghost showing.
 const GHOST_EDGE_PIXELS = 8;
 const CONTINUATION_MARKER_HEIGHT = 6;
+// Bands and chips shorter than this have no room for a text label.
+export const LABEL_MIN_MINUTES = 15;
 
 // The tag strip along the top of an event: the main tag fills the left half
 // and any other tags share the right half, or the main tag fills it all.

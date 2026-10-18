@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, MouseEvent } from "react";
 import {
   EVENT_SEPARATOR_PIXELS,
   formatEventTime,
@@ -17,7 +17,9 @@ import type { CommuteSegment, GatheringSegment } from "./timelineView";
 import type { Reminder, TimelineEntry } from "../../types";
 import { describeReminders } from "../reminders/reminders";
 import { cx } from "../../lib/classNames";
+import { CommuteBand, OptionalGatheringBand } from "./EntryBands";
 import {
+  LABEL_MIN_MINUTES,
   describeApproximateEdges,
   getEntryBackground,
   getHorizontalInsets,
@@ -47,7 +49,6 @@ type CalendarEntryProps = {
 };
 
 const CONTINUATION_MARKER_SPACING = 12;
-const COMMUTE_LABEL_MIN_MINUTES = 15;
 
 const ContinuationMarkers = ({
   position,
@@ -146,8 +147,7 @@ export const CalendarEntry = ({
       : `${gathering.label ?? "Gathering"} from ${gatheringTime}, before ${entry.title} starts`
     : undefined;
   const showGatheringChip = Boolean(
-    gatheringSegment &&
-    gatheringSegment.durationMinutes >= COMMUTE_LABEL_MIN_MINUTES,
+    gatheringSegment && gatheringSegment.durationMinutes >= LABEL_MIN_MINUTES,
   );
   // Mandatory gathering is the top part of the event block, in full event
   // color: you must be there. A line marks the real start; its offset is
@@ -156,8 +156,28 @@ export const CalendarEntry = ({
   const gatheringHeight = mandatoryGathering
     ? `calc(${gridOffset(mandatoryGathering.startMinutes + mandatoryGathering.durationMinutes - startMinutes)} - ${vertical.top}px)`
     : undefined;
-  // Shared entries open a read-only view; App decides which drawer to show.
-  const openEditor = () => onEdit(entry);
+  // Every piece opens the entry; the day column underneath must not also
+  // start a new event. Shared entries open a read-only view instead.
+  const openOnClick = (event: MouseEvent) => {
+    event.stopPropagation();
+    onEdit(entry);
+  };
+  const commuteBand = (segment: CommuteSegment) => (
+    <CommuteBand
+      key={segment.position}
+      segment={segment}
+      eventTitle={entry.title}
+      trim={
+        (segment.position === "before" ? trimTop : trimBottom)
+          ? EVENT_SEPARATOR_PIXELS
+          : 0
+      }
+      raised={hasEarlierOverlap}
+      color={accentColor}
+      insets={insets}
+      onClick={openOnClick}
+    />
+  );
 
   useEffect(() => {
     const entryElement = entryRef.current;
@@ -180,90 +200,21 @@ export const CalendarEntry = ({
     return () => observer.disconnect();
   }, [continuesFromPreviousDay, continuesToNextDay]);
 
-  const renderCommuteBand = (segment: CommuteSegment) => {
-    const trim = (segment.position === "before" ? trimTop : trimBottom)
-      ? EVENT_SEPARATOR_PIXELS
-      : 0;
-    const description = `Commute ${segment.minutes} min ${segment.position} ${entry.title}`;
-    return (
-      <div
-        key={segment.position}
-        className={cx(
-          "commute-band",
-          segment.position,
-          hasEarlierOverlap && "overlapping-later-event",
-        )}
-        role="img"
-        aria-label={description}
-        title={description}
-        style={
-          {
-            "--commute-color": accentColor,
-            top: gridOffset(segment.startMinutes),
-            height: `calc(${gridOffset(segment.durationMinutes)} - ${trim}px)`,
-            ...insets,
-            zIndex: hasEarlierOverlap ? 2 : undefined,
-            transform:
-              segment.position === "before" && trim
-                ? `translateY(${trim}px)`
-                : undefined,
-          } as CSSProperties
-        }
-        onClick={(event) => {
-          event.stopPropagation();
-          openEditor();
-        }}
-      >
-        {segment.durationMinutes >= COMMUTE_LABEL_MIN_MINUTES && (
-          <span aria-hidden="true">
-            {segment.position === "before" ? "⇢" : "⇠"} {segment.minutes} min
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  // Optional gathering may be skipped, so it is a dotted band drawn behind
-  // other entries instead of part of the event block.
-  const renderOptionalGathering = (segment: GatheringSegment) => (
-    <div
-      className={cx(
-        "gathering-band optional",
-        startIsApproximate &&
-          !segment.continuesFromPreviousDay &&
-          "approximate-start",
-      )}
-      role="img"
-      aria-label={gatheringDescription}
-      title={gatheringDescription}
-      style={
-        {
-          "--gathering-color": accentColor,
-          top: gridOffset(segment.startMinutes),
-          height: `calc(${gridOffset(segment.durationMinutes)} - ${vertical.outerBandTop}px)`,
-          ...insets,
-          transform: vertical.outerBandTop
-            ? `translateY(${vertical.outerBandTop}px)`
-            : undefined,
-        } as CSSProperties
-      }
-      onClick={(event) => {
-        event.stopPropagation();
-        openEditor();
-      }}
-    >
-      {showGatheringChip && (
-        <span className="gathering-label" aria-hidden="true">
-          {gatheringChip}
-        </span>
-      )}
-    </div>
-  );
-
   return (
     <>
-      {commuteBefore && renderCommuteBand(commuteBefore)}
-      {optionalGathering && renderOptionalGathering(optionalGathering)}
+      {commuteBefore && commuteBand(commuteBefore)}
+      {optionalGathering && (
+        <OptionalGatheringBand
+          segment={optionalGathering}
+          description={gatheringDescription}
+          chip={showGatheringChip ? gatheringChip : null}
+          approximateStart={startIsApproximate}
+          topTrim={vertical.outerBandTop}
+          color={accentColor}
+          insets={insets}
+          onClick={openOnClick}
+        />
+      )}
       {showBody && (
         <article
           ref={entryRef}
@@ -313,10 +264,7 @@ export const CalendarEntry = ({
                 : {}),
             } as CSSProperties
           }
-          onClick={(event) => {
-            event.stopPropagation();
-            openEditor();
-          }}
+          onClick={openOnClick}
         >
           {continuesFromPreviousDay && (
             <ContinuationMarkers
@@ -415,7 +363,7 @@ export const CalendarEntry = ({
           )}
         </article>
       )}
-      {commuteAfter && renderCommuteBand(commuteAfter)}
+      {commuteAfter && commuteBand(commuteAfter)}
     </>
   );
 };
