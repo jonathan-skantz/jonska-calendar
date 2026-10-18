@@ -37,8 +37,9 @@ type Handler struct {
 	Client parser
 	now    func() time.Time
 
-	mu      sync.Mutex
-	windows map[uuid.UUID]rateCount
+	mu        sync.Mutex
+	windows   map[uuid.UUID]rateCount
+	lastSweep time.Time
 }
 
 type rateCount struct {
@@ -115,6 +116,16 @@ func (h *Handler) allow(userID uuid.UUID) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	now := h.now()
+	// Expired windows are forgotten at most once per window, so the map holds
+	// only users who parsed recently.
+	if now.Sub(h.lastSweep) >= rateWindow {
+		for id, window := range h.windows {
+			if now.Sub(window.start) >= rateWindow {
+				delete(h.windows, id)
+			}
+		}
+		h.lastSweep = now
+	}
 	window := h.windows[userID]
 	if now.Sub(window.start) >= rateWindow {
 		window = rateCount{start: now}

@@ -195,3 +195,22 @@ func TestParseReportsUpstreamFailure(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusBadGateway, code)
 	}
 }
+
+func TestRateWindowsOfIdleUsersAreForgotten(t *testing.T) {
+	handler := New(fakeTags{}, testutil.SignedInAs(uuid.New()), nil)
+	now := time.Date(2026, 10, 17, 8, 0, 0, 0, time.UTC)
+	handler.now = func() time.Time { return now }
+	for range 3 {
+		handler.allow(uuid.New())
+	}
+	if len(handler.windows) != 3 {
+		t.Fatalf("expected 3 windows, got %d", len(handler.windows))
+	}
+
+	now = now.Add(rateWindow)
+	active := uuid.New()
+	handler.allow(active)
+	if len(handler.windows) != 1 || handler.windows[active].count != 1 {
+		t.Fatalf("expected only the active user's window, got %+v", handler.windows)
+	}
+}

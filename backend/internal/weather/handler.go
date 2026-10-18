@@ -21,6 +21,9 @@ import (
 // by every user in that cell.
 const cacheTTL = 3 * time.Hour
 
+// fetchTimeout bounds the shared lookup, which outlives any one request.
+const fetchTimeout = 30 * time.Second
+
 var (
 	ErrInvalidCoordinates = errors.New("lat and lon must be valid coordinates")
 	errUnavailable        = errors.New("weather is unavailable")
@@ -50,10 +53,12 @@ func (h *Handler) Forecast(w http.ResponseWriter, r *http.Request) {
 
 	// Concurrent requests for the same cell share one lookup and upstream
 	// call. The work is detached from this request so one client hanging up
-	// does not fail the others waiting on it.
+	// does not fail the others waiting on it, but it still has a deadline.
 	key := fmt.Sprintf("%.1f,%.1f", latitude, longitude)
 	result, err, _ := h.fetches.Do(key, func() (any, error) {
-		return h.forecast(context.WithoutCancel(r.Context()), latitude, longitude)
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), fetchTimeout)
+		defer cancel()
+		return h.forecast(ctx, latitude, longitude)
 	})
 	if errors.Is(err, errUnavailable) {
 		http.Error(w, "weather is unavailable", http.StatusServiceUnavailable)
