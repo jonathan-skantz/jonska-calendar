@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 )
 
 const (
@@ -20,8 +21,6 @@ const (
 	parsesPerWindow = 30
 	rateWindow      = time.Hour
 )
-
-type CurrentUser func(*http.Request) (uuid.UUID, error)
 
 type TagLister interface {
 	ListTags(ctx context.Context, userID uuid.UUID) ([]db.Tag, error)
@@ -33,7 +32,7 @@ type parser interface {
 
 type Handler struct {
 	Tags        TagLister
-	CurrentUser CurrentUser
+	CurrentUser auth.CurrentUser
 	// Client is nil when no API key is configured.
 	Client parser
 	now    func() time.Time
@@ -49,7 +48,7 @@ type rateCount struct {
 
 // New takes a nil client when quick add is not configured; requests then get
 // 503 instead of failing at startup.
-func New(tags TagLister, currentUser CurrentUser, client *Client) *Handler {
+func New(tags TagLister, currentUser auth.CurrentUser, client *Client) *Handler {
 	handler := &Handler{Tags: tags, CurrentUser: currentUser, now: time.Now, windows: map[uuid.UUID]rateCount{}}
 	if client != nil {
 		handler.Client = client
@@ -60,9 +59,8 @@ func New(tags TagLister, currentUser CurrentUser, client *Client) *Handler {
 // Parse turns a sentence into an event draft for the browser to review. It
 // never writes anything: the user saves the event through the normal form.
 func (h *Handler) Parse(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	userID, ok := auth.RequireUser(w, r, h.CurrentUser)
+	if !ok {
 		return
 	}
 	var request struct {

@@ -166,6 +166,28 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(registerResponse{ID: user.ID})
 }
 
+// CurrentUser resolves the signed-in user's ID for a request. Handlers in
+// other packages take one, so tests can stub authentication.
+type CurrentUser func(*http.Request) (uuid.UUID, error)
+
+// RequireUser returns the signed-in user's ID, or answers 401 and returns
+// false when there is none.
+func RequireUser(w http.ResponseWriter, r *http.Request, currentUser CurrentUser) (uuid.UUID, bool) {
+	userID, err := currentUser(r)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return uuid.Nil, false
+	}
+	return userID, true
+}
+
+// CurrentUserID is the CurrentUser for real requests, read from the session
+// cookie.
+func (h *Handler) CurrentUserID(r *http.Request) (uuid.UUID, error) {
+	user, err := h.UserFromRequest(r)
+	return user.ID, err
+}
+
 func (h *Handler) UserFromRequest(r *http.Request) (db.User, error) {
 	tokenHash, err := sessionTokenHash(r)
 	if err != nil {

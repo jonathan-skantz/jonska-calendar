@@ -7,16 +7,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 )
-
-type CurrentUser func(*http.Request) (uuid.UUID, error)
 
 type Handler struct {
 	Store       *db.Store
-	CurrentUser CurrentUser
+	CurrentUser auth.CurrentUser
 }
 
-func New(store *db.Store, currentUser CurrentUser) *Handler {
+func New(store *db.Store, currentUser auth.CurrentUser) *Handler {
 	return &Handler{Store: store, CurrentUser: currentUser}
 }
 
@@ -42,12 +41,7 @@ func (h *Handler) findUserByEmail(w http.ResponseWriter, r *http.Request, rawEma
 }
 
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	userID, err := h.CurrentUser(r)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return uuid.Nil, false
-	}
-	return userID, true
+	return auth.RequireUser(w, r, h.CurrentUser)
 }
 
 func (h *Handler) DeleteTimelineItem(w http.ResponseWriter, r *http.Request) {

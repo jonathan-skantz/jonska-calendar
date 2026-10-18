@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -26,23 +26,20 @@ var (
 	errUnavailable        = errors.New("weather is unavailable")
 )
 
-type CurrentUser func(*http.Request) (uuid.UUID, error)
-
 type Handler struct {
 	Store       *db.Store
-	CurrentUser CurrentUser
+	CurrentUser auth.CurrentUser
 	Client      *Client
 	now         func() time.Time
 	fetches     singleflight.Group
 }
 
-func New(store *db.Store, currentUser CurrentUser, client *Client) *Handler {
+func New(store *db.Store, currentUser auth.CurrentUser, client *Client) *Handler {
 	return &Handler{Store: store, CurrentUser: currentUser, Client: client, now: time.Now}
 }
 
 func (h *Handler) Forecast(w http.ResponseWriter, r *http.Request) {
-	if _, err := h.CurrentUser(r); err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
+	if _, ok := auth.RequireUser(w, r, h.CurrentUser); !ok {
 		return
 	}
 	latitude, longitude, err := parseCoordinates(r.URL.Query())

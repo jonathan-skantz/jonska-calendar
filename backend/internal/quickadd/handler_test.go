@@ -14,6 +14,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 )
 
 const upstreamDraft = `{"title":"Lunch with Anna","date":{"kind":"relative_days","days":1},` +
@@ -88,7 +89,7 @@ func (f fakeTags) ListTags(_ context.Context, userID uuid.UUID) ([]db.Tag, error
 	return f.byUser[userID], nil
 }
 
-func userFunc(id uuid.UUID) CurrentUser {
+func userFunc(id uuid.UUID) auth.CurrentUser {
 	return func(*http.Request) (uuid.UUID, error) { return id, nil }
 }
 

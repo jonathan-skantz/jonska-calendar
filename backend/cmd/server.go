@@ -7,8 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
-	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
@@ -18,7 +18,6 @@ import (
 )
 
 func main() {
-
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
 	}
@@ -42,15 +41,10 @@ func main() {
 
 	log.Println("Connected to the database")
 
-	handler := auth.New(
-		db.NewStore(dbPool),
-	)
-	timelineHandler := timeline.New(handler.Store, func(r *http.Request) (uuid.UUID, error) {
-		user, err := handler.UserFromRequest(r)
-		return user.ID, err
-	})
-
-	weatherHandler := weather.New(handler.Store, weather.CurrentUser(timelineHandler.CurrentUser), weather.NewClient())
+	store := db.NewStore(dbPool)
+	authHandler := auth.New(store)
+	timelineHandler := timeline.New(store, authHandler.CurrentUserID)
+	weatherHandler := weather.New(store, authHandler.CurrentUserID, weather.NewClient())
 
 	// Quick add stays off (503) without a key, so the rest of the app runs
 	// without one.
@@ -58,18 +52,14 @@ func main() {
 	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
 		quickAddClient = quickadd.NewClient(apiKey, os.Getenv("ANTHROPIC_MODEL"))
 	}
-	quickAddHandler := quickadd.New(handler.Store, quickadd.CurrentUser(timelineHandler.CurrentUser), quickAddClient)
+	quickAddHandler := quickadd.New(store, authHandler.CurrentUserID, quickAddClient)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, World!"))
-	})
-
-	mux.HandleFunc("POST /api/auth/register", handler.Register)
-	mux.HandleFunc("POST /api/auth/login", handler.Login)
-	mux.HandleFunc("POST /api/auth/logout", handler.Logout)
-	mux.HandleFunc("GET /api/auth/me", handler.CurrentUser)
-	mux.HandleFunc("PATCH /api/auth/me", handler.UpdateCurrentUser)
+	mux.HandleFunc("POST /api/auth/register", authHandler.Register)
+	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
+	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
+	mux.HandleFunc("GET /api/auth/me", authHandler.CurrentUser)
+	mux.HandleFunc("PATCH /api/auth/me", authHandler.UpdateCurrentUser)
 	mux.HandleFunc("POST /api/events", timelineHandler.CreateEvent)
 	mux.HandleFunc("POST /api/events/parse", quickAddHandler.Parse)
 	mux.HandleFunc("PUT /api/events/{eventID}", timelineHandler.UpdateEvent)
@@ -105,11 +95,14 @@ func main() {
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
+		// Bounds how long a client may take to send its request headers, so
+		// slow connections cannot hold the server open indefinitely.
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	if err := server.ListenAndServe(); err != nil {
+		// log.Fatal skips deferred calls, so close the pool first.
 		dbPool.Close()
 		log.Fatal(err)
 	}
-
 }
