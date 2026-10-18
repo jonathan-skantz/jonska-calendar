@@ -35,57 +35,56 @@ var (
 const (
 	dateLayout              = "2006-01-02"
 	maxTransitCardRangeDays = 62
-	maxCommuteSeconds       = 24 * 60 * 60
 	maxTransitCardCount     = 20
-	maxGatheringLabelLength = 40
-	maxReminderOffset       = 30 * 24 * 60 * 60
 )
 
 func validCommuteSeconds(seconds int) bool {
-	return seconds >= 0 && seconds <= maxCommuteSeconds && seconds%60 == 0
+	return seconds >= 0 && seconds <= db.MaxCommuteSeconds && seconds%60 == 0
 }
 
-// validateEventRequest also trims the gathering label; blank means no label.
-func validateEventRequest(request *eventRequest) error {
+// validateEventRequest returns the request with its gathering label trimmed;
+// a blank label means no label.
+func validateEventRequest(request eventRequest) (eventRequest, error) {
 	request.GatheringLabel = normalizeOptionalText(request.GatheringLabel)
 	if request.Title == "" {
-		return ErrTitleRequired
+		return request, ErrTitleRequired
 	}
-	if request.Kind != "attendable" && request.Kind != "informational" {
-		return ErrInvalidKind
+	if request.Kind != db.EventKindAttendable && request.Kind != db.EventKindInformational {
+		return request, ErrInvalidKind
 	}
-	if request.IsSkipped && request.Kind != "attendable" {
-		return ErrInvalidSkip
+	if request.IsSkipped && request.Kind != db.EventKindAttendable {
+		return request, ErrInvalidSkip
 	}
 	if !request.EndsAt.After(request.StartsAt) {
-		return ErrInvalidTimes
+		return request, ErrInvalidTimes
 	}
+	// Commute and gathering only make sense for timed events the user attends.
+	timedAttendable := request.Kind == db.EventKindAttendable && !request.IsAllDay
 	if !validCommuteSeconds(request.CommuteBeforeSeconds) || !validCommuteSeconds(request.CommuteAfterSeconds) {
-		return ErrInvalidCommute
+		return request, ErrInvalidCommute
 	}
 	hasCommute := request.CommuteBeforeSeconds > 0 || request.CommuteAfterSeconds > 0
-	if hasCommute && (request.Kind != "attendable" || request.IsAllDay) {
-		return ErrInvalidCommute
+	if hasCommute && !timedAttendable {
+		return request, ErrInvalidCommute
 	}
-	if !validCommuteSeconds(request.GatheringSeconds) ||
-		(request.GatheringSeconds > 0 && (request.Kind != "attendable" || request.IsAllDay)) {
-		return ErrInvalidGathering
+	if !validCommuteSeconds(request.GatheringSeconds) || (request.GatheringSeconds > 0 && !timedAttendable) {
+		return request, ErrInvalidGathering
 	}
 	hasGatheringDetails := request.GatheringIsOptional || request.GatheringLabel != nil
 	if hasGatheringDetails && request.GatheringSeconds == 0 {
-		return ErrInvalidGathering
+		return request, ErrInvalidGathering
 	}
-	if request.GatheringLabel != nil && utf8.RuneCountInString(*request.GatheringLabel) > maxGatheringLabelLength {
-		return ErrInvalidGathering
+	if request.GatheringLabel != nil && utf8.RuneCountInString(*request.GatheringLabel) > db.MaxGatheringLabelLength {
+		return request, ErrInvalidGathering
 	}
 	if request.IsAllDay && (request.StartIsApproximate || request.EndIsApproximate) {
-		return ErrInvalidApproximate
+		return request, ErrInvalidApproximate
 	}
-	return nil
+	return request, nil
 }
 
 func validateReminderRequest(request reminderRequest) error {
-	if request.OffsetSeconds < 0 || request.OffsetSeconds > maxReminderOffset || request.OffsetSeconds%60 != 0 {
+	if request.OffsetSeconds < 0 || request.OffsetSeconds > db.MaxReminderOffsetSeconds || request.OffsetSeconds%60 != 0 {
 		return ErrInvalidOffset
 	}
 	return nil
@@ -101,21 +100,26 @@ func validateTaskRequest(request taskRequest) error {
 	return nil
 }
 
-func validateTagName(name string) error {
-	if strings.TrimSpace(name) == "" {
-		return ErrInvalidRequest
+// validateTagName returns the name trimmed.
+func validateTagName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", ErrInvalidRequest
 	}
-	return nil
+	return name, nil
 }
 
-func validateTagUpdateRequest(request tagUpdateRequest) error {
-	if err := validateTagName(request.Name); err != nil {
-		return err
+// validateTagUpdateRequest returns the request with its name trimmed.
+func validateTagUpdateRequest(request tagUpdateRequest) (tagUpdateRequest, error) {
+	name, err := validateTagName(request.Name)
+	if err != nil {
+		return request, err
 	}
+	request.Name = name
 	if !validTagColor(request.Color) {
-		return ErrInvalidRequest
+		return request, ErrInvalidRequest
 	}
-	return nil
+	return request, nil
 }
 
 func validateTagSelectionRequest(request tagSelectionRequest) error {
@@ -202,15 +206,16 @@ func validateTransitCardDaysRequest(request transitCardDaysRequest, todayUTC tim
 	return transitCardSubmission{days: days, needed: needed, maybe: maybe}, nil
 }
 
-func validateHouseholdRequest(request *householdRequest) error {
+// validateHouseholdRequest returns the request with its name trimmed.
+func validateHouseholdRequest(request householdRequest) (householdRequest, error) {
 	request.Name = strings.TrimSpace(request.Name)
 	if request.Name == "" {
-		return ErrHouseholdNameRequired
+		return request, ErrHouseholdNameRequired
 	}
 	if request.TransitCardCount < 1 || request.TransitCardCount > maxTransitCardCount {
-		return ErrInvalidTransitCardCount
+		return request, ErrInvalidTransitCardCount
 	}
-	return nil
+	return request, nil
 }
 
 // normalizeOptionalText trims an optional text value; blank means "not set".

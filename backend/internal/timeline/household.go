@@ -36,7 +36,8 @@ func (h *Handler) decodeHouseholdRequest(w http.ResponseWriter, r *http.Request)
 	if !decodeJSON(w, r, &request) {
 		return request, false
 	}
-	if err := validateHouseholdRequest(&request); err != nil {
+	request, err := validateHouseholdRequest(request)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return request, false
 	}

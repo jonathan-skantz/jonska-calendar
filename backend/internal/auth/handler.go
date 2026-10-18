@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexedwards/argon2id"
 	"github.com/google/uuid"
@@ -241,7 +242,7 @@ func (h *Handler) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 	var displayName *string
 	if name := strings.TrimSpace(req.DisplayName); name != "" {
-		if len([]rune(name)) > maxDisplayNameLength {
+		if utf8.RuneCountInString(name) > maxDisplayNameLength {
 			http.Error(w, "display name is too long", http.StatusBadRequest)
 			return
 		}

@@ -21,7 +21,8 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	if err := validateEventRequest(&request); err != nil {
+	request, err := validateEventRequest(request)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -50,7 +51,8 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	if err := validateEventRequest(&request); err != nil {
+	request, err := validateEventRequest(request)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

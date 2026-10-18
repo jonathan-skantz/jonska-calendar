@@ -2,7 +2,6 @@ package timeline
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
@@ -21,11 +20,12 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	if err := validateTagName(request.Name); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	name, err := validateTagName(request.Name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	tag, err := h.Store.CreateTag(r.Context(), userID, strings.TrimSpace(request.Name))
+	tag, err := h.Store.CreateTag(r.Context(), userID, name)
 	if err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to create tag"},
@@ -88,11 +88,12 @@ func (h *Handler) RenameTag(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	if err := validateTagUpdateRequest(request); err != nil {
+	request, err := validateTagUpdateRequest(request)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.Store.RenameTag(r.Context(), userID, tagID, strings.TrimSpace(request.Name), request.Color); err != nil {
+	if err := h.Store.RenameTag(r.Context(), userID, tagID, request.Name, request.Color); err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update tag"},
 			tagNotFound,

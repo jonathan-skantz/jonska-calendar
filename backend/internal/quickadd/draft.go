@@ -10,14 +10,14 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
 
-// The commute, gathering and reminder limits mirror the event validation in
-// internal/timeline; the others only keep a misbehaving reply small.
+// The commute, gathering and reminder limits are the event limits from db;
+// the others only keep a misbehaving reply small.
 const (
 	maxTitleLength          = 200
 	maxLocationLength       = 200
-	maxCommuteMinutes       = 24 * 60
-	maxGatheringLabelLength = 40
-	maxReminderMinutes      = 30 * 24 * 60
+	maxCommuteMinutes       = db.MaxCommuteSeconds / 60
+	maxGatheringLabelLength = db.MaxGatheringLabelLength
+	maxReminderMinutes      = db.MaxReminderOffsetSeconds / 60
 	maxDurationMinutes      = 14 * 24 * 60
 	maxRelativeDays         = 366
 	maxReminders            = 10
@@ -137,7 +137,7 @@ func validateDraft(raw RawDraft, tags []db.Tag) ParseResult {
 	draft.EndIsApproximate = raw.EndIsApproximate
 	draft.GatheringIsOptional = raw.GatheringIsOptional
 	if raw.Kind != nil {
-		if *raw.Kind == "attendable" || *raw.Kind == "informational" {
+		if *raw.Kind == db.EventKindAttendable || *raw.Kind == db.EventKindInformational {
 			draft.Kind = raw.Kind
 		} else {
 			warn("Couldn't tell whether to attend or treat it as a heads-up")

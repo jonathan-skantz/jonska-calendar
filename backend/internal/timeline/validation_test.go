@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jonathan-skantz/calendar/backend/db"
 )
 
 func TestValidateTaskRequest(t *testing.T) {
@@ -29,13 +30,13 @@ func TestValidateTaskRequest(t *testing.T) {
 }
 
 func TestValidateTagRequests(t *testing.T) {
-	if err := validateTagName("  "); !errors.Is(err, ErrInvalidRequest) {
+	if _, err := validateTagName("  "); !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("expected invalid request, got %v", err)
 	}
-	if err := validateTagUpdateRequest(tagUpdateRequest{Name: "Work", Color: "#1a2B3c"}); err != nil {
+	if _, err := validateTagUpdateRequest(tagUpdateRequest{Name: "Work", Color: "#1a2B3c"}); err != nil {
 		t.Fatalf("expected valid tag update, got %v", err)
 	}
-	if err := validateTagUpdateRequest(tagUpdateRequest{Name: "Work", Color: "red"}); !errors.Is(err, ErrInvalidRequest) {
+	if _, err := validateTagUpdateRequest(tagUpdateRequest{Name: "Work", Color: "red"}); !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("expected invalid color error, got %v", err)
 	}
 	if err := validateTagSelectionRequest(tagSelectionRequest{}); !errors.Is(err, ErrInvalidRequest) {
@@ -43,5 +44,31 @@ func TestValidateTagRequests(t *testing.T) {
 	}
 	if err := validateTagSelectionRequest(tagSelectionRequest{TagID: uuid.New()}); err != nil {
 		t.Fatalf("expected valid tag selection, got %v", err)
+	}
+}
+
+func TestValidatorsReturnNormalizedRequests(t *testing.T) {
+	label := "  Warm-up  "
+	event, err := validateEventRequest(eventRequest{
+		Title:            "Football",
+		Kind:             db.EventKindAttendable,
+		StartsAt:         time.Date(2026, 10, 15, 18, 0, 0, 0, time.UTC),
+		EndsAt:           time.Date(2026, 10, 15, 19, 0, 0, 0, time.UTC),
+		GatheringSeconds: 900,
+		GatheringLabel:   &label,
+	})
+	if err != nil || event.GatheringLabel == nil || *event.GatheringLabel != "Warm-up" {
+		t.Fatalf("expected a trimmed gathering label, got %v (err %v)", event.GatheringLabel, err)
+	}
+	if label != "  Warm-up  " {
+		t.Fatal("the caller's request must not be modified")
+	}
+
+	if name, err := validateTagName("  Work "); err != nil || name != "Work" {
+		t.Fatalf("expected trimmed tag name, got %q (err %v)", name, err)
+	}
+	household, err := validateHouseholdRequest(householdRequest{Name: " Home ", TransitCardCount: 1})
+	if err != nil || household.Name != "Home" {
+		t.Fatalf("expected trimmed household name, got %q (err %v)", household.Name, err)
 	}
 }

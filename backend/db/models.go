@@ -33,6 +33,21 @@ type Household struct {
 	Members          []HouseholdMember `json:"members"`
 }
 
+// Event kinds. Attendable events take up the user's time; informational
+// ones are heads-ups.
+const (
+	EventKindAttendable    = "attendable"
+	EventKindInformational = "informational"
+)
+
+// Limits shared by event validation and quick add. They mirror the
+// database's CHECK constraints.
+const (
+	MaxCommuteSeconds        = 24 * 60 * 60
+	MaxGatheringLabelLength  = 40
+	MaxReminderOffsetSeconds = 30 * 24 * 60 * 60
+)
+
 type Event struct {
 	ID                   uuid.UUID
 	Title                string
