@@ -16,7 +16,7 @@ import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useSidebarState } from "./hooks/useSidebarState";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
-import { useAuth } from "./features/auth/useAuth";
+import { useAuthActions } from "./features/auth/useAuth";
 import { AllDayEvent } from "./features/calendar/AllDayEvent";
 import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
 import { DayEntries } from "./features/calendar/DayEntries";
@@ -48,7 +48,8 @@ import { resolveDraft } from "./features/quickAdd/resolveDraft";
 import { ReminderToasts } from "./features/reminders/ReminderToasts";
 import { RemindersDrawer } from "./features/reminders/RemindersDrawer";
 import { isReminderUpcoming } from "./features/reminders/reminders";
-import { useEventReminders } from "./features/reminders/useEventReminders";
+import { useReminderActions } from "./features/reminders/useReminderActions";
+import { useReminderDelivery } from "./features/reminders/useReminderNotifications";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ShareEventDrawer } from "./features/sharing/ShareEventDrawer";
 import { SharedEventDrawer } from "./features/sharing/SharedEventDrawer";
@@ -82,8 +83,8 @@ type OpenDrawer =
 // The calendar for a signed-in user. Rendered inside PreferencesProvider, so
 // it and everything below read preferences from context.
 export function CalendarApp({ user }: { user: User }) {
-  const { logout, updateDisplayName } = useAuth();
-  const workspaceQuery = useWorkspace(true);
+  const { logout, updateDisplayName } = useAuthActions();
+  const workspaceQuery = useWorkspace();
   const entries = workspaceQuery.data?.entries ?? [];
   const tags = workspaceQuery.data?.tags ?? [];
   const [showSettings, setShowSettings] = useState(false);
@@ -108,13 +109,13 @@ export function CalendarApp({ user }: { user: User }) {
   const transitCardQuery = useTransitCardDays(
     dateKey(dates[0]),
     dateKey(dates[dates.length - 1]),
-    true,
   );
   const saveTransitCardDays = useSaveTransitCardDays();
-  const weatherByDay = useWeather(true);
-  const household = useHousehold(true).data ?? null;
+  const weatherByDay = useWeather();
+  const household = useHousehold().data ?? null;
   const householdMutations = useHouseholdMutations();
-  const reminders = useEventReminders(true);
+  const reminders = useReminderActions();
+  const reminderDelivery = useReminderDelivery();
   const eventSharesQuery = useEventShares(sharingEvent?.id ?? null);
   const shareMutations = useEventShareMutations(sharingEvent?.id ?? null);
   const composer = useComposer({
@@ -462,9 +463,9 @@ export function CalendarApp({ user }: { user: User }) {
         />
       )}
       <ReminderToasts
-        toasts={reminders.notifications.toasts}
+        toasts={reminderDelivery.toasts}
         onOpenEvent={openEventById}
-        onDismiss={reminders.notifications.dismiss}
+        onDismiss={reminderDelivery.dismiss}
       />
       {drawer?.kind === "transitCard" && (
         <TransitCardDrawer

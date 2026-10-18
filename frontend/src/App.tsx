@@ -1,5 +1,5 @@
 import { AuthScreen } from "./features/auth/AuthScreen";
-import { useAuth } from "./features/auth/useAuth";
+import { useAuthActions, useCurrentUser } from "./features/auth/useAuth";
 import { PreferencesProvider } from "./features/calendar/PreferencesProvider";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { getErrorText } from "./lib/requestErrors";
@@ -8,7 +8,8 @@ import "./App.css";
 
 // Signs the user in, then hands over to the calendar.
 function App() {
-  const { user, isLoading, authenticate } = useAuth();
+  const { user, isLoading } = useCurrentUser();
+  const { authenticate } = useAuthActions();
   if (isLoading) return <LoadingScreen />;
   if (!user) {
     return (

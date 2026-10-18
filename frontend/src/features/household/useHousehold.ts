@@ -6,11 +6,10 @@ import { queryKeys } from "../../lib/queryKeys";
 import type { Household } from "../../types";
 
 // The API answers null when the user has no household.
-export const useHousehold = (enabled: boolean) =>
+export const useHousehold = () =>
   useQuery({
     queryKey: queryKeys.household,
     queryFn: () => api<Household | null>("/api/household"),
-    enabled,
   });
 
 export type HouseholdDetails = {

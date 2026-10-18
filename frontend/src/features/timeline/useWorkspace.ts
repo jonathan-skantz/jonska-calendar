@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryKeys";
 import type { Tag, TimelineEntry } from "../../types";
 
-export const useWorkspace = (enabled: boolean) =>
+export const useWorkspace = () =>
   useQuery({
     queryKey: queryKeys.workspace,
     queryFn: async () => {
@@ -13,5 +13,4 @@ export const useWorkspace = (enabled: boolean) =>
       ]);
       return { entries: timeline, tags: userTags };
     },
-    enabled,
   });

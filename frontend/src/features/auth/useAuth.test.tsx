@@ -2,12 +2,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../lib/api";
-import { useAuth } from "./useAuth";
+import { useAuthActions, useCurrentUser } from "./useAuth";
 
 vi.mock("../../lib/api", () => ({ api: vi.fn() }));
 
 const mockedApi = vi.mocked(api);
 const user = { id: "user-1", email: "person@example.com" };
+
+// Both hooks together, as the app uses them.
+const useAuth = () => ({ ...useCurrentUser(), ...useAuthActions() });
 
 describe("useAuth", () => {
   beforeEach(() => {

@@ -11,16 +11,11 @@ export type TransitCardSubmission = {
   maybe_dates: string[];
 };
 
-export const useTransitCardDays = (
-  from: string,
-  to: string,
-  enabled: boolean,
-) =>
+export const useTransitCardDays = (from: string, to: string) =>
   useQuery({
     queryKey: queryKeys.transitCardDays(from, to),
     queryFn: () =>
       api<TransitCardDay[]>(`/api/transit-card/days?from=${from}&to=${to}`),
-    enabled,
   });
 
 export const useSaveTransitCardDays = () => {

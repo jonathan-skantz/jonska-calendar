@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryKeys";
@@ -38,13 +38,18 @@ const storePosition = (position: Position | null) => {
   }
 };
 
+const toWeatherByDay = (days: WeatherDay[]) =>
+  new Map(days.map((day) => [day.date, day]));
+const NO_WEATHER = new Map<string, WeatherDay>();
+
 // Weather is an optional enhancement: without location permission or when
 // the request fails, this returns an empty map and the calendar shows no icons.
-export const useWeather = (enabled: boolean) => {
+// It asks for the location when it mounts, so call it once, at the app level.
+export const useWeather = () => {
   const [position, setPosition] = useState(readStoredPosition);
 
   useEffect(() => {
-    if (!enabled || !("geolocation" in navigator)) return;
+    if (!("geolocation" in navigator)) return;
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         const next = {
@@ -65,24 +70,18 @@ export const useWeather = (enabled: boolean) => {
       },
       { maximumAge: HOUR_MS, timeout: 10_000 },
     );
-  }, [enabled]);
+  }, []);
 
-  const query = useQuery({
+  const { data } = useQuery({
     queryKey: queryKeys.weather(position?.lat ?? 0, position?.lon ?? 0),
     queryFn: () =>
       api<WeatherDay[]>(
         `/api/weather?lat=${position?.lat}&lon=${position?.lon}`,
       ),
-    enabled: enabled && position !== null,
+    enabled: position !== null,
     staleTime: HOUR_MS,
     retry: 1,
+    select: toWeatherByDay,
   });
-
-  return useMemo(
-    () =>
-      new Map<string, WeatherDay>(
-        (query.data ?? []).map((day) => [day.date, day]),
-      ),
-    [query.data],
-  );
+  return data ?? NO_WEATHER;
 };

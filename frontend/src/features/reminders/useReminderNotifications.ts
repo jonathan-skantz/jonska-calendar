@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { formatTime } from "../../lib/calendar";
 import type { TimeFormatPreference } from "../../lib/calendar";
 import type { Reminder } from "../../types";
+import { usePreferences } from "../calendar/preferencesContext";
 import { isReminderDue } from "./reminders";
+import { remindersQueryOptions, useReminderMutations } from "./useReminders";
 
 // setTimeout overflows above ~24.8 days; later reminders are scheduled after
 // a later refetch or reload instead.
@@ -90,4 +93,15 @@ export const useReminderNotifications = (
     );
 
   return { toasts, dismiss };
+};
+
+const NO_REMINDERS: Reminder[] = [];
+
+// Delivers the signed-in user's reminders. Call it once, at the app level:
+// every call schedules its own notifications.
+export const useReminderDelivery = () => {
+  const reminders = useQuery(remindersQueryOptions).data ?? NO_REMINDERS;
+  const { markNotified } = useReminderMutations();
+  const { timeFormat } = usePreferences().preferences;
+  return useReminderNotifications(reminders, markNotified, timeFormat);
 };

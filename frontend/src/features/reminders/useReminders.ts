@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { useActionMutation } from "../../hooks/useActionMutation";
 import { invalidateReminders } from "../../lib/queryInvalidation";
@@ -8,13 +8,12 @@ import type { Reminder } from "../../types";
 // Refetched periodically so reminders set on another device get scheduled.
 const REMINDER_REFETCH_MS = 5 * 60 * 1000;
 
-export const useReminders = (enabled: boolean) =>
-  useQuery({
-    queryKey: queryKeys.reminders,
-    queryFn: () => api<Reminder[]>("/api/reminders"),
-    enabled,
-    refetchInterval: REMINDER_REFETCH_MS,
-  });
+// Shared by the hooks that read reminders, so they observe one query.
+export const remindersQueryOptions = queryOptions({
+  queryKey: queryKeys.reminders,
+  queryFn: () => api<Reminder[]>("/api/reminders"),
+  refetchInterval: REMINDER_REFETCH_MS,
+});
 
 // Notification permission must be requested from a user gesture, so it is
 // asked for when the user adds their first reminder.

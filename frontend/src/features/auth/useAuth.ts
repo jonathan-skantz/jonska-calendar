@@ -23,13 +23,19 @@ const signIn = async ({ mode, email, password }: Credentials) => {
   }
 };
 
-export const useAuth = () => {
-  const queryClient = useQueryClient();
-  const currentUserQuery = useQuery({
+// The signed-in user, or null. Safe to call from any component; the request
+// is shared.
+export const useCurrentUser = () => {
+  const query = useQuery({
     queryKey: queryKeys.currentUser,
     queryFn: () => api<User>("/api/auth/me"),
     retry: false,
   });
+  return { user: query.data ?? null, isLoading: query.isLoading };
+};
+
+export const useAuthActions = () => {
+  const queryClient = useQueryClient();
   const authenticate = useMutation({
     mutationFn: signIn,
     onSuccess: () => invalidateCurrentUserAndWorkspace(queryClient),
@@ -53,8 +59,6 @@ export const useAuth = () => {
   );
 
   return {
-    user: currentUserQuery.data ?? null,
-    isLoading: currentUserQuery.isLoading,
     authenticate,
     logout,
     // Resolves to an error message, or null on success.
