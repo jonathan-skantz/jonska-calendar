@@ -14,7 +14,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
-	"github.com/jonathan-skantz/calendar/backend/internal/auth"
+	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
 const upstreamDraft = `{"title":"Lunch with Anna","date":{"kind":"relative_days","days":1},` +
@@ -89,10 +89,6 @@ func (f fakeTags) ListTags(_ context.Context, userID uuid.UUID) ([]db.Tag, error
 	return f.byUser[userID], nil
 }
 
-func userFunc(id uuid.UUID) auth.CurrentUser {
-	return func(*http.Request) (uuid.UUID, error) { return id, nil }
-}
-
 func post(handler *Handler, body string) *httptest.ResponseRecorder {
 	response := httptest.NewRecorder()
 	handler.Parse(response, httptest.NewRequest(http.MethodPost, "/api/events/parse", strings.NewReader(body)))
@@ -108,7 +104,7 @@ func TestParseValidatesRequest(t *testing.T) {
 	}
 
 	upstream := newFakeAnthropic(t)
-	handler := New(fakeTags{}, userFunc(uuid.New()), upstream.client())
+	handler := New(fakeTags{}, testutil.SignedInAs(uuid.New()), upstream.client())
 	for _, body := range []string{`{`, `{"text":"   "}`, `{"text":"` + strings.Repeat("å", maxTextLength+1) + `"}`} {
 		if code := post(handler, body).Code; code != http.StatusBadRequest {
 			t.Fatalf("expected status %d, got %d", http.StatusBadRequest, code)
@@ -118,7 +114,7 @@ func TestParseValidatesRequest(t *testing.T) {
 		t.Fatalf("expected no upstream calls for invalid requests, got %d", calls)
 	}
 
-	unconfigured := New(fakeTags{}, userFunc(uuid.New()), nil)
+	unconfigured := New(fakeTags{}, testutil.SignedInAs(uuid.New()), nil)
 	if code := post(unconfigured, `{"text":"lunch"}`).Code; code != http.StatusServiceUnavailable {
 		t.Fatalf("expected status %d without a key, got %d", http.StatusServiceUnavailable, code)
 	}
@@ -131,7 +127,7 @@ func TestParseReturnsValidatedDraftWithOwnTags(t *testing.T) {
 		userID:  {{ID: workID, Name: "Work"}},
 		otherID: {{ID: uuid.New(), Name: "Secret"}},
 	}}
-	handler := New(tags, userFunc(userID), upstream.client())
+	handler := New(tags, testutil.SignedInAs(userID), upstream.client())
 
 	response := post(handler, `{"text":"lunch with Anna tomorrow 12-13 #work #gym"}`)
 	if response.Code != http.StatusOK {
@@ -168,7 +164,7 @@ func TestParseReturnsValidatedDraftWithOwnTags(t *testing.T) {
 func TestParseRateLimitsPerUser(t *testing.T) {
 	upstream := newFakeAnthropic(t)
 	userID := uuid.New()
-	handler := New(fakeTags{}, userFunc(userID), upstream.client())
+	handler := New(fakeTags{}, testutil.SignedInAs(userID), upstream.client())
 	now := time.Date(2026, 10, 17, 8, 0, 0, 0, time.UTC)
 	handler.now = func() time.Time { return now }
 
@@ -180,11 +176,11 @@ func TestParseRateLimitsPerUser(t *testing.T) {
 	if code := post(handler, `{"text":"lunch"}`).Code; code != http.StatusTooManyRequests {
 		t.Fatalf("expected status %d over the limit, got %d", http.StatusTooManyRequests, code)
 	}
-	handler.CurrentUser = userFunc(uuid.New())
+	handler.CurrentUser = testutil.SignedInAs(uuid.New())
 	if code := post(handler, `{"text":"lunch"}`).Code; code != http.StatusOK {
 		t.Fatalf("expected another user to have their own budget, got %d", code)
 	}
-	handler.CurrentUser = userFunc(userID)
+	handler.CurrentUser = testutil.SignedInAs(userID)
 	now = now.Add(rateWindow)
 	if code := post(handler, `{"text":"lunch"}`).Code; code != http.StatusOK {
 		t.Fatalf("expected the budget to reset after the window, got %d", code)
@@ -194,7 +190,7 @@ func TestParseRateLimitsPerUser(t *testing.T) {
 func TestParseReportsUpstreamFailure(t *testing.T) {
 	upstream := newFakeAnthropic(t)
 	upstream.failing.Store(true)
-	handler := New(fakeTags{}, userFunc(uuid.New()), upstream.client())
+	handler := New(fakeTags{}, testutil.SignedInAs(uuid.New()), upstream.client())
 	if code := post(handler, `{"text":"lunch"}`).Code; code != http.StatusBadGateway {
 		t.Fatalf("expected status %d, got %d", http.StatusBadGateway, code)
 	}

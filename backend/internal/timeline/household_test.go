@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
 func TestHousehold(t *testing.T) {
@@ -149,7 +150,7 @@ func TestTransitCardConflicts(t *testing.T) {
 		}
 	}
 	list := func(userID uuid.UUID) map[uuid.UUID]transitCardDayResponse {
-		handler := New(store, func(*http.Request) (uuid.UUID, error) { return userID, nil })
+		handler := New(store, testutil.SignedInAs(userID))
 		date := day.Format(dateLayout)
 		response := httptest.NewRecorder()
 		handler.ListTransitCardDays(response, httptest.NewRequest(http.MethodGet, "/api/transit-card/days?from="+date+"&to="+date, nil))

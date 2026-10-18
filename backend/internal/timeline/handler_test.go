@@ -367,7 +367,7 @@ func TestApproximateTimesAreStoredAndShared(t *testing.T) {
 
 func TestCreateEventAndTask(t *testing.T) {
 	store, userID := setupTestStore(t)
-	handler := New(store, func(*http.Request) (uuid.UUID, error) { return userID, nil })
+	handler := New(store, testutil.SignedInAs(userID))
 
 	eventRequest := httptest.NewRequest(http.MethodPost, "/api/events", bytes.NewBufferString(`{
 		"title":"Family dinner",
@@ -432,7 +432,7 @@ func TestUpdateEventAndTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := New(store, func(*http.Request) (uuid.UUID, error) { return ownerID, nil })
+	handler := New(store, testutil.SignedInAs(ownerID))
 
 	eventRequest := httptest.NewRequest(http.MethodPut, "/api/events/"+eventID.String(), bytes.NewBufferString(`{
 		"title":"After",
@@ -463,7 +463,7 @@ func TestUpdateEventAndTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherHandler := New(store, func(*http.Request) (uuid.UUID, error) { return otherUserID, nil })
+	otherHandler := New(store, testutil.SignedInAs(otherUserID))
 	eventRequest = httptest.NewRequest(http.MethodPut, "/api/events/"+eventID.String(), bytes.NewBufferString(`{
 		"title":"Unauthorized",
 		"starts_at":"2026-10-09T13:00:00Z",
@@ -512,7 +512,7 @@ func TestEventMainTagMustBeOwnedAndAttached(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := New(store, func(*http.Request) (uuid.UUID, error) { return ownerID, nil })
+	handler := New(store, testutil.SignedInAs(ownerID))
 	update := func(tagID uuid.UUID) int {
 		request := httptest.NewRequest(http.MethodPut, "/api/events/"+eventID.String(), bytes.NewBufferString(`{
 			"title":"Main tag test",
@@ -549,7 +549,7 @@ func TestSetTaskCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := New(store, func(*http.Request) (uuid.UUID, error) { return ownerID, nil })
+	handler := New(store, testutil.SignedInAs(ownerID))
 
 	request := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+taskID.String(), bytes.NewBufferString(`{"is_completed":true}`))
 	request.SetPathValue("taskID", taskID.String())
@@ -581,7 +581,7 @@ func TestSetTaskCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherHandler := New(store, func(*http.Request) (uuid.UUID, error) { return otherUserID, nil })
+	otherHandler := New(store, testutil.SignedInAs(otherUserID))
 	request = httptest.NewRequest(http.MethodPatch, "/api/tasks/"+taskID.String(), bytes.NewBufferString(`{"is_completed":true}`))
 	request.SetPathValue("taskID", taskID.String())
 	response = httptest.NewRecorder()
@@ -600,7 +600,7 @@ func TestDeleteTimelineItem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := New(store, func(*http.Request) (uuid.UUID, error) { return ownerID, nil })
+	handler := New(store, testutil.SignedInAs(ownerID))
 
 	request := httptest.NewRequest(http.MethodDelete, "/api/timeline/"+itemID.String(), nil)
 	request.SetPathValue("itemID", itemID.String())
@@ -631,7 +631,7 @@ func TestDeleteTimelineItem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherHandler := New(store, func(*http.Request) (uuid.UUID, error) { return otherUserID, nil })
+	otherHandler := New(store, testutil.SignedInAs(otherUserID))
 	request = httptest.NewRequest(http.MethodDelete, "/api/timeline/"+otherItemID.String(), nil)
 	request.SetPathValue("itemID", otherItemID.String())
 	response = httptest.NewRecorder()
@@ -643,7 +643,7 @@ func TestDeleteTimelineItem(t *testing.T) {
 
 func TestPersonalTags(t *testing.T) {
 	store, userID := setupTestStore(t)
-	handler := New(store, func(*http.Request) (uuid.UUID, error) { return userID, nil })
+	handler := New(store, testutil.SignedInAs(userID))
 
 	eventID, err := store.CreateEvent(context.Background(), userID, db.Event{
 		Title:    "Tagged event",
@@ -928,7 +928,7 @@ func TestShareEventWithPerRecipientFields(t *testing.T) {
 
 func TestStoreFailuresAreNotReportedAsNotFound(t *testing.T) {
 	store, userID := setupTestStore(t)
-	handler := New(store, func(*http.Request) (uuid.UUID, error) { return userID, nil })
+	handler := New(store, testutil.SignedInAs(userID))
 	setDefault := func(ctx context.Context, tagID uuid.UUID) *httptest.ResponseRecorder {
 		request := httptest.NewRequestWithContext(ctx, http.MethodPut, "/api/tags/default",
 			bytes.NewBufferString(`{"tag_id":"`+tagID.String()+`"}`))

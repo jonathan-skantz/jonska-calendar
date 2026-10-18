@@ -31,7 +31,7 @@ cd frontend && mise exec -- npm run lint                                  # oxli
 cd frontend && mise exec -- npm run build                                 # tsc -b + vite build
 ```
 
-The Go tests that use PostgreSQL start a container with Testcontainers, so Docker must be running.
+The Go tests that use PostgreSQL start one container per test package with Testcontainers, so Docker must be running. Each test gets a fresh copy of a migrated template database (`backend/internal/testutil`); a package that uses it calls `testutil.Run` from `TestMain`.
 
 The pre-commit hook (`.githooks/pre-commit`, enabled with `git config core.hooksPath .githooks`) runs prettier/gofmt on staged files through lint-staged, then all the checks above.
 
@@ -57,7 +57,7 @@ Invariants that span several files:
 ### Migrations
 
 - Never edit an applied migration. Add a new numbered file in `backend/db/migrations`.
-- Also append the new file name to `migrationNames` in `backend/internal/testutil/store.go`. The tests apply migrations from that list, not through Goose.
+- The tests read the migration files from that directory in numeric order and apply them without Goose, so a new file is picked up automatically.
 
 ### Frontend (`frontend/src`)
 

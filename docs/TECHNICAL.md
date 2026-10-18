@@ -345,4 +345,4 @@ go vet ./...
 cd frontend && mise exec -- npm run build && mise exec -- npm run lint
 ```
 
-The PostgreSQL-backed tests use Testcontainers, so Docker must be running.
+The PostgreSQL-backed tests use Testcontainers, so Docker must be running. Each test package starts one container; every test gets its own database copied from a template with all migrations applied.

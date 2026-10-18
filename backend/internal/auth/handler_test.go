@@ -16,12 +16,8 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
-func setupTestStore(t *testing.T) *db.Store {
-	return testutil.NewStore(t)
-}
-
 func TestRegister(t *testing.T) {
-	store := setupTestStore(t)
+	store := testutil.NewStore(t)
 	handler := New(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":" TEST@example.com ","password":"password123"}`))
@@ -60,7 +56,7 @@ func TestRegister(t *testing.T) {
 }
 
 func TestRegisterRejectsDuplicateEmail(t *testing.T) {
-	store := setupTestStore(t)
+	store := testutil.NewStore(t)
 	handler := New(store)
 
 	register := func() *httptest.ResponseRecorder {
@@ -79,7 +75,7 @@ func TestRegisterRejectsDuplicateEmail(t *testing.T) {
 }
 
 func TestLoginCreatesSession(t *testing.T) {
-	store := setupTestStore(t)
+	store := testutil.NewStore(t)
 	handler := New(store)
 
 	registerRequest := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`))
@@ -113,7 +109,7 @@ func TestLoginCreatesSession(t *testing.T) {
 }
 
 func TestLoginRejectsInvalidCredentials(t *testing.T) {
-	store := setupTestStore(t)
+	store := testutil.NewStore(t)
 	handler := New(store)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"missing@example.com","password":"password123"}`))
@@ -126,7 +122,7 @@ func TestLoginRejectsInvalidCredentials(t *testing.T) {
 }
 
 func TestLogoutRevokesSession(t *testing.T) {
-	store := setupTestStore(t)
+	store := testutil.NewStore(t)
 	handler := New(store)
 
 	registerRequest := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`))
@@ -167,7 +163,7 @@ func TestLogoutRevokesSession(t *testing.T) {
 }
 
 func TestCurrentUser(t *testing.T) {
-	store := setupTestStore(t)
+	store := testutil.NewStore(t)
 	handler := New(store)
 
 	registerRequest := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`))
@@ -229,7 +225,7 @@ func TestParseRegisterRequestValidation(t *testing.T) {
 }
 
 func TestUpdateCurrentUserDisplayName(t *testing.T) {
-	store := setupTestStore(t)
+	store := testutil.NewStore(t)
 	handler := New(store)
 
 	registerResponse := httptest.NewRecorder()

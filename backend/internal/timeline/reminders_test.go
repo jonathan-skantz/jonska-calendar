@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
 func TestCreateReminderValidatesOffset(t *testing.T) {
@@ -141,7 +142,7 @@ func TestRemindersArePrivatePerUser(t *testing.T) {
 func TestReminderNotifiedResetsWhenEventMoves(t *testing.T) {
 	store, ownerID := setupTestStore(t)
 	ctx := context.Background()
-	handler := New(store, func(*http.Request) (uuid.UUID, error) { return ownerID, nil })
+	handler := New(store, testutil.SignedInAs(ownerID))
 
 	startsAt := time.Now().Add(48 * time.Hour).Truncate(time.Minute).UTC()
 	event := db.Event{Title: "Dentist", StartsAt: startsAt, EndsAt: startsAt.Add(time.Hour), Kind: "attendable"}
