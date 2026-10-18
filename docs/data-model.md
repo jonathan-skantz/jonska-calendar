@@ -1,0 +1,175 @@
+# Data model
+
+```mermaid
+erDiagram
+    users ||--o{ timeline_items : owns
+    timeline_items ||--o| events : "subtype"
+    timeline_items ||--o| tasks : "subtype"
+    users ||--o{ tags : owns
+    timeline_items ||--o{ timeline_item_tags : "has"
+    tags ||--o{ timeline_item_tags : "is attached"
+    events ||--o{ event_shares : "shared as"
+    users ||--o{ event_shares : "receives"
+    events ||--o{ event_reminders : "has"
+    users ||--o{ event_reminders : "sets"
+    users ||--o{ transit_card_days : "declares"
+    households ||--o{ household_members : "has"
+    users ||--o| household_members : "belongs to at most one"
+    users ||--o{ sessions : "has"
+```
+
+`weather_forecasts` has no owner, so it is not in the diagram. See [weather cache](#weather-cache).
+
+## Ownership
+
+- `timeline_items.user_id` is the only place that stores who owns an event or task.
+- `events` and `tasks` are subtype rows keyed by `timeline_item_id`. The API uses that ID as the event or task ID.
+- A write to both a parent and a subtype row runs in one transaction. Example: `Store.CreateEvent` (`backend/db/events.go`) writes `timeline_items`, `events`, and the first `timeline_item_tags` row together. If one fails, all roll back.
+
+## Events
+
+An event stores:
+
+- `starts_at` and `ends_at` (`TIMESTAMPTZ`);
+- `start_is_approximate` and `end_is_approximate`, which only change how the edge is drawn;
+- `is_all_day`;
+- `kind`: `attendable` (you must be there) or `informational` (on the calendar, not busy);
+- `is_skipped`, allowed only on `attendable` events;
+- `location`;
+- commute before and after, in seconds (whole minutes);
+- gathering before the start, in seconds, with an optional flag and label.
+
+Schema constraints:
+
+- All-day events cannot have commute (migration 14), gathering (migration 19), or approximate edges (migration 18).
+- Only attendable events can be skipped (migration 20). An all-day attendable event can be skipped.
+
+### All-day events
+
+- An all-day event ends at **midnight after its last day**. A one-day event on 12 October ends at 00:00 on 13 October.
+- The frontend builds that value. The API only checks `ends_at > starts_at`. See [gotchas](gotchas.md#all-day-end-is-exclusive).
+
+### Gathering and commute
+
+- **Commute:** travel to and from the event.
+- **Gathering:** time at the event before it starts, such as getting ready.
+- Mandatory gathering is part of the event block.
+- Optional gathering is a dotted band. It counts as busy only when there is a commute before it.
+- Shared events never include the owner's commute. Gathering is shared, because it describes the event.
+
+## Tasks
+
+- Stores a title, optional description and URL, `deadline_at`, and `is_completed`.
+- No start time or duration.
+- The app does not offer tags on tasks. The tag endpoints accept any owned item, so the API would accept them.
+- Drawn as a fixed block at its deadline.
+- Cannot be shared.
+
+## Tags
+
+```text
+users 1 ─── n tags
+tags  n ─── n timeline_items   (through timeline_item_tags)
+```
+
+- A tag belongs to one user. Names are unique per user; a duplicate returns `409`.
+- `default_tag_id` is used for new events when none is chosen.
+- Every event has at least one tag, and its `main_tag_id` is one of them.
+- Removing an event's main tag returns `409`. See [gotchas](gotchas.md#removing-the-main-tag).
+
+Deleting a tag runs in one transaction, `Store.DeleteTag` (`backend/db/tags.go`):
+
+- events whose main tag was deleted get the replacement as main tag;
+- events left with no tags get the replacement attached;
+- if the deleted tag was the default, the replacement becomes the default;
+- the tag is deleted.
+
+The replacement is the alphabetically first remaining tag. The last tag cannot be deleted (`409`).
+
+Always delete through `Store.DeleteTag`. `events.main_tag_id` has a foreign key with no `ON DELETE` rule, so a direct `DELETE` fails while events use the tag.
+
+## Sharing
+
+```text
+events ─── event_shares ─── recipient_user_id
+            (title, description, url, location: owner-set, nullable)
+```
+
+A share is a **projection**, not a copy. Nothing is written to the recipient's `timeline_items`. The recipient's view reads the event and uses the share's value for each field the owner set.
+
+- **Owner:** not stored on `event_shares`. Found through `event_shares.event_id → events.timeline_item_id → timeline_items.user_id`. Storing it twice could make the two disagree.
+- **Per-recipient fields:** `title`, `description`, `url`, `location`. A NULL field means "use the event's current value", so later edits still reach the recipient.
+- **Always from the event:** times, all-day, approximate flags, kind, and gathering.
+- **Never sent to recipients:** tags, `main_tag_id`, commute, `is_skipped`.
+- **Read-only for recipients.** Only the owner manages shares.
+- Sharing with yourself returns `400`. Sharing twice with the same person returns `409`.
+- Migration 16 removed `event_share_overrides`, which let recipients keep their own copy of some fields.
+
+`ShareEvent` (`backend/db/sharing.go`) is one `INSERT ... SELECT`. It checks ownership, that the event exists, and that the recipient is not the owner.
+
+## Reminders
+
+```text
+events ─── event_reminders ─── user_id
+           (offset_seconds before start, notified_at)
+```
+
+- Private to the user who set them. Nobody else sees them.
+- Anyone who can see an event can set reminders on it: the owner, or a recipient.
+- An offset from `starts_at`, so reminders move with the event. `remind_at` is calculated when listed.
+- `notified_at` records the first delivery, so other tabs and devices do not repeat it. The browser reports it with `POST /api/reminders/{id}/notified`.
+- Moving an event's start clears `notified_at` on its reminders, so they fire again.
+- Removing a share deletes that recipient's reminders for the event, in the same transaction.
+- Reminders fire only while a browser tab is open. See [gotchas](gotchas.md#not-built-yet).
+
+## Transit card
+
+```text
+users 1 ─── n transit_card_days (user_id, day DATE, need)
+users n ─── 1 households        (through household_members, user_id UNIQUE)
+```
+
+- `need` is `yes`, `maybe`, or `no`, for one local date.
+- A **missing** row means "not reported".
+- `no` means "reported, not needed". Saving a range writes `no` for every unselected day, so an empty selection still counts as a report.
+- `day` is a `DATE`, so time zones cannot shift it.
+- A household has a name and `transit_card_count` (1 to 20).
+- A user belongs to at most one household. Leaving keeps your declarations.
+- **Conflict** is computed per request, not stored. A `yes` row is `conflict` when more members said `yes` that day than there are cards. `maybe` never conflicts. See `transitCardStatuses` in `backend/internal/timeline/transit_card.go`.
+- Household queries use only the caller's membership. The client never sends a household ID.
+
+## Weather cache
+
+```text
+weather_forecasts (latitude, longitude, fetched_at, hourly JSONB, daily JSONB)
+```
+
+- Shared by all users. No `user_id`.
+- Coordinates are rounded to 0.1 degrees (about 10 km). Exact positions are never stored.
+- `hourly` holds raw Open-Meteo codes. Icons are chosen at read time, so changing the rule needs no refetch.
+- `daily` holds local sunrise and sunset (migration 23). A NULL `daily` counts as stale.
+- A row older than 3 hours is refreshed on the next request. If the refresh fails, the stale row is served.
+- Concurrent requests for one cell share one upstream call. This is per process.
+
+## Quick add
+
+- No table.
+- `POST /api/events/parse` sends the text and your tag names to Anthropic and returns a draft.
+- The draft is only a suggestion. The event is saved only when you press Save, through `POST /api/events`.
+- The model's reply is untrusted. `validateDraft` (`backend/internal/quickadd/draft.go`) drops values the form cannot hold and reports them as warnings. It maps tag names to your existing tags and never creates tags.
+- The frontend turns relative dates ("tomorrow") into real dates with `resolveDraft`.
+
+## Users and sessions
+
+- `users.email` is stored lowercase. A database check enforces it.
+- `users.display_name` is optional. The `user_display_name(display_name, email)` function (migration 17) falls back to the email's local part.
+- `sessions` stores a SHA-256 hash of the token, the expiry, and the user.
+- Logout deletes the current session. Expired rows are rejected on lookup, but never deleted. There is no cleanup job.
+
+## Migrations
+
+- Files are `N_name.sql` in `backend/db/migrations`.
+- Numbers are **not zero-padded**. Sorting by name puts `10_` before `2_`. Goose and the tests sort by number.
+- The next file is `24_...`.
+- Never edit an applied migration. Add a new one.
+- Each file has an `Up` part and a `Down` part, split by `-- +goose Down`. Tests run only `Up`.

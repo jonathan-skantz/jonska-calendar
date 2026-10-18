@@ -1,1 +1,0 @@
-- Editing an event in Google Cal opens a popup that takes up the whole screen

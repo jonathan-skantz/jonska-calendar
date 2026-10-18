@@ -13,7 +13,7 @@ Before implementing features or changing existing behavior:
 
 ## Technical decisions
 
-* The technology stack and architecture have not yet been finalized.
+* The technology stack and architecture are set. See `docs/decisions.md`. Change them only with a written reason.
 * Do not assume a particular framework, database, or deployment model without justification.
 * Inspect the existing code and follow established decisions where they exist.
 * Prefer simple, maintainable, testable designs that leave room for the product to evolve.

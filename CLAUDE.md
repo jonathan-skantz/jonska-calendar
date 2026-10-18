@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Read these before changing behavior or structure:
 
 - `PRODUCT.md` is the source of truth for product behavior. Items marked **Future** are out of scope unless asked for.
-- `docs/TECHNICAL.md` has the data model, the full HTTP API table, and a "where to change things" map.
+- `docs/README.md` is the developer reading order. `docs/architecture.md` has the "where to change things" map, `docs/data-model.md` the ownership and sharing rules, `docs/api.md` the HTTP routes, and `docs/gotchas.md` the traps.
 - `.github/copilot-instructions.md` has the project working rules for Copilot. The engineering principles below extend them.
 
 ## Commands
@@ -44,13 +44,13 @@ The stack is a React + Vite + TanStack Query frontend, a Go `net/http` API, and 
 - `backend/cmd/server.go` registers all routes. `timeline.New` gets a `CurrentUser` function that wraps the auth handler's session lookup. This is how timeline handlers get the authenticated user ID.
 - `backend/internal/auth` handles registration, login, and logout with Argon2id passwords. The HTTP-only `calendar_session` cookie holds a raw token, and the database stores only its hash.
 - `backend/internal/timeline` holds the HTTP handlers for events, tasks, tags, and sharing. `requireUser()` does the auth check. Request validation lives in `validation.go`, and response helpers map `db` sentinel errors to HTTP status codes. Error bodies are plain text.
-- `backend/db` is a single `Store` whose SQL is split into files by feature. It uses handwritten pgx queries, not sqlc (see `docs/TECHNICAL.md` for why).
+- `backend/db` is a single `Store` whose SQL is split into files by feature. It uses handwritten pgx queries, not sqlc (see `docs/decisions.md` for why).
 
 Invariants that span several files:
 
 - Authorization is enforced twice: once in the handler and again in the SQL. Every store query filters by the owner's `user_id`, so a guessed UUID must not reach another user's data.
 - `timeline_items` is the parent row and the only place ownership is stored. `events` and `tasks` are subtype rows keyed by `timeline_item_id`. Use one transaction when an operation writes both the parent and a subtype row.
-- Shared events are projections, not copies. `event_shares` links a recipient to an event, and the owner is derived through `events -> timeline_items.user_id`. `event_share_overrides` stores only the recipient's local fields. Keep source data and recipient-local data separate.
+- Shared events are projections, not copies. `event_shares` links a recipient to an event, and the owner is derived through `events -> timeline_items.user_id`. The owner sets per-recipient fields on the share row, and recipients cannot edit anything. Keep source data and share data separate.
 - Tags: each user has a `default_tag_id`. Every event has at least one tag and a `main_tag_id` that must be one of its attached tags. Deleting a tag reassigns main tags and defaults (see `backend/db/tags.go`).
 - All-day events use an exclusive end at midnight after the last day.
 
@@ -61,7 +61,7 @@ Invariants that span several files:
 
 ### Frontend (`frontend/src`)
 
-- `App.tsx` is the shell and coordinates the pieces. Code is colocated by feature: `features/<name>/` holds that feature's components, hooks, pure logic, and tests (for example `features/composer`, `features/calendar`, `features/sharing`). `components/` holds only shared UI and the app shell (`TopBar`, `Sidebar`, `DateTimeField`), `hooks/` only generic hooks, and `lib/` helpers used by several features. Import from the source file; there are no barrel `index.ts` files.
+- `CalendarApp.tsx` coordinates the pieces; `App.tsx` is only the signed-in/signed-out gate. Code is colocated by feature: `features/<name>/` holds that feature's components, hooks, pure logic, and tests (for example `features/composer`, `features/calendar`, `features/sharing`). `components/` holds only shared UI and the app shell (`TopBar`, `Sidebar`, `DateTimeField`), `hooks/` only generic hooks, and `lib/` helpers used by several features. Import from the source file; there are no barrel `index.ts` files.
 - Server state lives in TanStack Query: query keys are in `lib/queryKeys.ts` and invalidation helpers are in `lib/queryInvalidation.ts`. Each feature's queries and mutations live in its folder. Calendar and week state and the browser time/week preferences live in `features/calendar`.
 - `lib/api.ts` is the `api<T>()` JSON wrapper that sends cookie credentials. `types.ts` mirrors the backend JSON. Optional fields match the backend `omitempty` tags.
 - The week grid is custom: it is not a calendar library. Item position comes from the number of minutes after local midnight (`lib/calendar.ts`, `features/calendar/timelineView.ts`). Use `date-fns` for date math.
