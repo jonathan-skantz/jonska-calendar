@@ -1,10 +1,7 @@
 package timeline
 
 import (
-	"encoding/json"
 	"net/http"
-
-	"github.com/google/uuid"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
@@ -16,8 +13,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var request taskRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateTaskRequest(request); err != nil {
@@ -43,14 +39,12 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	taskID, err := uuid.Parse(r.PathValue("taskID"))
-	if err != nil {
-		http.Error(w, "invalid task id", http.StatusBadRequest)
+	taskID, ok := pathID(w, r, "taskID")
+	if !ok {
 		return
 	}
 	var request taskRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateTaskRequest(request); err != nil {
@@ -78,14 +72,12 @@ func (h *Handler) SetTaskCompleted(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	taskID, err := uuid.Parse(r.PathValue("taskID"))
-	if err != nil {
-		http.Error(w, "invalid task id", http.StatusBadRequest)
+	taskID, ok := pathID(w, r, "taskID")
+	if !ok {
 		return
 	}
 	var request taskCompletionRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := h.Store.SetTaskCompleted(r.Context(), userID, taskID, request.IsCompleted); err != nil {

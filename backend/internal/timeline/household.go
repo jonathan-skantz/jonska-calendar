@@ -1,9 +1,7 @@
 package timeline
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
@@ -30,14 +28,12 @@ func (h *Handler) GetHousehold(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load household", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(household)
+	writeJSON(w, http.StatusOK, household)
 }
 
 func (h *Handler) decodeHouseholdRequest(w http.ResponseWriter, r *http.Request) (householdRequest, bool) {
 	var request householdRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return request, false
 	}
 	if err := validateHouseholdRequest(&request); err != nil {
@@ -92,18 +88,11 @@ func (h *Handler) AddHouseholdMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request householdMemberRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
-	email := strings.ToLower(strings.TrimSpace(request.Email))
-	if email == "" {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
-		return
-	}
-	member, err := h.Store.FindUserByEmail(r.Context(), email)
-	if err != nil {
-		http.Error(w, "user not found", http.StatusNotFound)
+	member, ok := h.findUserByEmail(w, r, request.Email, "user not found")
+	if !ok {
 		return
 	}
 	if err := h.Store.AddHouseholdMember(r.Context(), userID, member.ID); err != nil {

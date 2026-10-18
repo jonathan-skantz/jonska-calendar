@@ -1,7 +1,6 @@
 package timeline
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -23,8 +22,7 @@ func (h *Handler) ListReminders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list reminders", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(reminders)
+	writeJSON(w, http.StatusOK, reminders)
 }
 
 func (h *Handler) CreateReminder(w http.ResponseWriter, r *http.Request) {
@@ -32,13 +30,12 @@ func (h *Handler) CreateReminder(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	eventID, ok := parsePathID(w, r, "eventID")
+	eventID, ok := pathID(w, r, "eventID")
 	if !ok {
 		return
 	}
 	var request reminderRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateReminderRequest(request); err != nil {
@@ -65,7 +62,7 @@ func (h *Handler) DeleteReminder(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	reminderID, ok := parsePathID(w, r, "reminderID")
+	reminderID, ok := pathID(w, r, "reminderID")
 	if !ok {
 		return
 	}
@@ -84,7 +81,7 @@ func (h *Handler) MarkReminderNotified(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	reminderID, ok := parsePathID(w, r, "reminderID")
+	reminderID, ok := pathID(w, r, "reminderID")
 	if !ok {
 		return
 	}

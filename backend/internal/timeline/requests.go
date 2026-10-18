@@ -1,10 +1,35 @@
 package timeline
 
 import (
+	"encoding/json"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jonathan-skantz/calendar/backend/db"
 )
+
+// decodeJSON reads the request body into dst. On malformed JSON it answers
+// 400 and returns false.
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
+// pathID parses the UUID path value called name, such as "eventID". On
+// failure it answers 400 ("invalid event id") and returns false.
+func pathID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(r.PathValue(name))
+	if err != nil {
+		http.Error(w, "invalid "+strings.TrimSuffix(name, "ID")+" id", http.StatusBadRequest)
+		return uuid.Nil, false
+	}
+	return id, true
+}
 
 type eventRequest struct {
 	Title                string    `json:"title"`
@@ -24,6 +49,28 @@ type eventRequest struct {
 	CommuteBeforeSeconds int       `json:"commute_before_seconds"`
 	CommuteAfterSeconds  int       `json:"commute_after_seconds"`
 	MainTagID            uuid.UUID `json:"main_tag_id"`
+}
+
+func (request eventRequest) toEvent() db.Event {
+	return db.Event{
+		Title:                request.Title,
+		Description:          request.Description,
+		URL:                  request.URL,
+		StartsAt:             request.StartsAt,
+		EndsAt:               request.EndsAt,
+		IsAllDay:             request.IsAllDay,
+		StartIsApproximate:   request.StartIsApproximate,
+		EndIsApproximate:     request.EndIsApproximate,
+		Kind:                 request.Kind,
+		IsSkipped:            request.IsSkipped,
+		Location:             request.Location,
+		GatheringSeconds:     request.GatheringSeconds,
+		GatheringIsOptional:  request.GatheringIsOptional,
+		GatheringLabel:       request.GatheringLabel,
+		CommuteBeforeSeconds: request.CommuteBeforeSeconds,
+		CommuteAfterSeconds:  request.CommuteAfterSeconds,
+		MainTagID:            request.MainTagID,
+	}
 }
 
 type reminderRequest struct {

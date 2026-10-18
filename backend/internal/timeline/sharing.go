@@ -1,11 +1,7 @@
 package timeline
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
-
-	"github.com/google/uuid"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
@@ -24,21 +20,12 @@ var (
 	}
 )
 
-func parsePathID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(r.PathValue(name))
-	if err != nil {
-		http.Error(w, "invalid "+name, http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return id, true
-}
-
 func (h *Handler) ListEventShares(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
-	eventID, ok := parsePathID(w, r, "eventID")
+	eventID, ok := pathID(w, r, "eventID")
 	if !ok {
 		return
 	}
@@ -50,8 +37,7 @@ func (h *Handler) ListEventShares(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(shares)
+	writeJSON(w, http.StatusOK, shares)
 }
 
 func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
@@ -59,23 +45,16 @@ func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	eventID, ok := parsePathID(w, r, "eventID")
+	eventID, ok := pathID(w, r, "eventID")
 	if !ok {
 		return
 	}
 	var request shareRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
-	email := strings.ToLower(strings.TrimSpace(request.RecipientEmail))
-	if email == "" {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
-		return
-	}
-	recipient, err := h.Store.FindUserByEmail(r.Context(), email)
-	if err != nil {
-		http.Error(w, "recipient not found", http.StatusNotFound)
+	recipient, ok := h.findUserByEmail(w, r, request.RecipientEmail, "recipient not found")
+	if !ok {
 		return
 	}
 	if recipient.ID == ownerID {
@@ -102,17 +81,16 @@ func (h *Handler) UpdateEventShare(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	eventID, ok := parsePathID(w, r, "eventID")
+	eventID, ok := pathID(w, r, "eventID")
 	if !ok {
 		return
 	}
-	shareID, ok := parsePathID(w, r, "shareID")
+	shareID, ok := pathID(w, r, "shareID")
 	if !ok {
 		return
 	}
 	var request shareFieldsRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := h.Store.UpdateEventShare(r.Context(), ownerID, eventID, shareID, normalizeShareFields(request)); err != nil {
@@ -130,11 +108,11 @@ func (h *Handler) DeleteEventShare(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	eventID, ok := parsePathID(w, r, "eventID")
+	eventID, ok := pathID(w, r, "eventID")
 	if !ok {
 		return
 	}
-	shareID, ok := parsePathID(w, r, "shareID")
+	shareID, ok := pathID(w, r, "shareID")
 	if !ok {
 		return
 	}

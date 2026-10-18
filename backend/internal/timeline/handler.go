@@ -1,8 +1,8 @@
 package timeline
 
 import (
-	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
@@ -19,6 +19,23 @@ func New(store *db.Store, currentUser CurrentUser) *Handler {
 	return &Handler{Store: store, CurrentUser: currentUser}
 }
 
+// findUserByEmail finds another user by the email they signed up with. On
+// failure it answers 400 for an empty email or 404 with notFoundMessage, and
+// returns false.
+func (h *Handler) findUserByEmail(w http.ResponseWriter, r *http.Request, rawEmail, notFoundMessage string) (db.User, bool) {
+	email := strings.ToLower(strings.TrimSpace(rawEmail))
+	if email == "" {
+		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+		return db.User{}, false
+	}
+	user, err := h.Store.FindUserByEmail(r.Context(), email)
+	if err != nil {
+		http.Error(w, notFoundMessage, http.StatusNotFound)
+		return db.User{}, false
+	}
+	return user, true
+}
+
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	userID, err := h.CurrentUser(r)
 	if err != nil {
@@ -33,9 +50,8 @@ func (h *Handler) DeleteTimelineItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	itemID, err := uuid.Parse(r.PathValue("itemID"))
-	if err != nil {
-		http.Error(w, "invalid item id", http.StatusBadRequest)
+	itemID, ok := pathID(w, r, "itemID")
+	if !ok {
 		return
 	}
 	if err := h.Store.DeleteTimelineItem(r.Context(), userID, itemID); err != nil {
@@ -62,12 +78,5 @@ func (h *Handler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list timeline", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(entries)
-}
-
-func writeCreated(w http.ResponseWriter, id uuid.UUID) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(createResponse{ID: id})
+	writeJSON(w, http.StatusOK, entries)
 }

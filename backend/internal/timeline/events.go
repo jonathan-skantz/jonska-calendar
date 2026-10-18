@@ -1,13 +1,15 @@
 package timeline
 
 import (
-	"encoding/json"
 	"net/http"
-
-	"github.com/google/uuid"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
+
+var mainTagNotFound = mappedErrorResponse{
+	cause:    db.ErrTagNotFound,
+	response: httpErrorResponse{status: http.StatusNotFound, message: "main tag not found"},
+}
 
 func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.requireUser(w, r)
@@ -16,8 +18,7 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var request eventRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateEventRequest(&request); err != nil {
@@ -25,32 +26,11 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.Store.CreateEvent(r.Context(), userID, db.Event{
-		Title:                request.Title,
-		Description:          request.Description,
-		URL:                  request.URL,
-		StartsAt:             request.StartsAt,
-		EndsAt:               request.EndsAt,
-		IsAllDay:             request.IsAllDay,
-		StartIsApproximate:   request.StartIsApproximate,
-		EndIsApproximate:     request.EndIsApproximate,
-		Kind:                 request.Kind,
-		IsSkipped:            request.IsSkipped,
-		Location:             request.Location,
-		GatheringSeconds:     request.GatheringSeconds,
-		GatheringIsOptional:  request.GatheringIsOptional,
-		GatheringLabel:       request.GatheringLabel,
-		CommuteBeforeSeconds: request.CommuteBeforeSeconds,
-		CommuteAfterSeconds:  request.CommuteAfterSeconds,
-		MainTagID:            request.MainTagID,
-	})
+	id, err := h.Store.CreateEvent(r.Context(), userID, request.toEvent())
 	if err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to create event"},
-			mappedErrorResponse{
-				cause:    db.ErrTagNotFound,
-				response: httpErrorResponse{status: http.StatusNotFound, message: "main tag not found"},
-			},
+			mainTagNotFound,
 		)
 		return
 	}
@@ -62,38 +42,22 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	eventID, err := uuid.Parse(r.PathValue("eventID"))
-	if err != nil {
-		http.Error(w, "invalid event id", http.StatusBadRequest)
+	eventID, ok := pathID(w, r, "eventID")
+	if !ok {
 		return
 	}
 	var request eventRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateEventRequest(&request); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.Store.UpdateEvent(r.Context(), userID, eventID, db.Event{
-		Title: request.Title, Description: request.Description, URL: request.URL,
-		StartsAt: request.StartsAt, EndsAt: request.EndsAt, Kind: request.Kind,
-		IsSkipped:          request.IsSkipped,
-		IsAllDay:           request.IsAllDay,
-		StartIsApproximate: request.StartIsApproximate, EndIsApproximate: request.EndIsApproximate,
-		Location: request.Location, GatheringSeconds: request.GatheringSeconds,
-		GatheringIsOptional: request.GatheringIsOptional, GatheringLabel: request.GatheringLabel,
-		CommuteBeforeSeconds: request.CommuteBeforeSeconds,
-		CommuteAfterSeconds:  request.CommuteAfterSeconds,
-		MainTagID:            request.MainTagID,
-	}); err != nil {
+	if err := h.Store.UpdateEvent(r.Context(), userID, eventID, request.toEvent()); err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update event"},
-			mappedErrorResponse{
-				cause:    db.ErrTagNotFound,
-				response: httpErrorResponse{status: http.StatusNotFound, message: "main tag not found"},
-			},
+			mainTagNotFound,
 			mappedErrorResponse{
 				cause:    db.ErrEventNotFound,
 				response: httpErrorResponse{status: http.StatusNotFound, message: "event not found"},

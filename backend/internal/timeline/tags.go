@@ -1,11 +1,8 @@
 package timeline
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
-
-	"github.com/google/uuid"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
@@ -16,8 +13,7 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request tagRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateTagName(request.Name); err != nil {
@@ -35,9 +31,7 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(tag)
+	writeJSON(w, http.StatusCreated, tag)
 }
 
 func (h *Handler) ListTags(w http.ResponseWriter, r *http.Request) {
@@ -50,8 +44,7 @@ func (h *Handler) ListTags(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list tags", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(tags)
+	writeJSON(w, http.StatusOK, tags)
 }
 
 func (h *Handler) SetDefaultTag(w http.ResponseWriter, r *http.Request) {
@@ -60,8 +53,7 @@ func (h *Handler) SetDefaultTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request tagSelectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateTagSelectionRequest(request); err != nil {
@@ -80,14 +72,12 @@ func (h *Handler) RenameTag(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	tagID, err := uuid.Parse(r.PathValue("tagID"))
-	if err != nil {
-		http.Error(w, "invalid tag id", http.StatusBadRequest)
+	tagID, ok := pathID(w, r, "tagID")
+	if !ok {
 		return
 	}
 	var request tagUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateTagUpdateRequest(request); err != nil {
@@ -112,9 +102,8 @@ func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	tagID, err := uuid.Parse(r.PathValue("tagID"))
-	if err != nil {
-		http.Error(w, "invalid tag id", http.StatusBadRequest)
+	tagID, ok := pathID(w, r, "tagID")
+	if !ok {
 		return
 	}
 	if err := h.Store.DeleteTag(r.Context(), userID, tagID); err != nil {
@@ -135,14 +124,12 @@ func (h *Handler) AddTagToItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	itemID, err := uuid.Parse(r.PathValue("itemID"))
-	if err != nil {
-		http.Error(w, "invalid item id", http.StatusBadRequest)
+	itemID, ok := pathID(w, r, "itemID")
+	if !ok {
 		return
 	}
 	var request tagSelectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	if err := validateTagSelectionRequest(request); err != nil {
@@ -161,14 +148,12 @@ func (h *Handler) RemoveTagFromItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	itemID, err := uuid.Parse(r.PathValue("itemID"))
-	if err != nil {
-		http.Error(w, "invalid item id", http.StatusBadRequest)
+	itemID, ok := pathID(w, r, "itemID")
+	if !ok {
 		return
 	}
-	tagID, err := uuid.Parse(r.PathValue("tagID"))
-	if err != nil {
-		http.Error(w, "invalid tag id", http.StatusBadRequest)
+	tagID, ok := pathID(w, r, "tagID")
+	if !ok {
 		return
 	}
 	if err := h.Store.RemoveTagFromItem(r.Context(), userID, itemID, tagID); err != nil {

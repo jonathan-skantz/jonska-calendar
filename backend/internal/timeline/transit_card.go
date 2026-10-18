@@ -1,7 +1,6 @@
 package timeline
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -69,8 +68,7 @@ func (h *Handler) ListTransitCardDays(w http.ResponseWriter, r *http.Request) {
 			Status:      statuses[i],
 		})
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) SetTransitCardDays(w http.ResponseWriter, r *http.Request) {
@@ -79,8 +77,7 @@ func (h *Handler) SetTransitCardDays(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request transitCardDaysRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, ErrInvalidRequest.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	submission, err := validateTransitCardDaysRequest(request, time.Now().UTC().Truncate(24*time.Hour))
