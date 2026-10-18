@@ -6,6 +6,42 @@
       "sourceType": "github",
       "skillPath": "SKILL.md",
       "computedHash": "911447778fee7936cc62f4ff8b86c9e38a9c11c73a1f14b2e233acdb517a9a12"
+    },
+    "hooks-pattern": {
+      "source": "PatternsDev/skills",
+      "sourceType": "github",
+      "skillPath": "react/hooks-pattern/SKILL.md",
+      "computedHash": "4e5c7539e93ce14810f0b9ee8d0b5945245c787c8b7430f47a36ae393890301d"
+    },
+    "module-pattern": {
+      "source": "PatternsDev/skills",
+      "sourceType": "github",
+      "skillPath": "javascript/module-pattern/SKILL.md",
+      "computedHash": "bdbc7798d9780b77bdb65902bd875c8f21c0286fa9a829c8b4323599113665b0"
+    },
+    "presentational-container-pattern": {
+      "source": "PatternsDev/skills",
+      "sourceType": "github",
+      "skillPath": "react/presentational-container-pattern/SKILL.md",
+      "computedHash": "3aafd64e3196232e6fe9c4e943a335e3d02d5c0dfccaad60470417beeacf874f"
+    },
+    "react-2026": {
+      "source": "PatternsDev/skills",
+      "sourceType": "github",
+      "skillPath": "react/react-2026/SKILL.md",
+      "computedHash": "c069a9325b67a82ebcf3bb5271cfbd858894387ceec69558ecb1ab0a656341d1"
+    },
+    "react-composition-2026": {
+      "source": "PatternsDev/skills",
+      "sourceType": "github",
+      "skillPath": "react/react-composition-2026/SKILL.md",
+      "computedHash": "e89ba214136fd59f8cd627f6488782c5f13b13bc6b6f9d1a5f7643d8a1874404"
+    },
+    "react-data-fetching": {
+      "source": "PatternsDev/skills",
+      "sourceType": "github",
+      "skillPath": "react/react-data-fetching/SKILL.md",
+      "computedHash": "15b5b98496249315ea3bf0f1785a3df7c9a53ac573c1cfb02c6c70769a415d67"
     }
   }
 }
