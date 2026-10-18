@@ -42,9 +42,10 @@ func validCommuteSeconds(seconds int) bool {
 	return seconds >= 0 && seconds <= db.MaxCommuteSeconds && seconds%60 == 0
 }
 
-// validateEventRequest returns the request with its gathering label trimmed;
-// a blank label means no label.
+// validateEventRequest returns the request with its title and gathering label
+// trimmed; a blank label means no label.
 func validateEventRequest(request eventRequest) (eventRequest, error) {
+	request.Title = strings.TrimSpace(request.Title)
 	request.GatheringLabel = normalizeOptionalText(request.GatheringLabel)
 	if request.Title == "" {
 		return request, ErrTitleRequired
@@ -90,14 +91,16 @@ func validateReminderRequest(request reminderRequest) error {
 	return nil
 }
 
-func validateTaskRequest(request taskRequest) error {
+// validateTaskRequest returns the request with its title trimmed.
+func validateTaskRequest(request taskRequest) (taskRequest, error) {
+	request.Title = strings.TrimSpace(request.Title)
 	if request.Title == "" {
-		return ErrTitleRequired
+		return request, ErrTitleRequired
 	}
 	if request.DeadlineAt.IsZero() {
-		return ErrDeadlineNeeded
+		return request, ErrDeadlineNeeded
 	}
-	return nil
+	return request, nil
 }
 
 // validateTagName returns the name trimmed.

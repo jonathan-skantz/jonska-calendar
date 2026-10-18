@@ -16,7 +16,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	if err := validateTaskRequest(request); err != nil {
+	request, err := validateTaskRequest(request)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -47,7 +48,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	if err := validateTaskRequest(request); err != nil {
+	request, err := validateTaskRequest(request)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

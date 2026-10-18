@@ -21,7 +21,7 @@ func TestValidateTaskRequest(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := validateTaskRequest(test.request)
+			_, err := validateTaskRequest(test.request)
 			if !errors.Is(err, test.wantErr) {
 				t.Fatalf("expected error %v, got %v", test.wantErr, err)
 			}
@@ -70,5 +70,30 @@ func TestValidatorsReturnNormalizedRequests(t *testing.T) {
 	household, err := validateHouseholdRequest(householdRequest{Name: " Home ", TransitCardCount: 1})
 	if err != nil || household.Name != "Home" {
 		t.Fatalf("expected trimmed household name, got %q (err %v)", household.Name, err)
+	}
+}
+
+func TestTitlesAreTrimmedAndMustNotBeBlank(t *testing.T) {
+	event := eventRequest{
+		Title:    "   ",
+		Kind:     db.EventKindInformational,
+		StartsAt: time.Date(2026, 10, 15, 18, 0, 0, 0, time.UTC),
+		EndsAt:   time.Date(2026, 10, 15, 19, 0, 0, 0, time.UTC),
+	}
+	if _, err := validateEventRequest(event); !errors.Is(err, ErrTitleRequired) {
+		t.Fatalf("blank event title: expected %v, got %v", ErrTitleRequired, err)
+	}
+	event.Title = "  Lecture "
+	if validated, err := validateEventRequest(event); err != nil || validated.Title != "Lecture" {
+		t.Fatalf("expected trimmed event title, got %q (err %v)", validated.Title, err)
+	}
+
+	task := taskRequest{Title: " \t", DeadlineAt: time.Date(2026, 10, 15, 18, 0, 0, 0, time.UTC)}
+	if _, err := validateTaskRequest(task); !errors.Is(err, ErrTitleRequired) {
+		t.Fatalf("blank task title: expected %v, got %v", ErrTitleRequired, err)
+	}
+	task.Title = " Follow up "
+	if validated, err := validateTaskRequest(task); err != nil || validated.Title != "Follow up" {
+		t.Fatalf("expected trimmed task title, got %q (err %v)", validated.Title, err)
 	}
 }
