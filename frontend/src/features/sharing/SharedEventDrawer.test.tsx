@@ -1,7 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SharedEventDrawer } from "./SharedEventDrawer";
 import type { TimelineEntry } from "../../types";
+import { renderWithPreferences } from "../../test/renderWithPreferences";
 
 const entry: TimelineEntry = {
   id: "event-1",
@@ -21,12 +22,8 @@ describe("SharedEventDrawer", () => {
   afterEach(cleanup);
 
   it("shows the shared fields read-only", () => {
-    render(
-      <SharedEventDrawer
-        entry={entry}
-        timeFormat="24-hour"
-        onClose={vi.fn()}
-      />,
+    renderWithPreferences(
+      <SharedEventDrawer entry={entry} onClose={vi.fn()} />,
     );
 
     expect(screen.getByText("Shared by Jonathan")).toBeTruthy();
@@ -42,10 +39,9 @@ describe("SharedEventDrawer", () => {
   });
 
   it("marks approximate edges", () => {
-    render(
+    renderWithPreferences(
       <SharedEventDrawer
         entry={{ ...entry, start_is_approximate: true }}
-        timeFormat="24-hour"
         onClose={vi.fn()}
       />,
     );
@@ -54,7 +50,7 @@ describe("SharedEventDrawer", () => {
   });
 
   it("shows gathering time", () => {
-    render(
+    renderWithPreferences(
       <SharedEventDrawer
         entry={{
           ...entry,
@@ -63,7 +59,6 @@ describe("SharedEventDrawer", () => {
           gathering_is_optional: true,
           gathering_label: "Mingle",
         }}
-        timeFormat="24-hour"
         onClose={vi.fn()}
       />,
     );

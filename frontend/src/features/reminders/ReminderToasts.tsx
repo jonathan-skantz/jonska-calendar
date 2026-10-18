@@ -1,21 +1,20 @@
 import { formatTime } from "../../lib/calendar";
-import type { TimeFormatPreference } from "../../lib/calendar";
 import type { ReminderToast } from "./useReminderNotifications";
+import { usePreferences } from "../calendar/preferencesContext";
 
 type ReminderToastsProps = {
   toasts: ReminderToast[];
-  timeFormat: TimeFormatPreference;
   onOpenEvent: (eventId: string) => void;
   onDismiss: (reminderId: string) => void;
 };
 
 export const ReminderToasts = ({
   toasts,
-  timeFormat,
   onOpenEvent,
   onDismiss,
-}: ReminderToastsProps) =>
-  toasts.length === 0 ? null : (
+}: ReminderToastsProps) => {
+  const { timeFormat } = usePreferences().preferences;
+  return toasts.length === 0 ? null : (
     <div className="reminder-toasts" role="status" aria-live="polite">
       {toasts.map(({ reminder, missed }) => (
         <div key={reminder.id} className="reminder-toast">
@@ -52,3 +51,4 @@ export const ReminderToasts = ({
       ))}
     </div>
   );
+};

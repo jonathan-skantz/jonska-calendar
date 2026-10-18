@@ -6,10 +6,10 @@ import type { TimelineEntry } from "../../types";
 import { ReminderEditor } from "../reminders/ReminderEditor";
 import type { ReminderItem } from "../reminders/ReminderEditor";
 import { Drawer } from "../../components/Drawer";
+import { usePreferences } from "../calendar/preferencesContext";
 
 type SharedEventDrawerProps = {
   entry: TimelineEntry;
-  timeFormat: TimeFormatPreference;
   onClose: () => void;
   // The recipient's own reminders; the only thing they can change here.
   reminders?: ReminderItem[];
@@ -49,61 +49,63 @@ const formatRange = (
 // Recipients cannot change a shared event; only their own reminders.
 export const SharedEventDrawer = ({
   entry,
-  timeFormat,
   onClose,
   reminders,
   reminderError,
   onAddReminder,
   onRemoveReminder,
-}: SharedEventDrawerProps) => (
-  <Drawer
-    eyebrow={`Shared by ${entry.shared_by}`}
-    title={entry.title}
-    className="shared-event-view"
-    onClose={onClose}
-  >
-    <dl>
-      <dt>When</dt>
-      <dd>{formatRange(entry, timeFormat)}</dd>
-      <dt>Kind</dt>
-      <dd>{entry.kind === "attendable" ? "Attend" : "Heads-up"}</dd>
-      {entry.location && (
-        <>
-          <dt>Location</dt>
-          <dd>{entry.location}</dd>
-        </>
+}: SharedEventDrawerProps) => {
+  const { timeFormat } = usePreferences().preferences;
+  return (
+    <Drawer
+      eyebrow={`Shared by ${entry.shared_by}`}
+      title={entry.title}
+      className="shared-event-view"
+      onClose={onClose}
+    >
+      <dl>
+        <dt>When</dt>
+        <dd>{formatRange(entry, timeFormat)}</dd>
+        <dt>Kind</dt>
+        <dd>{entry.kind === "attendable" ? "Attend" : "Heads-up"}</dd>
+        {entry.location && (
+          <>
+            <dt>Location</dt>
+            <dd>{entry.location}</dd>
+          </>
+        )}
+        {entry.url && (
+          <>
+            <dt>URL</dt>
+            <dd>
+              {/* The URL comes from another user, so only web links are clickable. */}
+              {/^https?:\/\//i.test(entry.url) ? (
+                <a href={entry.url} target="_blank" rel="noreferrer">
+                  {entry.url}
+                </a>
+              ) : (
+                entry.url
+              )}
+            </dd>
+          </>
+        )}
+        {entry.description && (
+          <>
+            <dt>Details</dt>
+            <dd className="shared-event-description">{entry.description}</dd>
+          </>
+        )}
+      </dl>
+      {onAddReminder && onRemoveReminder && (
+        <ReminderEditor
+          reminders={reminders ?? []}
+          isAllDay={Boolean(entry.is_all_day)}
+          error={reminderError}
+          onAdd={onAddReminder}
+          onRemove={onRemoveReminder}
+        />
       )}
-      {entry.url && (
-        <>
-          <dt>URL</dt>
-          <dd>
-            {/* The URL comes from another user, so only web links are clickable. */}
-            {/^https?:\/\//i.test(entry.url) ? (
-              <a href={entry.url} target="_blank" rel="noreferrer">
-                {entry.url}
-              </a>
-            ) : (
-              entry.url
-            )}
-          </dd>
-        </>
-      )}
-      {entry.description && (
-        <>
-          <dt>Details</dt>
-          <dd className="shared-event-description">{entry.description}</dd>
-        </>
-      )}
-    </dl>
-    {onAddReminder && onRemoveReminder && (
-      <ReminderEditor
-        reminders={reminders ?? []}
-        isAllDay={Boolean(entry.is_all_day)}
-        error={reminderError}
-        onAdd={onAddReminder}
-        onRemove={onRemoveReminder}
-      />
-    )}
-    <p className="form-hint">Only {entry.shared_by} can change this event.</p>
-  </Drawer>
-);
+      <p className="form-hint">Only {entry.shared_by} can change this event.</p>
+    </Drawer>
+  );
+};

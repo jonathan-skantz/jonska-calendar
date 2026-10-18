@@ -1,7 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CalendarEntry } from "./CalendarEntry";
 import type { TimelineEntry } from "../../types";
+import { renderWithPreferences } from "../../test/renderWithPreferences";
 
 const entry: TimelineEntry = {
   id: "event-1",
@@ -19,7 +20,7 @@ describe("CalendarEntry", () => {
   afterEach(cleanup);
 
   it("fades approximate edges and marks their times", () => {
-    const { container } = render(
+    const { container } = renderWithPreferences(
       <CalendarEntry
         entry={entry}
         startMinutes={600}
@@ -31,7 +32,6 @@ describe("CalendarEntry", () => {
         continuesToNextDay={false}
         commuteSegments={[]}
         showBody
-        timeFormat="24-hour"
         onEdit={vi.fn()}
         onToggleTask={vi.fn()}
       />,
@@ -55,7 +55,7 @@ describe("CalendarEntry", () => {
     isOptional: boolean,
     startMinutes: number,
   ) =>
-    render(
+    renderWithPreferences(
       <CalendarEntry
         entry={item}
         startMinutes={startMinutes}
@@ -76,7 +76,6 @@ describe("CalendarEntry", () => {
           endsAtEventStart: true,
         }}
         showBody
-        timeFormat="24-hour"
         onEdit={vi.fn()}
         onToggleTask={vi.fn()}
       />,
@@ -123,7 +122,7 @@ describe("CalendarEntry", () => {
   });
 
   const renderEntry = (item: TimelineEntry) =>
-    render(
+    renderWithPreferences(
       <CalendarEntry
         entry={item}
         startMinutes={600}
@@ -135,7 +134,6 @@ describe("CalendarEntry", () => {
         continuesToNextDay={false}
         commuteSegments={[]}
         showBody
-        timeFormat="24-hour"
         onEdit={vi.fn()}
         onToggleTask={vi.fn()}
       />,
@@ -179,7 +177,7 @@ describe("CalendarEntry", () => {
   });
 
   it("marks events that have reminders", () => {
-    render(
+    renderWithPreferences(
       <CalendarEntry
         entry={{ ...lecture, kind: "attendable" }}
         startMinutes={600}
@@ -191,7 +189,6 @@ describe("CalendarEntry", () => {
         continuesToNextDay={false}
         commuteSegments={[]}
         showBody
-        timeFormat="24-hour"
         onEdit={vi.fn()}
         onToggleTask={vi.fn()}
         reminders={[
@@ -230,7 +227,7 @@ describe("CalendarEntry", () => {
       ends_at: "2026-10-16T02:00:00",
     };
     const renderSegment = (fromPrevious: boolean, toNext: boolean) =>
-      render(
+      renderWithPreferences(
         <CalendarEntry
           entry={nightShift}
           startMinutes={fromPrevious ? 0 : 1320}
@@ -242,7 +239,6 @@ describe("CalendarEntry", () => {
           continuesToNextDay={toNext}
           commuteSegments={[]}
           showBody
-          timeFormat="24-hour"
           onEdit={vi.fn()}
           onToggleTask={vi.fn()}
         />,

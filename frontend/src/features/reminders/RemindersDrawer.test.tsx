@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RemindersDrawer } from "./RemindersDrawer";
 import type { Reminder } from "../../types";
+import { renderWithPreferences } from "../../test/renderWithPreferences";
 
 const reminder = (overrides: Partial<Reminder> = {}): Reminder => ({
   id: "reminder-1",
@@ -29,11 +30,10 @@ describe("RemindersDrawer", () => {
       event_is_all_day: true,
       is_shared: true,
     });
-    render(
+    renderWithPreferences(
       <RemindersDrawer
         reminders={[reminder(), birthday]}
         now={new Date("2026-10-15T09:00:00")}
-        timeFormat="24-hour"
         onOpenEvent={onOpenEvent}
         onRemove={onRemove}
         onClose={vi.fn()}
@@ -59,11 +59,10 @@ describe("RemindersDrawer", () => {
   });
 
   it("explains where reminders come from when there are none", () => {
-    render(
+    renderWithPreferences(
       <RemindersDrawer
         reminders={[]}
         now={new Date()}
-        timeFormat="24-hour"
         onOpenEvent={vi.fn()}
         onRemove={vi.fn()}
         onClose={vi.fn()}

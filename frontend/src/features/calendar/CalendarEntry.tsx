@@ -5,7 +5,6 @@ import {
   formatEventTime,
   gridOffset,
 } from "../../lib/calendar";
-import type { TimeFormatPreference } from "../../lib/calendar";
 import { tagTextColor } from "../../lib/colors";
 import {
   getGathering,
@@ -25,6 +24,7 @@ import {
   getTagStripImage,
   getVerticalInsets,
 } from "./entryStyle";
+import { usePreferences } from "./preferencesContext";
 
 type CalendarEntryProps = {
   entry: TimelineEntry;
@@ -42,7 +42,6 @@ type CalendarEntryProps = {
   overlapsGhost?: boolean;
   // The current user's reminders for this event; shown only as a 🔔 marker.
   reminders?: Reminder[];
-  timeFormat: TimeFormatPreference;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
 };
@@ -84,10 +83,10 @@ export const CalendarEntry = ({
   showBody,
   overlapsGhost = false,
   reminders = [],
-  timeFormat,
   onEdit,
   onToggleTask,
 }: CalendarEntryProps) => {
+  const { timeFormat } = usePreferences().preferences;
   const entryRef = useRef<HTMLElement>(null);
   const [continuationMarkerCount, setContinuationMarkerCount] = useState(1);
   const mainTag = getMainTag(entry);

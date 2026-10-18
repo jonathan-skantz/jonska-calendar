@@ -7,7 +7,6 @@ import {
   MAX_GATHERING_LABEL_LENGTH,
   SECONDS_PER_MINUTE,
   inputDateTime,
-  type TimeFormatPreference,
 } from "../../lib/calendar";
 import { getComposerFieldErrors } from "./formValidation";
 import type { ComposerField, ComposerFieldErrors } from "./formValidation";
@@ -19,6 +18,7 @@ import { ReminderEditor } from "../reminders/ReminderEditor";
 import type { ReminderItem } from "../reminders/ReminderEditor";
 import { requestNotificationPermission } from "../reminders/useReminders";
 import { cx } from "../../lib/classNames";
+import { usePreferences } from "../calendar/preferencesContext";
 
 const ERROR_ID = "composer-error";
 const FIELD_ERROR_MESSAGE = "Please correct the highlighted fields.";
@@ -31,7 +31,6 @@ type ComposerDrawerProps = {
   tags: Tag[];
   selectedTagIds: string[];
   mainTagId: string | null;
-  timeFormat: TimeFormatPreference;
   // The last save or delete failure.
   error?: string;
   // Whether a save is in flight.
@@ -66,7 +65,6 @@ export const ComposerDrawer = ({
   tags,
   selectedTagIds,
   mainTagId,
-  timeFormat,
   error: requestError,
   pending = false,
   onSave,
@@ -84,6 +82,7 @@ export const ComposerDrawer = ({
   draftReminderOffsets = [],
   draftWarnings = [],
 }: ComposerDrawerProps) => {
+  const { timeFormat } = usePreferences().preferences;
   const initial = editingItem ?? draftValues;
   const [fieldErrors, setFieldErrors] = useState<ComposerFieldErrors>({});
   const error =

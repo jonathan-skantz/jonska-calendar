@@ -1,21 +1,17 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import type {
-  CalendarPreferences,
   SunDisplayPreferences,
   WeekStartPreference,
 } from "../calendar/calendarPreferences";
 import { weekdayName } from "../calendar/calendarPreferences";
 import type { TimeFormatPreference, WeekStartsOn } from "../../lib/calendar";
+import { usePreferences } from "../calendar/preferencesContext";
 
 type SettingsPageProps = {
   displayName: string;
   displayNamePlaceholder: string;
   onDisplayNameSave: (value: string) => Promise<string | null>;
-  preferences: CalendarPreferences;
-  onTimeFormatChange: (value: TimeFormatPreference) => void;
-  onWeekStartChange: (value: WeekStartPreference) => void;
-  onSunDisplayChange: (update: Partial<SunDisplayPreferences>) => void;
   onBack: () => void;
   children?: ReactNode;
 };
@@ -24,13 +20,10 @@ export function SettingsPage({
   displayName,
   displayNamePlaceholder,
   onDisplayNameSave,
-  preferences,
-  onTimeFormatChange,
-  onWeekStartChange,
-  onSunDisplayChange,
   onBack,
   children,
 }: SettingsPageProps) {
+  const { preferences, updatePreferences } = usePreferences();
   const [displayNameMessage, setDisplayNameMessage] = useState("");
   const weekOptions: { value: WeekStartPreference; label: string }[] = [
     { value: "browser", label: "Use browser setting" },
@@ -110,7 +103,7 @@ export function SettingsPage({
                 name="time-format"
                 value={value}
                 checked={preferences.timeFormat === value}
-                onChange={() => onTimeFormatChange(value)}
+                onChange={() => updatePreferences({ timeFormat: value })}
               />
               <span>{label}</span>
             </label>
@@ -130,11 +123,12 @@ export function SettingsPage({
           id="week-start"
           value={preferences.weekStartsOn}
           onChange={(event) =>
-            onWeekStartChange(
-              event.target.value === "browser"
-                ? "browser"
-                : (Number(event.target.value) as WeekStartsOn),
-            )
+            updatePreferences({
+              weekStartsOn:
+                event.target.value === "browser"
+                  ? "browser"
+                  : (Number(event.target.value) as WeekStartsOn),
+            })
           }
         >
           {weekOptions.map((option) => (
@@ -161,7 +155,7 @@ export function SettingsPage({
                 type="checkbox"
                 checked={preferences[key]}
                 onChange={(event) =>
-                  onSunDisplayChange({ [key]: event.target.checked })
+                  updatePreferences({ [key]: event.target.checked })
                 }
               />
               <span>{label}</span>

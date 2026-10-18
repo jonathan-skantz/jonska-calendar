@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { TimeFormatPreference } from "../../lib/calendar";
 import type { Reminder } from "../../types";
+import { usePreferences } from "../calendar/preferencesContext";
 import type { ReminderItem } from "./ReminderEditor";
 import { getRemindersByEvent } from "./reminders";
 import { useReminderMutations, useReminders } from "./useReminders";
@@ -11,10 +11,8 @@ const NO_REMINDERS: Reminder[] = [];
 // The current user's reminders, their delivery while the app is open, and the
 // add/remove actions the event views share. The last action's error is kept
 // for whichever view is showing reminders.
-export const useEventReminders = (
-  enabled: boolean,
-  timeFormat: TimeFormatPreference,
-) => {
+export const useEventReminders = (enabled: boolean) => {
+  const { timeFormat } = usePreferences().preferences;
   const remindersQuery = useReminders(enabled);
   const reminders = remindersQuery.data ?? NO_REMINDERS;
   const remindersByEvent = getRemindersByEvent(reminders);

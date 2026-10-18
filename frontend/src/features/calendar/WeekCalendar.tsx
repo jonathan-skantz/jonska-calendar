@@ -6,7 +6,6 @@ import {
   formatDate,
   formatHour,
 } from "../../lib/calendar";
-import type { TimeFormatPreference } from "../../lib/calendar";
 import {
   SWIPE_MAX_VERTICAL_RATIO,
   SWIPE_MIN_DISTANCE_PX,
@@ -14,6 +13,7 @@ import {
 import type { WeatherDay } from "../../types";
 import { WeatherIcons } from "../weather/WeatherIcons";
 import { cx } from "../../lib/classNames";
+import { usePreferences } from "./preferencesContext";
 
 type WeekCalendarProps = {
   dates: Date[];
@@ -23,7 +23,6 @@ type WeekCalendarProps = {
   transitCardPills: ReactNode;
   onTransitCardClick?: () => void;
   hasAllDayEvents: boolean;
-  timeFormat: TimeFormatPreference;
   weatherByDay: Map<string, WeatherDay>;
   // Hour scrolled into view whenever a new date range is shown.
   scrollToHour: number;
@@ -41,11 +40,11 @@ export const WeekCalendar = ({
   transitCardPills,
   onTransitCardClick,
   hasAllDayEvents,
-  timeFormat,
   weatherByDay,
   scrollToHour,
   onSwipe,
 }: WeekCalendarProps) => {
+  const { timeFormat } = usePreferences().preferences;
   const scrollerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);

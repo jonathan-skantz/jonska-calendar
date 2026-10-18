@@ -1,4 +1,3 @@
-import type { TimeFormatPreference } from "../../lib/calendar";
 import type { Reminder, TimelineEntry } from "../../types";
 import { CalendarEntry } from "./CalendarEntry";
 import { layoutDayEntries } from "./timelineView";
@@ -9,7 +8,6 @@ type DayEntriesProps = {
   entries: TimelineEntry[];
   date: Date;
   now: Date;
-  timeFormat: TimeFormatPreference;
   remindersByEvent: Map<string, Reminder[]>;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
@@ -21,7 +19,6 @@ export const DayEntries = ({
   entries,
   date,
   now,
-  timeFormat,
   remindersByEvent,
   onEdit,
   onToggleTask,
@@ -31,7 +28,6 @@ export const DayEntries = ({
     <CalendarEntry
       key={item.entry.id}
       {...item}
-      timeFormat={timeFormat}
       reminders={remindersByEvent.get(item.entry.id)}
       onEdit={onEdit}
       onToggleTask={onToggleTask}

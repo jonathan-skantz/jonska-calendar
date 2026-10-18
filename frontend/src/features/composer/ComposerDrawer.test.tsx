@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ComposerDrawer } from "./ComposerDrawer";
 import type { TimelineEntry } from "../../types";
+import { renderWithPreferences } from "../../test/renderWithPreferences";
 
 afterEach(cleanup);
 
@@ -17,7 +18,6 @@ describe("ComposerDrawer validation state", () => {
         tags={[]}
         selectedTagIds={[]}
         mainTagId={null}
-        timeFormat="browser"
         onSave={onSave}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
@@ -71,7 +71,6 @@ describe("ComposerDrawer saving", () => {
         tags={[]}
         selectedTagIds={[]}
         mainTagId={null}
-        timeFormat="browser"
         onSave={onSave}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
@@ -119,7 +118,6 @@ describe("ComposerDrawer commute fields", () => {
         tags={[]}
         selectedTagIds={[]}
         mainTagId={null}
-        timeFormat="browser"
         onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
@@ -251,7 +249,6 @@ describe("ComposerDrawer approximate fields", () => {
         tags={[]}
         selectedTagIds={[]}
         mainTagId={null}
-        timeFormat="browser"
         onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
@@ -295,7 +292,6 @@ describe("ComposerDrawer reminders", () => {
     tags: [],
     selectedTagIds: [],
     mainTagId: null,
-    timeFormat: "browser" as const,
     onSave: vi.fn(),
     onClose: vi.fn(),
     onTypeChange: vi.fn(),
@@ -367,7 +363,7 @@ describe("ComposerDrawer reminders", () => {
 
 describe("ComposerDrawer quick add draft", () => {
   it("prefills a new event from draft values and lists the warnings", () => {
-    const { container } = render(
+    const { container } = renderWithPreferences(
       <ComposerDrawer
         type="event"
         editingItem={null}
@@ -376,7 +372,6 @@ describe("ComposerDrawer quick add draft", () => {
         tags={[]}
         selectedTagIds={[]}
         mainTagId={null}
-        timeFormat="24-hour"
         onSave={vi.fn()}
         onClose={vi.fn()}
         onTypeChange={vi.fn()}
