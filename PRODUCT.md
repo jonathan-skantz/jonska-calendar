@@ -160,6 +160,31 @@ Events have a start date/time and end date/time.
 - [x] The sentence is sent to Anthropic's API to be read. Each user can do 30
       quick adds per hour.
 
+#### Assistant (Demo)
+
+A conversation for requests that take more than one step, e.g. "I might eat
+lunch with my friend on Friday. If I'm busy, I'll do it next week on Monday
+instead".
+
+- [x] An "Assistant" button in the top bar opens a drawer with a conversation.
+      The assistant decides for itself what to look up: it lists events and
+      finds free time in the user's own calendar, including events shared with
+      them, and keeps going until it can answer or suggest something.
+- [x] Free time follows the week view: heads-ups and skipped events are free;
+      commute, mandatory gathering, and attended all-day events are busy;
+      optional gathering is busy only after a commute. This is the only part
+      of conflict detection in the demo.
+- [x] It can propose new events. A proposal shows the date and time and opens
+      in the new-event form, like quick add. Nothing is saved until the user
+      presses Save, and the assistant never changes existing data.
+- [x] Each answer lists what the assistant checked. It may ask a follow-up
+      question; the conversation keeps its context for 30 minutes or 10
+      messages. Each user can send 20 messages per hour.
+- [ ] Changing, moving, skipping, or deleting events from the assistant (moves
+      and deletes after the user confirms them), sharing (always confirmed),
+      weather-aware suggestions, and fitting tasks into free time are
+      **Future**.
+
 ### Timeline Item Type 2: Tasks
 
 **UI fields (Demo):**

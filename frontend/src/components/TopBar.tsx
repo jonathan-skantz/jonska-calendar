@@ -3,6 +3,7 @@ type TopBarProps = {
   upcomingReminderCount: number;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onOpenAssistant: () => void;
   onOpenReminders: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
@@ -13,6 +14,7 @@ export function TopBar({
   upcomingReminderCount,
   sidebarOpen,
   onToggleSidebar,
+  onOpenAssistant,
   onOpenReminders,
   onOpenSettings,
   onLogout,
@@ -35,6 +37,9 @@ export function TopBar({
         </div>
       </div>
       <div className="topbar-actions">
+        <button className="text-button" onClick={onOpenAssistant}>
+          Assistant
+        </button>
         <button
           className="text-button reminders-button"
           onClick={onOpenReminders}

@@ -4,21 +4,22 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 
 ## Stack
 
-| Layer          | Choice                                                     | Source                      |
-| -------------- | ---------------------------------------------------------- | --------------------------- |
-| Backend        | Go 1.27; standard `net/http` with method and path patterns | `mise.toml`, `go.mod`       |
-| Database       | PostgreSQL 18 (dev), through the pgx driver                | `compose.yaml`              |
-| Migrations     | Goose, SQL files                                           | `backend/db/migrations`     |
-| Passwords      | Argon2id                                                   | `backend/internal/auth`     |
-| Frontend       | React 19, Vite, TypeScript                                 | `frontend/package.json`     |
-| Server state   | TanStack Query                                             | `frontend/package.json`     |
-| Dates          | `date-fns`                                                 | `frontend/package.json`     |
-| Color contrast | `culori` (WCAG ratio for tag text)                         | `frontend/package.json`     |
-| Frontend tests | Vitest, jsdom, Testing Library                             | `frontend/package.json`     |
-| Lint           | oxlint                                                     | `frontend/package.json`     |
-| Quick add      | Anthropic Messages API, official Go SDK                    | `backend/internal/quickadd` |
-| Weather        | Open-Meteo, cached in PostgreSQL                           | `backend/internal/weather`  |
-| Tool versions  | mise                                                       | `mise.toml`                 |
+| Layer          | Choice                                                     | Source                       |
+| -------------- | ---------------------------------------------------------- | ---------------------------- |
+| Backend        | Go 1.27; standard `net/http` with method and path patterns | `mise.toml`, `go.mod`        |
+| Database       | PostgreSQL 18 (dev), through the pgx driver                | `compose.yaml`               |
+| Migrations     | Goose, SQL files                                           | `backend/db/migrations`      |
+| Passwords      | Argon2id                                                   | `backend/internal/auth`      |
+| Frontend       | React 19, Vite, TypeScript                                 | `frontend/package.json`      |
+| Server state   | TanStack Query                                             | `frontend/package.json`      |
+| Dates          | `date-fns`                                                 | `frontend/package.json`      |
+| Color contrast | `culori` (WCAG ratio for tag text)                         | `frontend/package.json`      |
+| Frontend tests | Vitest, jsdom, Testing Library                             | `frontend/package.json`      |
+| Lint           | oxlint                                                     | `frontend/package.json`      |
+| Quick add      | Anthropic Messages API, official Go SDK                    | `backend/internal/quickadd`  |
+| Assistant      | Anthropic Messages API, Go SDK tool runner (beta)          | `backend/internal/assistant` |
+| Weather        | Open-Meteo, cached in PostgreSQL                           | `backend/internal/weather`   |
+| Tool versions  | mise                                                       | `mise.toml`                  |
 
 **TODO(maintainer):** why Go, PostgreSQL, React, Vite, TanStack Query, and Goose were chosen. The repo does not say.
 
@@ -75,6 +76,15 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 
 - **Chosen:** `POST /api/events/parse` returns a draft and never writes. The user saves through the normal event API.
 - **Why:** the model's output is untrusted. The user reviews every field before it becomes data.
+
+## The assistant is a tool loop in the Go API
+
+- **Chosen:** `backend/internal/assistant` runs the agent with the Go SDK's tool runner (`client.Beta.Messages.NewToolRunner`). The model picks tools (`list_events`, `find_free_slots`, `propose_event`), sees their results, and repeats, up to 8 model calls per message. The tools call `db.Store` with the signed-in user's ID.
+- **Why not the Claude Agent SDK or `claude -p`:** both run Claude Code, a coding agent with its own file and shell tools, as a separate process. They are made for Python or TypeScript programs and for working in a repository, not for a multi-user API. Using them would need a second service, a sandbox, and a way to pass the user's identity. The tool runner is part of the SDK the API already uses, and authorization stays the same as every other route.
+- **Proposal-only, for now:** like quick add, the assistant writes nothing. Proposals open in the event form. Its input includes text written by other users (titles of shared events), so any future write tool needs a confirmation step for anything beyond creating the user's own events.
+- **Conversations live in memory** on the server, keyed by ID and owner, for 30 minutes. The client never sends history back, so it cannot forge tool results. A restart ends every conversation.
+- **Busy rules are written twice:** in Go for the assistant (`busy.go`) and in TypeScript for the week view (`lib/timeline.ts`). Both test suites run `frontend/src/lib/testdata/occupied-spans.json`, so a change to one that is not made to the other fails a test.
+- **Reconsider if:** the app runs on more than one server (conversations and rate limits would need the database), or the assistant gets write tools.
 
 ## Reminders are client-driven
 

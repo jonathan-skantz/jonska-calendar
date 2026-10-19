@@ -9,7 +9,7 @@ flowchart LR
     API["Go API<br/>net/http (port 8080)"]
     DB[("PostgreSQL<br/>via pgx pool")]
     Goose["Goose<br/>migrations"]
-    Anthropic["Anthropic API<br/>(quick add, optional)"]
+    Anthropic["Anthropic API<br/>(quick add, assistant; optional)"]
     OpenMeteo["Open-Meteo<br/>(weather, sun times)"]
 
     Browser -->|"JSON + cookie"| Vite --> API
@@ -32,7 +32,7 @@ In development, Vite serves the frontend and forwards `/api` to the Go server. T
 ```mermaid
 flowchart TD
     Route["backend/cmd/server.go<br/>route table"]
-    Handler["internal/timeline, auth, quickadd, weather<br/>handlers: parse, validate, map errors"]
+    Handler["internal/timeline, auth, quickadd, assistant, weather<br/>handlers: parse, validate, map errors"]
     Store["backend/db<br/>one Store: SQL by feature"]
     Schema[("PostgreSQL schema<br/>constraints")]
 
@@ -50,17 +50,19 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 
 ## Packages
 
-| Path                         | Contents                                                                                                      |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `backend/cmd/server.go`      | Starts the server, loads env files, builds handlers, registers all routes.                                    |
-| `backend/internal/auth/`     | Register, login, logout, `me`. Argon2id passwords, session cookie.                                            |
-| `backend/internal/timeline/` | Handlers for events, tasks, tags, sharing, reminders, households, transit card. Validation and error mapping. |
-| `backend/internal/quickadd/` | `POST /api/events/parse`. Sends text to Anthropic, returns a draft. Never writes.                             |
-| `backend/internal/weather/`  | `GET /api/weather`. Fetches from Open-Meteo and caches in the database.                                       |
-| `backend/internal/testutil/` | Starts a PostgreSQL container for tests, and one database per test.                                           |
-| `backend/db/`                | `Store` and its SQL, split by feature. `models.go` has row types, `errors.go` the sentinel errors.            |
-| `backend/db/migrations/`     | Goose files `N_name.sql`, numbered 1 to 23 so far.                                                            |
-| `frontend/src/`              | See [frontend](frontend.md).                                                                                  |
+| Path                          | Contents                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `backend/cmd/server.go`       | Starts the server, loads env files, builds handlers, registers all routes.                                    |
+| `backend/internal/auth/`      | Register, login, logout, `me`. Argon2id passwords, session cookie.                                            |
+| `backend/internal/timeline/`  | Handlers for events, tasks, tags, sharing, reminders, households, transit card. Validation and error mapping. |
+| `backend/internal/quickadd/`  | `POST /api/events/parse`. Sends text to Anthropic, returns a draft. Never writes.                             |
+| `backend/internal/assistant/` | `POST /api/assistant/messages`. Agent loop over read-only calendar tools; proposes events. Never writes.      |
+| `backend/internal/ratelimit/` | Per-user fixed-window rate limit, in memory. Used by quick add and the assistant.                             |
+| `backend/internal/weather/`   | `GET /api/weather`. Fetches from Open-Meteo and caches in the database.                                       |
+| `backend/internal/testutil/`  | Starts a PostgreSQL container for tests, and one database per test.                                           |
+| `backend/db/`                 | `Store` and its SQL, split by feature. `models.go` has row types, `errors.go` the sentinel errors.            |
+| `backend/db/migrations/`      | Goose files `N_name.sql`, numbered 1 to 23 so far.                                                            |
+| `frontend/src/`               | See [frontend](frontend.md).                                                                                  |
 
 ## Where to change things
 
@@ -77,6 +79,8 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 | Change households                             | `backend/db/households.go`, `backend/internal/timeline/household.go`       | Migration 15; `frontend/src/features/household/`                           |
 | Change weather icons or caching               | `backend/internal/weather/`                                                | Migrations 22, 23; `frontend/src/features/weather/`                        |
 | Change quick add                              | `backend/internal/quickadd/`                                               | `frontend/src/features/quickAdd/`                                          |
+| Change the assistant or add a tool            | `backend/internal/assistant/tools.go` (registry), one file per tool        | `frontend/src/features/assistant/`                                         |
+| Change what counts as busy                    | `backend/internal/assistant/busy.go` and `frontend/src/lib/timeline.ts`    | `frontend/src/lib/testdata/occupied-spans.json`                            |
 | Change the JSON shape of a timeline entry     | `TimelineEntry` in `backend/db/models.go`                                  | Frontend `types.ts` and grid rendering                                     |
 | Change week navigation or date math           | `frontend/src/lib/calendar.ts`, `features/calendar/useCalendarState.ts`    | `date-fns`                                                                 |
 | Change where an event block sits              | `layoutDayEntries` in `features/calendar/timelineView.ts`                  | `features/calendar/DayEntries.tsx`, `.grid-entry` in `styles/calendar.css` |

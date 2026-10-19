@@ -547,3 +547,84 @@
     bottom: var(--gutter);
   }
 }
+
+.assistant-thread {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.assistant-turn {
+  display: grid;
+  gap: 8px;
+}
+
+.assistant-turn p {
+  margin: 0;
+}
+
+.assistant-turn.user {
+  justify-self: end;
+  max-width: 85%;
+  padding: 8px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+}
+
+.assistant-steps {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  list-style: none;
+}
+
+.assistant-steps li::before {
+  content: "✓ ";
+}
+
+.assistant-proposal {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--moss);
+}
+
+.assistant-proposal .primary-button {
+  justify-self: start;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+}
+
+.assistant-warning {
+  color: var(--coral);
+  font-size: 12px;
+}
+
+.assistant-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.assistant-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.assistant-input textarea {
+  flex: 1;
+  resize: vertical;
+}
+
+.assistant-input .primary-button {
+  margin: 0;
+  padding: 10px 14px;
+}

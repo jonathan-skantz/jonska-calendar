@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+// Shared with the assistant's busy rules in Go, so the two cannot drift.
+import occupiedSpanCases from "./testdata/occupied-spans.json?raw";
 import {
   getDefaultEventTagSelection,
   getCommuteSeconds,
   getGathering,
   getMainTag,
+  getOccupiedRange,
   isBusy,
   isEventVisible,
 } from "./timeline";
@@ -76,5 +79,30 @@ describe("timeline behavior", () => {
     const tags = [tag("first"), tag("main")];
     expect(getMainTag(event({ tags, main_tag_id: "main" }))?.id).toBe("main");
     expect(getMainTag(event({ tags }))?.id).toBe("first");
+  });
+});
+
+type OccupiedSpanCase = {
+  name: string;
+  entry: Omit<TimelineEntry, "id" | "title" | "is_completed">;
+  busy: boolean;
+  start?: string;
+  end?: string;
+};
+
+describe("occupied time", () => {
+  const cases = JSON.parse(occupiedSpanCases) as OccupiedSpanCase[];
+  it.each(cases.map((c) => [c.name, c] as const))("%s", (_, c) => {
+    const entry: TimelineEntry = {
+      id: "event-1",
+      title: "Event",
+      is_completed: false,
+      ...c.entry,
+    };
+    expect(isBusy(entry)).toBe(c.busy);
+    if (!c.busy) return;
+    const range = getOccupiedRange(entry);
+    expect(range.start.getTime()).toBe(new Date(c.start!).getTime());
+    expect(range.end.getTime()).toBe(new Date(c.end!).getTime());
   });
 });

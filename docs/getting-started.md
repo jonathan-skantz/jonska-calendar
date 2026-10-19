@@ -52,14 +52,15 @@ Who reads them:
   set -a; . ./.env; set +a
   ```
 
-Quick add (the box that turns "lunch with Sam tomorrow noon" into an event) needs a key in `.env.local`:
+Quick add (the box that turns "lunch with Sam tomorrow noon" into an event) and the assistant need a key in `.env.local`:
 
 ```dotenv
 ANTHROPIC_API_KEY=<key>
-# ANTHROPIC_MODEL=claude-haiku-5-5
+# ANTHROPIC_MODEL=claude-haiku-5-5     # quick add
+# ASSISTANT_MODEL=claude-opus-5-5      # assistant
 ```
 
-Without a key, the quick add box shows "Quick add is not configured". Everything else still works.
+Without a key, both show that they are not configured. Everything else still works.
 
 `.claude/settings.json` stops Claude Code from reading `.env.local`.
 

@@ -1,0 +1,106 @@
+[
+  {
+    "name": "a plain attended event blocks its own times",
+    "entry": {
+      "type": "event",
+      "kind": "attendable",
+      "starts_at": "2026-10-23T10:00:00Z",
+      "ends_at": "2026-10-23T11:00:00Z"
+    },
+    "busy": true,
+    "start": "2026-10-23T10:00:00Z",
+    "end": "2026-10-23T11:00:00Z"
+  },
+  {
+    "name": "a heads-up leaves the time free",
+    "entry": {
+      "type": "event",
+      "kind": "informational",
+      "starts_at": "2026-10-23T10:00:00Z",
+      "ends_at": "2026-10-23T11:00:00Z"
+    },
+    "busy": false
+  },
+  {
+    "name": "a skipped event leaves the time free, commute included",
+    "entry": {
+      "type": "event",
+      "kind": "attendable",
+      "is_skipped": true,
+      "commute_before_seconds": 1800,
+      "starts_at": "2026-10-23T10:00:00Z",
+      "ends_at": "2026-10-23T11:00:00Z"
+    },
+    "busy": false
+  },
+  {
+    "name": "commute before and after is busy",
+    "entry": {
+      "type": "event",
+      "kind": "attendable",
+      "commute_before_seconds": 1800,
+      "commute_after_seconds": 900,
+      "starts_at": "2026-10-23T10:00:00Z",
+      "ends_at": "2026-10-23T11:00:00Z"
+    },
+    "busy": true,
+    "start": "2026-10-23T09:30:00Z",
+    "end": "2026-10-23T11:15:00Z"
+  },
+  {
+    "name": "mandatory gathering is busy",
+    "entry": {
+      "type": "event",
+      "kind": "attendable",
+      "gathering_seconds": 1200,
+      "starts_at": "2026-10-23T10:00:00Z",
+      "ends_at": "2026-10-23T11:00:00Z"
+    },
+    "busy": true,
+    "start": "2026-10-23T09:40:00Z",
+    "end": "2026-10-23T11:00:00Z"
+  },
+  {
+    "name": "optional gathering without a commute is free",
+    "entry": {
+      "type": "event",
+      "kind": "attendable",
+      "gathering_seconds": 1800,
+      "gathering_is_optional": true,
+      "starts_at": "2026-10-23T10:00:00Z",
+      "ends_at": "2026-10-23T11:00:00Z"
+    },
+    "busy": true,
+    "start": "2026-10-23T10:00:00Z",
+    "end": "2026-10-23T11:00:00Z"
+  },
+  {
+    "name": "optional gathering after a commute is busy",
+    "entry": {
+      "type": "event",
+      "kind": "attendable",
+      "gathering_seconds": 1800,
+      "gathering_is_optional": true,
+      "commute_before_seconds": 900,
+      "starts_at": "2026-10-23T10:00:00Z",
+      "ends_at": "2026-10-23T11:00:00Z"
+    },
+    "busy": true,
+    "start": "2026-10-23T09:15:00Z",
+    "end": "2026-10-23T11:00:00Z"
+  },
+  {
+    "name": "an attended all-day event blocks its days and ignores commute",
+    "entry": {
+      "type": "event",
+      "kind": "attendable",
+      "is_all_day": true,
+      "commute_before_seconds": 1800,
+      "starts_at": "2026-10-22T22:00:00Z",
+      "ends_at": "2026-10-23T22:00:00Z"
+    },
+    "busy": true,
+    "start": "2026-10-22T22:00:00Z",
+    "end": "2026-10-23T22:00:00Z"
+  }
+]

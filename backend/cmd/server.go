@@ -8,9 +8,13 @@ import (
 	"net/http"
 	"os"
 	"time"
+	// Embeds the time zone database, so the assistant can read the browser's
+	// time zone on hosts without one.
+	_ "time/tzdata"
 
 	"github.com/joho/godotenv"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/assistant"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 	"github.com/jonathan-skantz/calendar/backend/internal/quickadd"
 	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
@@ -46,13 +50,16 @@ func main() {
 	timelineHandler := timeline.New(store, authHandler.CurrentUserID)
 	weatherHandler := weather.New(store, authHandler.CurrentUserID, weather.NewClient())
 
-	// Quick add stays off (503) without a key, so the rest of the app runs
-	// without one.
+	// Quick add and the assistant stay off (503) without a key, so the rest
+	// of the app runs without one.
 	var quickAddClient *quickadd.Client
+	var assistantClient *assistant.Client
 	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
 		quickAddClient = quickadd.NewClient(apiKey, os.Getenv("ANTHROPIC_MODEL"))
+		assistantClient = assistant.NewClient(apiKey, os.Getenv("ASSISTANT_MODEL"))
 	}
 	quickAddHandler := quickadd.New(store, authHandler.CurrentUserID, quickAddClient)
+	assistantHandler := assistant.New(store, authHandler.CurrentUserID, assistantClient)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/auth/register", authHandler.Register)
@@ -91,6 +98,7 @@ func main() {
 	mux.HandleFunc("POST /api/household/members", timelineHandler.AddHouseholdMember)
 	mux.HandleFunc("DELETE /api/household/members/me", timelineHandler.LeaveHousehold)
 	mux.HandleFunc("GET /api/weather", weatherHandler.Forecast)
+	mux.HandleFunc("POST /api/assistant/messages", assistantHandler.Message)
 
 	server := &http.Server{
 		Addr:    ":8080",

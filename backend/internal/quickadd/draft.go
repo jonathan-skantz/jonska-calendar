@@ -163,25 +163,10 @@ func validateDraft(raw RawDraft, tags []db.Tag) ParseResult {
 		draft.ReminderMinutes = append(draft.ReminderMinutes, reminder.MinutesBefore)
 	}
 
-	byName := make(map[string]uuid.UUID, len(tags))
-	for _, tag := range tags {
-		byName[strings.ToLower(tag.Name)] = tag.ID
-	}
-	seen := map[uuid.UUID]bool{}
-	for _, name := range raw.Tags {
-		name = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(name), "#"))
-		if name == "" {
-			continue
-		}
-		id, ok := byName[strings.ToLower(name)]
-		if !ok {
-			warn("No tag named %q", name)
-			continue
-		}
-		if !seen[id] {
-			seen[id] = true
-			draft.TagIDs = append(draft.TagIDs, id)
-		}
+	var unknown []string
+	draft.TagIDs, unknown = MatchTags(raw.Tags, tags)
+	for _, name := range unknown {
+		warn("No tag named %q", name)
 	}
 
 	for _, part := range raw.Unresolved {
@@ -190,6 +175,33 @@ func validateDraft(raw RawDraft, tags []db.Tag) ParseResult {
 		}
 	}
 	return result
+}
+
+// MatchTags resolves tag names, with or without "#", to the user's own tags,
+// ignoring case. It returns the IDs in the order named without duplicates, and
+// the names that match no tag. Tags are never created from a name.
+func MatchTags(names []string, tags []db.Tag) (ids []uuid.UUID, unknown []string) {
+	byName := make(map[string]uuid.UUID, len(tags))
+	for _, tag := range tags {
+		byName[strings.ToLower(tag.Name)] = tag.ID
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, name := range names {
+		name = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(name), "#"))
+		if name == "" {
+			continue
+		}
+		id, ok := byName[strings.ToLower(name)]
+		if !ok {
+			unknown = append(unknown, name)
+			continue
+		}
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	return ids, unknown
 }
 
 // text trims value and cuts it to limit characters; blank means absent.

@@ -18,44 +18,45 @@
 
 ## Routes
 
-| Method and path                                 | Request JSON                                | Success response                                         |
-| ----------------------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
-| `POST /api/auth/register`                       | `email`, `password`                         | `201` with `{ "id": "<uuid>" }`                          |
-| `POST /api/auth/login`                          | `email`, `password`                         | `200` with `{ "id": "<uuid>" }` and a session cookie     |
-| `POST /api/auth/logout`                         | None                                        | `204`; clears the cookie                                 |
-| `GET /api/auth/me`                              | None                                        | `{ "id", "email" }`, plus `display_name` when set        |
-| `PATCH /api/auth/me`                            | `display_name` (empty clears it)            | `204`                                                    |
-| `GET /api/timeline`                             | None                                        | Array of timeline entries                                |
-| `POST /api/events`                              | Event fields                                | `201` with `{ "id": "<uuid>" }`                          |
-| `PUT /api/events/{eventID}`                     | Event fields                                | `204`                                                    |
-| `POST /api/tasks`                               | Task fields                                 | `201` with `{ "id": "<uuid>" }`                          |
-| `PUT /api/tasks/{taskID}`                       | Task fields                                 | `204`                                                    |
-| `PATCH /api/tasks/{taskID}`                     | `is_completed`                              | `204`                                                    |
-| `DELETE /api/timeline/{itemID}`                 | None                                        | `204`                                                    |
-| `GET /api/tags`                                 | None                                        | Array of tags (`id`, `name`, `color`, `is_default`)      |
-| `POST /api/tags`                                | `name`                                      | `201` with a tag                                         |
-| `PATCH /api/tags/{tagID}`                       | `name`, `color` (both required)             | `204`                                                    |
-| `DELETE /api/tags/{tagID}`                      | None                                        | `204`                                                    |
-| `PUT /api/tags/default`                         | `tag_id`                                    | `204`                                                    |
-| `POST /api/timeline/{itemID}/tags`              | `tag_id`                                    | `204`                                                    |
-| `DELETE /api/timeline/{itemID}/tags/{tagID}`    | None                                        | `204`; `409` for the last tag or the main tag            |
-| `GET /api/events/{eventID}/shares`              | None                                        | Array of shares (owner only)                             |
-| `POST /api/events/{eventID}/shares`             | `recipient_email`, optional share fields    | `201` with `{ "id": "<share-uuid>" }`                    |
-| `PUT /api/events/{eventID}/shares/{shareID}`    | Share fields                                | `204`                                                    |
-| `DELETE /api/events/{eventID}/shares/{shareID}` | None                                        | `204`                                                    |
-| `GET /api/reminders`                            | None                                        | Your reminders for events that have not ended            |
-| `POST /api/events/{eventID}/reminders`          | `offset_seconds`                            | `201`; `404` event not visible; `409` offset already set |
-| `DELETE /api/reminders/{reminderID}`            | None                                        | `204`; `404` not yours                                   |
-| `POST /api/reminders/{reminderID}/notified`     | None                                        | `204`; keeps the first delivery time                     |
-| `GET /api/transit-card/days?from=&to=`          | None                                        | Array of reported transit-card days                      |
-| `PUT /api/transit-card/days`                    | `from`, `to`, `needed_dates`, `maybe_dates` | `204`                                                    |
-| `POST /api/events/parse`                        | `text` (1 to 500 characters)                | `{draft, warnings, unresolved}`; `429`, `502`, `503`     |
-| `GET /api/weather?lat=&lon=`                    | None                                        | `{date, conditions, sunrise?, sunset?}[]`; `503`         |
-| `GET /api/household`                            | None                                        | Household, or `null`                                     |
-| `POST /api/household`                           | `name`, `transit_card_count`                | `201`; `409` if already in a household                   |
-| `PATCH /api/household`                          | `name`, `transit_card_count`                | `204`; `404` without a household                         |
-| `POST /api/household/members`                   | `email`                                     | `204`; `404` unknown email; `409` already a member       |
-| `DELETE /api/household/members/me`              | None                                        | `204`; deletes the household when it becomes empty       |
+| Method and path                                 | Request JSON                                          | Success response                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `POST /api/auth/register`                       | `email`, `password`                                   | `201` with `{ "id": "<uuid>" }`                                                        |
+| `POST /api/auth/login`                          | `email`, `password`                                   | `200` with `{ "id": "<uuid>" }` and a session cookie                                   |
+| `POST /api/auth/logout`                         | None                                                  | `204`; clears the cookie                                                               |
+| `GET /api/auth/me`                              | None                                                  | `{ "id", "email" }`, plus `display_name` when set                                      |
+| `PATCH /api/auth/me`                            | `display_name` (empty clears it)                      | `204`                                                                                  |
+| `GET /api/timeline`                             | None                                                  | Array of timeline entries                                                              |
+| `POST /api/events`                              | Event fields                                          | `201` with `{ "id": "<uuid>" }`                                                        |
+| `PUT /api/events/{eventID}`                     | Event fields                                          | `204`                                                                                  |
+| `POST /api/tasks`                               | Task fields                                           | `201` with `{ "id": "<uuid>" }`                                                        |
+| `PUT /api/tasks/{taskID}`                       | Task fields                                           | `204`                                                                                  |
+| `PATCH /api/tasks/{taskID}`                     | `is_completed`                                        | `204`                                                                                  |
+| `DELETE /api/timeline/{itemID}`                 | None                                                  | `204`                                                                                  |
+| `GET /api/tags`                                 | None                                                  | Array of tags (`id`, `name`, `color`, `is_default`)                                    |
+| `POST /api/tags`                                | `name`                                                | `201` with a tag                                                                       |
+| `PATCH /api/tags/{tagID}`                       | `name`, `color` (both required)                       | `204`                                                                                  |
+| `DELETE /api/tags/{tagID}`                      | None                                                  | `204`                                                                                  |
+| `PUT /api/tags/default`                         | `tag_id`                                              | `204`                                                                                  |
+| `POST /api/timeline/{itemID}/tags`              | `tag_id`                                              | `204`                                                                                  |
+| `DELETE /api/timeline/{itemID}/tags/{tagID}`    | None                                                  | `204`; `409` for the last tag or the main tag                                          |
+| `GET /api/events/{eventID}/shares`              | None                                                  | Array of shares (owner only)                                                           |
+| `POST /api/events/{eventID}/shares`             | `recipient_email`, optional share fields              | `201` with `{ "id": "<share-uuid>" }`                                                  |
+| `PUT /api/events/{eventID}/shares/{shareID}`    | Share fields                                          | `204`                                                                                  |
+| `DELETE /api/events/{eventID}/shares/{shareID}` | None                                                  | `204`                                                                                  |
+| `GET /api/reminders`                            | None                                                  | Your reminders for events that have not ended                                          |
+| `POST /api/events/{eventID}/reminders`          | `offset_seconds`                                      | `201`; `404` event not visible; `409` offset already set                               |
+| `DELETE /api/reminders/{reminderID}`            | None                                                  | `204`; `404` not yours                                                                 |
+| `POST /api/reminders/{reminderID}/notified`     | None                                                  | `204`; keeps the first delivery time                                                   |
+| `GET /api/transit-card/days?from=&to=`          | None                                                  | Array of reported transit-card days                                                    |
+| `PUT /api/transit-card/days`                    | `from`, `to`, `needed_dates`, `maybe_dates`           | `204`                                                                                  |
+| `POST /api/events/parse`                        | `text` (1 to 500 characters)                          | `{draft, warnings, unresolved}`; `429`, `502`, `503`                                   |
+| `POST /api/assistant/messages`                  | `text`, `time_zone`, `week_start`, `conversation_id?` | `{conversation_id, reply, proposals, steps, ended}`; `404`, `409`, `429`, `502`, `503` |
+| `GET /api/weather?lat=&lon=`                    | None                                                  | `{date, conditions, sunrise?, sunset?}[]`; `503`                                       |
+| `GET /api/household`                            | None                                                  | Household, or `null`                                                                   |
+| `POST /api/household`                           | `name`, `transit_card_count`                          | `201`; `409` if already in a household                                                 |
+| `PATCH /api/household`                          | `name`, `transit_card_count`                          | `204`; `404` without a household                                                       |
+| `POST /api/household/members`                   | `email`                                               | `204`; `404` unknown email; `409` already a member                                     |
+| `DELETE /api/household/members/me`              | None                                                  | `204`; deletes the household when it becomes empty                                     |
 
 ## Event fields
 
@@ -124,3 +125,11 @@ Required: `title`, `starts_at`, `ends_at`, `kind`.
 - `POST /api/events/parse` returns a draft, not a saved event.
 - `warnings` lists anything that could not be kept. `unresolved` lists what could not be worked out.
 - Nothing is written. The user saves through `POST /api/events`.
+
+## Assistant
+
+- `POST /api/assistant/messages` sends one message. Leave out `conversation_id` to start a conversation; send the returned one to continue it.
+- `text` is 1 to 1000 characters. `time_zone` is the browser's IANA zone and `week_start` is 0 (Sunday) to 6, because only the browser knows them.
+- `proposals` are events the assistant suggests, with `starts_at`, `ends_at`, `is_all_day`, and optional `location`, `kind`, `tag_ids`, `reminder_minutes`, `warnings`. Nothing is written; the user saves through `POST /api/events`.
+- `steps` lists the tools the assistant ran, as `{tool, summary}`.
+- `ended: true` means the conversation cannot continue (step limit or refusal). `404` means it expired or belongs to someone else, and `409` means it is still answering or is full.

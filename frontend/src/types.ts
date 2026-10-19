@@ -155,3 +155,32 @@ export type ParseEventResponse = {
   warnings: string[];
   unresolved: string[];
 };
+
+// An event the assistant suggests. Nothing is saved: it opens in the event
+// form like a quick add draft.
+export type AssistantProposal = {
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  is_all_day: boolean;
+  location?: string;
+  kind?: "attendable" | "informational";
+  tag_ids?: string[];
+  reminder_minutes?: number[];
+  warnings?: string[];
+};
+
+// One tool call the assistant made, summarized.
+export type AssistantStep = {
+  tool: string;
+  summary: string;
+};
+
+export type AssistantReply = {
+  conversation_id: string;
+  reply: string;
+  proposals: AssistantProposal[];
+  steps: AssistantStep[];
+  // The conversation cannot take another message.
+  ended: boolean;
+};

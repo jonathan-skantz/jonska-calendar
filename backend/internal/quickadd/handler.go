@@ -6,13 +6,13 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
+	"github.com/jonathan-skantz/calendar/backend/internal/ratelimit"
 )
 
 const (
@@ -34,23 +34,14 @@ type Handler struct {
 	Tags        TagLister
 	CurrentUser auth.CurrentUser
 	// Client is nil when no API key is configured.
-	Client parser
-	now    func() time.Time
-
-	mu        sync.Mutex
-	windows   map[uuid.UUID]rateCount
-	lastSweep time.Time
-}
-
-type rateCount struct {
-	start time.Time
-	count int
+	Client  parser
+	limiter *ratelimit.Limiter
 }
 
 // New takes a nil client when quick add is not configured; requests then get
 // 503 instead of failing at startup.
 func New(tags TagLister, currentUser auth.CurrentUser, client *Client) *Handler {
-	handler := &Handler{Tags: tags, CurrentUser: currentUser, now: time.Now, windows: map[uuid.UUID]rateCount{}}
+	handler := &Handler{Tags: tags, CurrentUser: currentUser, limiter: ratelimit.New(parsesPerWindow, rateWindow)}
 	if client != nil {
 		handler.Client = client
 	}
@@ -80,7 +71,7 @@ func (h *Handler) Parse(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Quick add is not configured", http.StatusServiceUnavailable)
 		return
 	}
-	if !h.allow(userID) {
+	if !h.limiter.Allow(userID) {
 		http.Error(w, "Too many quick adds, try again later", http.StatusTooManyRequests)
 		return
 	}
@@ -108,32 +99,4 @@ func (h *Handler) Parse(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(validateDraft(raw, tags))
-}
-
-// allow counts parses per user in fixed windows. It is in memory, which is
-// enough for the single server this app runs on.
-func (h *Handler) allow(userID uuid.UUID) bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	now := h.now()
-	// Expired windows are forgotten at most once per window, so the map holds
-	// only users who parsed recently.
-	if now.Sub(h.lastSweep) >= rateWindow {
-		for id, window := range h.windows {
-			if now.Sub(window.start) >= rateWindow {
-				delete(h.windows, id)
-			}
-		}
-		h.lastSweep = now
-	}
-	window := h.windows[userID]
-	if now.Sub(window.start) >= rateWindow {
-		window = rateCount{start: now}
-	}
-	if window.count >= parsesPerWindow {
-		return false
-	}
-	window.count++
-	h.windows[userID] = window
-	return true
 }

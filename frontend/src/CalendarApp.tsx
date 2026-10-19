@@ -16,6 +16,9 @@ import { useSidebarState } from "./hooks/useSidebarState";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
+import { AssistantDrawer } from "./features/assistant/AssistantDrawer";
+import { proposalToDraft } from "./features/assistant/assistantApi";
+import { useAssistantConversation } from "./features/assistant/useAssistantConversation";
 import { useAuthActions } from "./features/auth/useAuth";
 import { AllDayEvent } from "./features/calendar/AllDayEvent";
 import { CalendarDayIndicators } from "./features/calendar/CalendarDayIndicators";
@@ -60,6 +63,7 @@ import { useWeather } from "./features/weather/useWeather";
 // The drawers opened from the calendar. Only one is open at a time; the
 // composer is tracked separately.
 type OpenDrawer =
+  | { kind: "assistant" }
   | { kind: "tags" }
   | { kind: "transitCard" }
   | { kind: "reminders" }
@@ -100,6 +104,7 @@ export function CalendarApp({ user }: { user: User }) {
     onSelectedDateChange: setSelectedDate,
   });
   const { editingItem } = composer;
+  const assistant = useAssistantConversation(weekStartsOn);
 
   // Quick add only prefills the event form; the user still reviews and saves.
   const quickAddEvent = async (text: string) => {
@@ -158,6 +163,7 @@ export function CalendarApp({ user }: { user: User }) {
           reminders.filter((reminder) => isReminderUpcoming(reminder, today))
             .length
         }
+        onOpenAssistant={() => setDrawer({ kind: "assistant" })}
         onOpenReminders={() => setDrawer({ kind: "reminders" })}
         onOpenSettings={openSettings}
         onLogout={signOut}
@@ -284,6 +290,22 @@ export function CalendarApp({ user }: { user: User }) {
         <SharedEventPanel
           key={drawer.entry.id}
           entry={drawer.entry}
+          onClose={closeDrawer}
+        />
+      )}
+      {drawer?.kind === "assistant" && (
+        <AssistantDrawer
+          turns={assistant.turns}
+          ended={assistant.ended}
+          pendingText={assistant.pendingText}
+          error={getErrorText(assistant.error, "Couldn't reach the assistant")}
+          onSend={assistant.send}
+          onReset={assistant.reset}
+          onOpenProposal={(proposal) => {
+            // The conversation is kept, so reopening the drawer continues it.
+            setDrawer(null);
+            composer.openNew(undefined, proposalToDraft(proposal));
+          }}
           onClose={closeDrawer}
         />
       )}
