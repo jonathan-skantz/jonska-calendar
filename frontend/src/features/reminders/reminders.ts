@@ -83,9 +83,25 @@ export const groupReminders = (
   return groups.filter((group) => group.reminders.length > 0);
 };
 
+// Identifies one reminder for one occurrence of its event.
+export const reminderKey = (reminder: Reminder) =>
+  `${reminder.id}@${reminder.occurrence_start}`;
+
+// Each reminder once, at its next occurrence: a repeating event's reminder is
+// listed for each occurrence, but set and removed once. The list is in the
+// order the reminders are due.
+export const firstOfEachReminder = (reminders: Reminder[]) => {
+  const seen = new Set<string>();
+  return reminders.filter((reminder) => {
+    if (seen.has(reminder.id)) return false;
+    seen.add(reminder.id);
+    return true;
+  });
+};
+
 export const getRemindersByEvent = (reminders: Reminder[]) => {
   const byEvent = new Map<string, Reminder[]>();
-  for (const reminder of reminders) {
+  for (const reminder of firstOfEachReminder(reminders)) {
     byEvent.set(reminder.event_id, [
       ...(byEvent.get(reminder.event_id) ?? []),
       reminder,

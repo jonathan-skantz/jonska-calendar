@@ -67,6 +67,9 @@ export type Reminder = {
   event_id: string;
   offset_seconds: number;
   remind_at: string;
+  // A reminder is listed, and delivered, once for each occurrence of its
+  // event; this is the occurrence's start.
+  occurrence_start: string;
   notified_at?: string;
   event_title: string;
   event_location?: string;

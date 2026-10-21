@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Reminder } from "../../types";
 import type { ReminderItem } from "./ReminderEditor";
-import { getRemindersByEvent } from "./reminders";
+import { firstOfEachReminder, getRemindersByEvent } from "./reminders";
 import { remindersQueryOptions, useReminderMutations } from "./useReminders";
 
 const indexReminders = (list: Reminder[]) => ({
-  list,
+  list: firstOfEachReminder(list),
   byEvent: getRemindersByEvent(list),
 });
 const NO_REMINDERS = indexReminders([]);

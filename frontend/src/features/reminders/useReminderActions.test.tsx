@@ -15,6 +15,7 @@ const reminder = (id: string, eventId: string, offset: number): Reminder => ({
   remind_at: "2026-10-15T09:45:00Z",
   event_title: "Lecture",
   event_starts_at: "2026-10-15T10:00:00Z",
+  occurrence_start: "2026-10-15T10:00:00Z",
   event_ends_at: "2026-10-15T11:00:00Z",
 });
 

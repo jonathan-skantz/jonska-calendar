@@ -4,7 +4,7 @@ import { formatTime } from "../../lib/calendar";
 import type { TimeFormatPreference } from "../../lib/calendar";
 import type { Reminder } from "../../types";
 import { usePreferences } from "../calendar/preferencesContext";
-import { isReminderDue } from "./reminders";
+import { isReminderDue, reminderKey } from "./reminders";
 import { remindersQueryOptions, useReminderMutations } from "./useReminders";
 
 // setTimeout overflows above ~24.8 days; later reminders are scheduled after
@@ -35,7 +35,7 @@ const reminderBody = (reminder: Reminder, timeFormat: TimeFormatPreference) =>
 // skip it; the tag also dedupes system notifications within one browser.
 export const useReminderNotifications = (
   reminders: Reminder[],
-  markNotified: (reminderId: string) => Promise<unknown>,
+  markNotified: (reminder: Reminder) => Promise<unknown>,
   timeFormat: TimeFormatPreference,
 ) => {
   const [toasts, setToasts] = useState<ReminderToast[]>([]);
@@ -51,7 +51,7 @@ export const useReminderNotifications = (
   useEffect(() => {
     const deliver = (reminder: Reminder) => {
       // Keyed by time too, so a moved event's re-armed reminder fires again.
-      const key = `${reminder.id}@${reminder.remind_at}`;
+      const key = `${reminderKey(reminder)}@${reminder.remind_at}`;
       if (delivered.current.has(key)) return;
       delivered.current.add(key);
       const missed =
@@ -63,12 +63,12 @@ export const useReminderNotifications = (
       if (canNotify) {
         new Notification(reminder.event_title, {
           body: reminderBody(reminder, latest.current.timeFormat),
-          tag: reminder.id,
+          tag: reminderKey(reminder),
         });
       } else {
         setToasts((current) => [...current, { reminder, missed }]);
       }
-      void latest.current.markNotified(reminder.id);
+      void latest.current.markNotified(reminder);
     };
 
     const now = new Date();
@@ -87,9 +87,9 @@ export const useReminderNotifications = (
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [reminders, mountedAt]);
 
-  const dismiss = (reminderId: string) =>
+  const dismiss = (key: string) =>
     setToasts((current) =>
-      current.filter((toast) => toast.reminder.id !== reminderId),
+      current.filter((toast) => reminderKey(toast.reminder) !== key),
     );
 
   return { toasts, dismiss };

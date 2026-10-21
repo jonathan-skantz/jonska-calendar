@@ -41,7 +41,9 @@ export const useReminderMutations = () => {
     },
     remove: (reminderId: string) =>
       send(`/api/reminders/${reminderId}`, "DELETE"),
-    markNotified: (reminderId: string) =>
-      send(`/api/reminders/${reminderId}/notified`, "POST"),
+    markNotified: (reminder: Reminder) =>
+      send(`/api/reminders/${reminder.id}/notified`, "POST", {
+        occurrence_start: reminder.occurrence_start,
+      }),
   };
 };

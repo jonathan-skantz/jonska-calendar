@@ -3,6 +3,8 @@ import type { Reminder } from "../../types";
 import {
   describeReminders,
   formatReminderOffset,
+  firstOfEachReminder,
+  getRemindersByEvent,
   groupReminders,
   isReminderDue,
 } from "./reminders";
@@ -14,6 +16,7 @@ const reminder = (overrides: Partial<Reminder> = {}): Reminder => ({
   remind_at: "2026-10-15T09:45:00",
   event_title: "Lecture",
   event_starts_at: "2026-10-15T10:00:00",
+  occurrence_start: "2026-10-15T10:00:00",
   event_ends_at: "2026-10-15T12:00:00",
   ...overrides,
 });
@@ -79,5 +82,19 @@ describe("reminder helpers", () => {
         reminder({ offset_seconds: 900 }),
       ]),
     ).toBe("Reminders: 15 min before, 1 day before");
+  });
+
+  it("lists a repeating event's reminder once, at its next occurrence", () => {
+    const next = reminder({ occurrence_start: "2026-10-15T10:00:00" });
+    const later = reminder({
+      remind_at: "2026-10-16T09:45:00",
+      occurrence_start: "2026-10-16T10:00:00",
+    });
+    const other = reminder({ id: "reminder-2", offset_seconds: 3600 });
+    expect(firstOfEachReminder([next, later, other])).toEqual([next, other]);
+    expect(getRemindersByEvent([next, later, other]).get("event-1")).toEqual([
+      next,
+      other,
+    ]);
   });
 });

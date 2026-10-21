@@ -11,6 +11,7 @@ const reminder = (overrides: Partial<Reminder> = {}): Reminder => ({
   event_title: "Lecture",
   event_location: "Hall B",
   event_starts_at: "2026-10-15T10:00:00",
+  occurrence_start: "2026-10-15T10:00:00",
   event_ends_at: "2026-10-15T12:00:00",
   ...overrides,
 });
@@ -52,10 +53,15 @@ describe("useReminderNotifications", () => {
     expect(notifications).toEqual([
       {
         title: "Lecture",
-        options: { body: "10:00 · Hall B", tag: "reminder-1" },
+        options: {
+          body: "10:00 · Hall B",
+          tag: "reminder-1@2026-10-15T10:00:00",
+        },
       },
     ]);
-    expect(markNotified).toHaveBeenCalledWith("reminder-1");
+    expect(markNotified).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "reminder-1" }),
+    );
     expect(result.current.toasts).toEqual([]);
 
     // A refetch before the server reflects the delivery must not repeat it.
@@ -78,7 +84,9 @@ describe("useReminderNotifications", () => {
     expect(result.current.toasts).toEqual([
       { reminder: reminder(), missed: true },
     ]);
-    expect(markNotified).toHaveBeenCalledExactlyOnceWith("reminder-1");
+    expect(markNotified).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: "reminder-1" }),
+    );
   });
 
   it("falls back to a toast without notification permission", async () => {
@@ -98,7 +106,28 @@ describe("useReminderNotifications", () => {
       { reminder: reminder(), missed: false },
     ]);
 
-    act(() => result.current.dismiss("reminder-1"));
+    act(() => result.current.dismiss("reminder-1@2026-10-15T10:00:00"));
     expect(result.current.toasts).toEqual([]);
+  });
+
+  it("delivers a repeating event's reminder once for each occurrence", async () => {
+    const markNotified = vi.fn().mockResolvedValue(null);
+    const tomorrow = reminder({
+      remind_at: "2026-10-16T09:45:00",
+      event_starts_at: "2026-10-16T10:00:00",
+      event_ends_at: "2026-10-16T12:00:00",
+      occurrence_start: "2026-10-16T10:00:00",
+    });
+    renderHook(() =>
+      useReminderNotifications([reminder(), tomorrow], markNotified, "24-hour"),
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(24 * 60 * 60 * 1000 + 15 * 60 * 1000);
+    });
+    expect(notifications.map(({ options }) => options?.tag)).toEqual([
+      "reminder-1@2026-10-15T10:00:00",
+      "reminder-1@2026-10-16T10:00:00",
+    ]);
+    expect(markNotified).toHaveBeenLastCalledWith(tomorrow);
   });
 });

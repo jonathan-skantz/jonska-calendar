@@ -226,6 +226,7 @@ describe("CalendarEntry", () => {
             remind_at: "2026-10-15T09:45:00",
             event_title: "Lecture",
             event_starts_at: "2026-10-15T10:00:00",
+            occurrence_start: "2026-10-15T10:00:00",
             event_ends_at: "2026-10-15T12:00:00",
           },
         ]}
