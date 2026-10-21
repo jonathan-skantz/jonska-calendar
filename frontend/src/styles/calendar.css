@@ -872,6 +872,24 @@
   z-index: 5;
 }
 
+/* Dragging to move: the moved block is drawn at its landing place, lifted
+   above everything else, and the whole page shows the grabbing cursor. */
+.grid-entry.draggable {
+  cursor: grab;
+  user-select: none;
+}
+
+.grid-entry.dragging {
+  z-index: 6;
+  box-shadow: 0 6px 18px rgba(39, 52, 47, 0.28);
+}
+
+body.dragging-entry,
+body.dragging-entry * {
+  cursor: grabbing;
+  user-select: none;
+}
+
 .grid-entry .entry-start {
   display: none;
   font-size: inherit;

@@ -1,4 +1,8 @@
-import type { CSSProperties, MouseEventHandler } from "react";
+import type {
+  CSSProperties,
+  MouseEventHandler,
+  PointerEventHandler,
+} from "react";
 import { gridOffset } from "../../lib/calendar";
 import { cx } from "../../lib/classNames";
 import { LABEL_MIN_MINUTES } from "./entryStyle";
@@ -8,6 +12,7 @@ type BandProps = {
   color: string;
   insets: { left?: string; right?: string };
   onClick: MouseEventHandler<HTMLDivElement>;
+  onPointerDown?: PointerEventHandler<HTMLDivElement>;
 };
 
 // Travel time drawn as a hatched band directly above or below the event.
@@ -20,6 +25,7 @@ export const CommuteBand = ({
   color,
   insets,
   onClick,
+  onPointerDown,
 }: BandProps & {
   segment: CommuteSegment;
   eventTitle: string;
@@ -52,6 +58,7 @@ export const CommuteBand = ({
         } as CSSProperties
       }
       onClick={onClick}
+      onPointerDown={onPointerDown}
     >
       {segment.durationMinutes >= LABEL_MIN_MINUTES && (
         <span aria-hidden="true">
@@ -73,6 +80,7 @@ export const OptionalGatheringBand = ({
   color,
   insets,
   onClick,
+  onPointerDown,
 }: BandProps & {
   segment: GatheringSegment;
   description?: string;
@@ -101,6 +109,7 @@ export const OptionalGatheringBand = ({
       } as CSSProperties
     }
     onClick={onClick}
+    onPointerDown={onPointerDown}
   >
     {chip && (
       <span className="gathering-label" aria-hidden="true">

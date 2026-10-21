@@ -196,6 +196,7 @@ export const WeekCalendar = ({
           <div
             className={cx("day-column", isWeekend(date) && "weekend")}
             key={dateKey(date)}
+            data-date={dateKey(date)}
             onClick={(event) => onDayClick(event, date)}
           >
             {renderDay(date)}

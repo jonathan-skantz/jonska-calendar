@@ -92,7 +92,7 @@ flowchart TD
 - Clicking an empty spot opens the composer at the nearest whole hour, clamped to 0 to 22.
 - Clicking an entry opens it for editing and does not create a new event.
 - On phones, a horizontal swipe of at least 60px, with vertical movement at most half the horizontal, moves the range by the number of visible days.
-- Dragging to move or resize is intentionally absent.
+- Dragging an own timed event or a task moves it (`useEntryDrag`, math in `dragMove.ts`). A press becomes a drag after 4px of movement, so a click still opens the item. The start (a task's deadline) snaps to the nearest half hour, and the duration is kept. While dragging, a moved copy of the item goes through the normal day layout, so the preview is exactly what is saved. Dropping saves through `moveItem`, which updates the cache at once and rolls back on failure. Escape cancels. Shared and all-day events can't be dragged, and there is no resizing.
 
 ## The composer
 

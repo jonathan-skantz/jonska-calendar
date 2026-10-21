@@ -54,7 +54,7 @@ Recipients see shared events read-only, marked with the owner's name.
 - Recipients cannot edit a shared event.
 - Card answers are per day, with no carry-over.
 - The card warning appears when more members say yes than there are cards.
-- Events cannot be dragged to move or resize.
+- Events and tasks can be dragged to a new time, snapping to the half hour, but not resized.
 - A task shows its deadline as a fixed block at that time. Google's Deadline is day-only and appears in the All day section ([Tasks in Calendar](https://support.google.com/calendar/answer/9901136)).
 - An event can have several tags, with one main tag that sets its color. Google sets an event's color directly ([Event color](https://support.google.com/calendar/answer/15619910)) and offers labels for tracking time ([Labels](https://support.google.com/calendar/answer/12377581)).
 

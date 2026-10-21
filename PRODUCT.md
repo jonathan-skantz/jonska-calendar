@@ -266,6 +266,9 @@ separate from events and tasks.
       marked in the day headings.
 - [x] Short or narrow blocks show a shorter label; hovering any block shows
       its full title, time, and location.
+- [x] Dragging an own event or a task moves it, also to another visible day.
+      Its start (a task's deadline) snaps to the nearest half hour and the
+      duration is kept. Escape cancels. Shared events can't be dragged.
 
 ## Future Features
 

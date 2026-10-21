@@ -37,6 +37,8 @@ import {
   getVisibleWeekEntries,
 } from "./features/calendar/timelineView";
 import { useCalendarState } from "./features/calendar/useCalendarState";
+import { useEntryDrag } from "./features/calendar/useEntryDrag";
+import { moveEntry } from "./features/calendar/dragMove";
 import { ComposerPanel } from "./features/composer/ComposerPanel";
 import { useComposer } from "./features/composer/useComposer";
 import { QuickAddBar } from "./features/quickAdd/QuickAddBar";
@@ -93,6 +95,7 @@ export function CalendarApp({ user }: { user: User }) {
   const dates = getCalendarDates(rangeStart, dayCount);
   const { createTag } = useTagMutations(removeHiddenTag);
   const { toggleTask, moveItem } = useTimelineMutations();
+  const { drag, startDrag } = useEntryDrag((moved) => moveItem.mutate(moved));
   const transitCardViews = useTransitCardViews(dates, today, user.id);
   const weatherByDay = useWeather();
   const { reminders, remindersByEvent } = useReminderActions();
@@ -150,6 +153,12 @@ export function CalendarApp({ user }: { user: User }) {
   );
   const weekEntries = getVisibleWeekEntries(entries, dates, hiddenTagIds);
   const allDayEventSpans = getAllDayEventSpans(weekEntries, dates);
+  // The dragged item is drawn where it would land, through the same layout.
+  const draggedWeekEntries = drag
+    ? weekEntries.map((entry) =>
+        entry.id === drag.entryId ? moveEntry(entry, drag.start) : entry,
+      )
+    : weekEntries;
   const formatRangeDate = isPhone ? formatShortDate : formatDate;
 
   return (
@@ -251,12 +260,14 @@ export function CalendarApp({ user }: { user: User }) {
                     )}
                   />
                   <DayEntries
-                    entries={weekEntries}
+                    entries={draggedWeekEntries}
                     date={date}
                     now={today}
                     remindersByEvent={remindersByEvent}
                     onEdit={openEntry}
                     onToggleTask={(entry) => toggleTask.mutate(entry)}
+                    onDragStart={startDrag}
+                    draggingId={drag?.entryId}
                   />
                   <CalendarDayIndicators
                     preview={

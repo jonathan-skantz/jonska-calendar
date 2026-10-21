@@ -117,7 +117,7 @@ Files are `1_` to `23_`, not zero-padded. Sorting by name puts `10_` before `2_`
 
 These are not bugs. [PRODUCT.md](../PRODUCT.md) lists the full set of **Future** items.
 
-- **No drag** to move or resize. Edit in the form.
+- **No resizing by drag.** Dragging moves an item; change its length in the form.
 - **No recurrence.** Each occurrence is its own event.
 - **No month or agenda view.** The grid shows 7 days, or 3 on phones.
 - **Reminders need an open tab.** No push, no background worker. A reminder whose time passed while no tab was open shows as an in-page toast on the next load, not a system notification.

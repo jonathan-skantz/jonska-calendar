@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, MouseEvent } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import {
   EVENT_SEPARATOR_PIXELS,
   formatEventTime,
@@ -13,6 +13,7 @@ import {
   isBusy,
   getOrderedStripTags,
 } from "../../lib/timeline";
+import { canDrag } from "./dragMove";
 import type {
   CommuteSegment,
   GatheringSegment,
@@ -50,6 +51,9 @@ type CalendarEntryProps = {
   reminders?: Reminder[];
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
+  // Set when items can be moved by dragging; every piece starts the drag.
+  onDragStart?: (entry: TimelineEntry, event: PointerEvent) => void;
+  isDragging?: boolean;
 };
 
 const CONTINUATION_MARKER_SPACING = 12;
@@ -90,6 +94,8 @@ export const CalendarEntry = ({
   reminders = [],
   onEdit,
   onToggleTask,
+  onDragStart,
+  isDragging = false,
 }: CalendarEntryProps) => {
   const { timeFormat } = usePreferences().preferences;
   const entryRef = useRef<HTMLElement>(null);
@@ -189,6 +195,10 @@ export const CalendarEntry = ({
     event.stopPropagation();
     onEdit(entry);
   };
+  const draggable = Boolean(onDragStart) && canDrag(entry);
+  const startDragOnPress = draggable
+    ? (event: PointerEvent) => onDragStart?.(entry, event)
+    : undefined;
   const commuteBand = (segment: CommuteSegment) => (
     <CommuteBand
       key={segment.position}
@@ -203,6 +213,7 @@ export const CalendarEntry = ({
       color={accentColor}
       insets={insets}
       onClick={openOnClick}
+      onPointerDown={startDragOnPress}
     />
   );
 
@@ -240,6 +251,7 @@ export const CalendarEntry = ({
           color={accentColor}
           insets={insets}
           onClick={openOnClick}
+          onPointerDown={startDragOnPress}
         />
       )}
       {showBody && (
@@ -249,6 +261,8 @@ export const CalendarEntry = ({
             "grid-entry",
             entry.type,
             entry.is_completed && "completed",
+            draggable && "draggable",
+            isDragging && "dragging",
             hasEarlierOverlap && "overlapping-later-event",
             continuesFromPreviousDay && "continues-from-previous-day",
             continuesToNextDay && "continues-to-next-day",
@@ -291,8 +305,9 @@ export const CalendarEntry = ({
                 : {}),
             } as CSSProperties
           }
-          title={tooltip}
+          title={isDragging ? undefined : tooltip}
           onClick={openOnClick}
+          onPointerDown={startDragOnPress}
         >
           {continuesFromPreviousDay && (
             <ContinuationMarkers
