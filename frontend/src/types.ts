@@ -193,3 +193,11 @@ export type AssistantReply = {
   // The conversation cannot take another message.
   ended: boolean;
 };
+
+// What an .ics import did, or would do for a preview. skipped lists the
+// events in the file that are not imported, with the reason.
+export type IcsImportResult = {
+  imported: number;
+  skipped: { title: string; reason: string }[];
+  warnings: string[];
+};

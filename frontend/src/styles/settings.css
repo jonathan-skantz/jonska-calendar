@@ -108,3 +108,19 @@
 .household-leave {
   margin-top: 18px;
 }
+
+.ics-export {
+  width: fit-content;
+  text-decoration: none;
+}
+
+.ics-actions .primary-button {
+  margin-top: 14px;
+}
+
+.ics-preview ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--moss-dark);
+  font-size: 13px;
+}
