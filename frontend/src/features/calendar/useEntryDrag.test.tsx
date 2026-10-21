@@ -222,3 +222,58 @@ describe("useEntryDrag on touch screens", () => {
     expect(onDrop).not.toHaveBeenCalled();
   });
 });
+
+describe("useEntryDrag auto-scroll", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // An 800px tall scroller over the 2400px grid; the columns move up as it
+  // scrolls.
+  const scrollable = () => {
+    const scroller = document.querySelector<HTMLElement>(".week-calendar")!;
+    let scrollTop = 0;
+    Object.defineProperty(scroller, "scrollTop", {
+      get: () => scrollTop,
+      set: (value: number) => {
+        scrollTop = Math.max(0, Math.min(1600, value));
+      },
+    });
+    scroller.getBoundingClientRect = () => new DOMRect(0, 0, 200, 800);
+    document
+      .querySelectorAll<HTMLElement>(".day-column")
+      .forEach((column, i) => {
+        column.getBoundingClientRect = () =>
+          new DOMRect(i * 100, -scrollTop, 100, 2400);
+      });
+    return scroller;
+  };
+
+  it("scrolls while the item is held near the bottom edge, and stops away from it", () => {
+    const scroller = scrollable();
+    const { result } = renderHook(() => useEntryDrag(vi.fn()));
+    act(() => result.current.startDrag(event, press(50, 400)));
+
+    pointer("pointerMove", 50, 790);
+    const startBefore = result.current.drag!.start;
+    act(() => vi.advanceTimersByTime(500));
+    expect(scroller.scrollTop).toBeGreaterThan(0);
+    // The grid moved under the pointer, so the item moved later in the day.
+    expect(result.current.drag!.start.getTime()).toBeGreaterThan(
+      startBefore.getTime(),
+    );
+
+    pointer("pointerMove", 50, 400);
+    const scrolled = scroller.scrollTop;
+    act(() => vi.advanceTimersByTime(500));
+    expect(scroller.scrollTop).toBe(scrolled);
+  });
+
+  it("does not scroll before a press becomes a drag", () => {
+    const scroller = scrollable();
+    const { result } = renderHook(() => useEntryDrag(vi.fn()));
+    act(() => result.current.startDrag(event, press(50, 790)));
+    pointer("pointerMove", 51, 791);
+    act(() => vi.advanceTimersByTime(500));
+    expect(scroller.scrollTop).toBe(0);
+  });
+});

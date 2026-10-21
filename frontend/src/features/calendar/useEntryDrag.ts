@@ -15,6 +15,10 @@ const DRAG_THRESHOLD_PX = 4;
 // the slop first leaves the touch to scrolling and swiping.
 const LONG_PRESS_MS = 300;
 const LONG_PRESS_SLOP_PX = 8;
+// Dragging this close to the grid's top or bottom edge scrolls it, faster
+// nearer the edge, up to the top speed per frame.
+const AUTO_SCROLL_EDGE_PX = 40;
+const AUTO_SCROLL_MAX_PX = 12;
 
 // The item being dragged and where it would land. After the drop it stays
 // there, no longer lifted, until its save has settled.
@@ -44,6 +48,22 @@ const readColumns = (scroller: Element): DragColumn[] =>
     date: new Date(`${column.dataset.date}T00:00`),
     rect: column.getBoundingClientRect(),
   }));
+
+// How far to scroll the grid for a pointer at y: negative near the top of the
+// visible hours (under the sticky day headings), positive near the bottom.
+const autoScrollStep = (scroller: Element, y: number) => {
+  const { bottom } = scroller.getBoundingClientRect();
+  const top =
+    scroller.querySelector(".week-calendar-header")?.getBoundingClientRect()
+      .bottom ?? scroller.getBoundingClientRect().top;
+  const speed = (distance: number) =>
+    Math.ceil(
+      AUTO_SCROLL_MAX_PX * (1 - Math.max(0, distance) / AUTO_SCROLL_EDGE_PX),
+    );
+  if (y < top + AUTO_SCROLL_EDGE_PX) return -speed(y - top);
+  if (y > bottom - AUTO_SCROLL_EDGE_PX) return speed(bottom - y);
+  return 0;
+};
 
 // A click follows the pointerup that ends a drag; it must not open the item
 // or start a new one in the day column underneath.
@@ -113,11 +133,37 @@ export const useEntryDrag = (
           setDrag({ entryId: press.entry.id, start: startTime });
         }, LONG_PRESS_MS)
       : undefined;
-    const move = (event: PointerEvent) => {
-      const distance = Math.hypot(
-        event.clientX - press.x,
-        event.clientY - press.y,
+    // Moves the item to wherever the pointer now is on the grid.
+    let pointer = { x: press.x, y: press.y };
+    const follow = () => {
+      const time = timeFromPoint(
+        readColumns(press.scroller),
+        pointer.x,
+        pointer.y,
       );
+      if (!time) return;
+      const next = getDropStart(time, press.grabOffset);
+      if (start?.getTime() !== next.getTime()) {
+        start = next;
+        setDrag({ entryId: press.entry.id, start: next });
+      }
+    };
+    // Scrolls a frame at a time while the pointer is near an edge; the item
+    // follows, since the grid moves under a pointer that stays still.
+    let scrollFrame: number | undefined;
+    const autoScroll = () => {
+      scrollFrame = undefined;
+      const step = autoScrollStep(press.scroller, pointer.y);
+      if (!picked || !step) return;
+      const before = press.scroller.scrollTop;
+      press.scroller.scrollTop += step;
+      if (press.scroller.scrollTop === before) return;
+      follow();
+      scrollFrame = requestAnimationFrame(autoScroll);
+    };
+    const move = (event: PointerEvent) => {
+      pointer = { x: event.clientX, y: event.clientY };
+      const distance = Math.hypot(pointer.x - press.x, pointer.y - press.y);
       if (!picked) {
         if (press.touch) {
           if (distance > LONG_PRESS_SLOP_PX) finish();
@@ -126,17 +172,8 @@ export const useEntryDrag = (
         if (distance < DRAG_THRESHOLD_PX) return;
         pickUp();
       }
-      const time = timeFromPoint(
-        readColumns(press.scroller),
-        event.clientX,
-        event.clientY,
-      );
-      if (!time) return;
-      const next = getDropStart(time, press.grabOffset);
-      if (start?.getTime() !== next.getTime()) {
-        start = next;
-        setDrag({ entryId: press.entry.id, start: next });
-      }
+      follow();
+      scrollFrame ??= requestAnimationFrame(autoScroll);
     };
     const release = (event: PointerEvent) => {
       if (picked) {
@@ -183,6 +220,7 @@ export const useEntryDrag = (
     }
     return () => {
       clearTimeout(longPress);
+      if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
       window.removeEventListener("pointermove", move, true);
       window.removeEventListener("pointerup", release, true);
       window.removeEventListener("pointercancel", finish, true);
