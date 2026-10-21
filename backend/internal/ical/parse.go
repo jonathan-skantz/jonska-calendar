@@ -1,0 +1,332 @@
+// Package ical reads and writes iCalendar (RFC 5545) files. It maps VEVENTs
+// to the app's events and back. Recurrence, tasks and attendees are not
+// supported: recurring events are skipped on import.
+package ical
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"strings"
+	"time"
+
+	ics "github.com/arran4/golang-ical"
+
+	"github.com/jonathan-skantz/calendar/backend/db"
+)
+
+// MaxEvents bounds the VEVENTs one file may hold, so one import cannot hold
+// a transaction open for long.
+const MaxEvents = 5000
+
+var (
+	ErrInvalidFile   = errors.New("the file is not a valid iCalendar file")
+	ErrTooManyEvents = fmt.Errorf("a file can hold at most %d events", MaxEvents)
+)
+
+// Reasons an event in a file is not imported.
+const (
+	ReasonRecurring = "recurring events are not supported yet"
+	ReasonCancelled = "cancelled"
+	ReasonNoStart   = "no start time"
+	ReasonBadTime   = "unreadable start or end time"
+)
+
+// Properties for the fields only this app has, so an exported file imports
+// back unchanged. Durations use the iCalendar format, such as PT30M.
+const (
+	propStartApproximate  = "X-JONSKA-START-APPROX"
+	propEndApproximate    = "X-JONSKA-END-APPROX"
+	propCommuteBefore     = "X-JONSKA-COMMUTE-BEFORE"
+	propCommuteAfter      = "X-JONSKA-COMMUTE-AFTER"
+	propGathering         = "X-JONSKA-GATHERING"
+	propGatheringOptional = "X-JONSKA-GATHERING-OPTIONAL"
+	propGatheringLabel    = "X-JONSKA-GATHERING-LABEL"
+	propSkipped           = "X-JONSKA-SKIPPED"
+)
+
+// defaultDuration is the length of a timed event that gives no end, or ends
+// when it starts. Events must end after they start.
+const defaultDuration = 30 * time.Minute
+
+// Event is one VEVENT mapped to the app. It is not validated yet.
+type Event struct {
+	db.Event
+	UID             string
+	Categories      []string
+	ReminderOffsets []int
+}
+
+// Skipped is an event the file holds that is not imported, and why.
+type Skipped struct {
+	Title  string `json:"title"`
+	Reason string `json:"reason"`
+}
+
+type Result struct {
+	Events   []Event
+	Skipped  []Skipped
+	Warnings []string
+}
+
+// Parse reads the VEVENTs of an iCalendar file. Floating times and all-day
+// dates are read in loc, the user's time zone. Other components are ignored,
+// and malformed lines are skipped.
+func Parse(r io.Reader, loc *time.Location) (Result, error) {
+	calendar, err := ics.ParseCalendarWithOptions(r,
+		ics.WithPropertyParser(ics.SkipPropertyParser),
+		ics.WithUnknownPropertyHandler(ics.AcceptUnknownPropertyHandler),
+	)
+	if err != nil {
+		return Result{}, fmt.Errorf("%w: %v", ErrInvalidFile, err)
+	}
+	// Malformed lines are skipped, so a file with no calendar in it parses
+	// as an empty one. A real calendar has at least VERSION and PRODID.
+	if len(calendar.CalendarProperties) == 0 && len(calendar.Components) == 0 {
+		return Result{}, ErrInvalidFile
+	}
+	vevents := calendar.Events()
+	if len(vevents) > MaxEvents {
+		return Result{}, ErrTooManyEvents
+	}
+	var result Result
+	for _, vevent := range vevents {
+		event, warnings, reason := parseEvent(vevent, loc)
+		for _, warning := range warnings {
+			result.Warnings = append(result.Warnings, event.Title+": "+warning)
+		}
+		if reason != "" {
+			result.Skipped = append(result.Skipped, Skipped{Title: event.Title, Reason: reason})
+			continue
+		}
+		result.Events = append(result.Events, event)
+	}
+	return result, nil
+}
+
+// parseEvent maps one VEVENT. A non-empty reason means it is skipped; the
+// event's title is set either way.
+func parseEvent(vevent *ics.VEvent, loc *time.Location) (event Event, warnings []string, reason string) {
+	event.Title = "Untitled"
+	if title := textValue(vevent, ics.ComponentPropertySummary); title != nil {
+		event.Title = *title
+	}
+	if hasAny(vevent, ics.ComponentPropertyRrule, ics.ComponentPropertyRdate,
+		ics.ComponentPropertyExrule, ics.ComponentPropertyRecurrenceId) {
+		return event, nil, ReasonRecurring
+	}
+	if status := textValue(vevent, ics.ComponentPropertyStatus); status != nil &&
+		strings.EqualFold(*status, string(ics.ObjectStatusCancelled)) {
+		return event, nil, ReasonCancelled
+	}
+
+	startProperty := vevent.GetProperty(ics.ComponentPropertyDtStart)
+	if startProperty == nil {
+		return event, nil, ReasonNoStart
+	}
+	start, err := readTime(startProperty, loc)
+	if err != nil {
+		return event, nil, ReasonBadTime
+	}
+	if start.warning != "" {
+		warnings = append(warnings, start.warning)
+	}
+	event.StartsAt = start.at
+	event.IsAllDay = start.isDate
+	switch {
+	case vevent.HasProperty(ics.ComponentPropertyDtEnd):
+		end, err := readTime(vevent.GetProperty(ics.ComponentPropertyDtEnd), loc)
+		if err != nil || end.isDate != start.isDate {
+			return event, warnings, ReasonBadTime
+		}
+		event.EndsAt = end.at
+	case vevent.HasProperty(ics.ComponentPropertyDuration):
+		length, err := parseDuration(vevent.GetProperty(ics.ComponentPropertyDuration).Value)
+		if err != nil {
+			return event, warnings, ReasonBadTime
+		}
+		event.EndsAt = length.addTo(event.StartsAt)
+	case event.IsAllDay:
+		event.EndsAt = event.StartsAt.AddDate(0, 0, 1)
+	}
+	if !event.IsAllDay && (event.EndsAt.IsZero() || event.EndsAt.Equal(event.StartsAt)) {
+		event.EndsAt = event.StartsAt.Add(defaultDuration)
+	}
+
+	event.Description = textValue(vevent, ics.ComponentPropertyDescription)
+	event.URL = textValue(vevent, ics.ComponentPropertyUrl)
+	event.Location = textValue(vevent, ics.ComponentPropertyLocation)
+	if uid := textValue(vevent, ics.ComponentPropertyUniqueId); uid != nil {
+		event.UID = *uid
+	}
+	event.Kind = db.EventKindAttendable
+	if transparency := textValue(vevent, ics.ComponentPropertyTransp); transparency != nil &&
+		strings.EqualFold(*transparency, string(ics.TransparencyTransparent)) {
+		event.Kind = db.EventKindInformational
+	}
+	for _, property := range vevent.GetProperties(ics.ComponentPropertyCategories) {
+		for name := range strings.SplitSeq(property.Value, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				event.Categories = append(event.Categories, name)
+			}
+		}
+	}
+	readAppFields(vevent, &event.Event)
+
+	for _, alarm := range vevent.Alarms() {
+		offset, ok := reminderOffset(alarm, event.Event, loc)
+		if !ok {
+			warnings = append(warnings, "a reminder that is not 0 to 30 days before the start was left out")
+			continue
+		}
+		event.ReminderOffsets = append(event.ReminderOffsets, offset)
+	}
+	return event, warnings, ""
+}
+
+// readAppFields reads the X-JONSKA properties. Values that cannot be read are
+// ignored; event validation rejects combinations the app does not allow.
+func readAppFields(vevent *ics.VEvent, event *db.Event) {
+	flag := func(name string) bool {
+		value := textValue(vevent, ics.ComponentProperty(name))
+		return value != nil && strings.EqualFold(*value, "TRUE")
+	}
+	seconds := func(name string) int {
+		value := textValue(vevent, ics.ComponentProperty(name))
+		if value == nil {
+			return 0
+		}
+		length, err := parseDuration(*value)
+		if err != nil || length.negative {
+			return 0
+		}
+		return int(length.nominal().Seconds())
+	}
+	event.StartIsApproximate = flag(propStartApproximate)
+	event.EndIsApproximate = flag(propEndApproximate)
+	event.CommuteBeforeSeconds = seconds(propCommuteBefore)
+	event.CommuteAfterSeconds = seconds(propCommuteAfter)
+	event.GatheringSeconds = seconds(propGathering)
+	event.GatheringIsOptional = flag(propGatheringOptional)
+	event.GatheringLabel = textValue(vevent, ics.ComponentProperty(propGatheringLabel))
+	event.IsSkipped = flag(propSkipped)
+}
+
+// reminderOffset turns a VALARM trigger into seconds before the event
+// starts, in whole minutes. Reminders after the start, or more than 30 days
+// before it, are not supported.
+func reminderOffset(alarm *ics.VAlarm, event db.Event, loc *time.Location) (int, bool) {
+	trigger := alarm.GetProperty(ics.ComponentPropertyTrigger)
+	if trigger == nil {
+		return 0, false
+	}
+	var remindAt time.Time
+	if parameter(trigger, ics.ParameterValue) == string(ics.ValueDataTypeDateTime) {
+		at, err := readTime(trigger, loc)
+		if err != nil {
+			return 0, false
+		}
+		remindAt = at.at
+	} else {
+		length, err := parseDuration(trigger.Value)
+		if err != nil {
+			return 0, false
+		}
+		base := event.StartsAt
+		if strings.EqualFold(parameter(trigger, ics.ParameterRelated), "END") {
+			base = event.EndsAt
+		}
+		remindAt = length.addTo(base)
+	}
+	offset := event.StartsAt.Sub(remindAt)
+	if offset < 0 || offset > db.MaxReminderOffsetSeconds*time.Second {
+		return 0, false
+	}
+	return int(offset/time.Minute) * 60, true
+}
+
+type icalTime struct {
+	at      time.Time
+	isDate  bool
+	warning string
+}
+
+const (
+	dateLayout     = "20060102"
+	dateTimeLayout = "20060102T150405"
+)
+
+// readTime reads a DATE or DATE-TIME value. Dates and floating times are in
+// loc. A TZID that is neither an IANA nor a Windows zone name is read as loc,
+// with a warning.
+func readTime(property *ics.IANAProperty, loc *time.Location) (icalTime, error) {
+	value := strings.TrimSpace(property.Value)
+	if len(value) == len(dateLayout) {
+		day, err := time.Parse(dateLayout, value)
+		if err != nil {
+			return icalTime{}, err
+		}
+		return icalTime{at: time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, loc), isDate: true}, nil
+	}
+	if utc, ok := strings.CutSuffix(value, "Z"); ok {
+		at, err := time.Parse(dateTimeLayout, utc)
+		return icalTime{at: at}, err
+	}
+	zone, warning := loc, ""
+	if tzid := parameter(property, ics.ParameterTzid); tzid != "" {
+		if named, ok := lookupZone(tzid); ok {
+			zone = named
+		} else {
+			warning = fmt.Sprintf("unknown time zone %q was read as %s", tzid, loc)
+		}
+	}
+	at, err := time.ParseInLocation(dateTimeLayout, value, zone)
+	return icalTime{at: at, warning: warning}, err
+}
+
+func lookupZone(tzid string) (*time.Location, bool) {
+	tzid = strings.Trim(tzid, `"`)
+	// "Local" and "" are valid for LoadLocation but mean the server's zone
+	// and UTC, not what the file says.
+	if tzid == "" || tzid == "Local" {
+		return nil, false
+	}
+	if zone, err := time.LoadLocation(tzid); err == nil {
+		return zone, true
+	}
+	if zone := ics.WindowsTimezoneToIANA(tzid); zone != nil {
+		return zone, true
+	}
+	return nil, false
+}
+
+// textValue returns a property's value trimmed, or nil when it is missing or
+// blank.
+func textValue(vevent *ics.VEvent, name ics.ComponentProperty) *string {
+	property := vevent.GetProperty(name)
+	if property == nil {
+		return nil
+	}
+	value := strings.TrimSpace(property.Value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func hasAny(vevent *ics.VEvent, names ...ics.ComponentProperty) bool {
+	for _, name := range names {
+		if vevent.HasProperty(name) {
+			return true
+		}
+	}
+	return false
+}
+
+func parameter(property *ics.IANAProperty, name ics.Parameter) string {
+	values := property.ICalParameters[string(name)]
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}

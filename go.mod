@@ -5,6 +5,7 @@ go 1.27.1
 require (
 	github.com/alexedwards/argon2id v1.0.0
 	github.com/anthropics/anthropic-sdk-go v1.82.0
+	github.com/arran4/golang-ical v0.3.7
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
