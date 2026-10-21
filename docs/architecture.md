@@ -59,6 +59,7 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 | `backend/internal/assistant/` | Agent loop over calendar tools. Creates events at once; other changes wait for the user's decision.           |
 | `backend/internal/ratelimit/` | Per-user fixed-window rate limit, in memory. Used by quick add and the assistant.                             |
 | `backend/internal/weather/`   | `GET /api/weather`. Fetches from Open-Meteo and caches in the database.                                       |
+| `backend/internal/ical/`      | `.ics` import and export. Parses and writes iCalendar with `arran4/golang-ical`; the handler validates.       |
 | `backend/internal/testutil/`  | Starts a PostgreSQL container for tests, and one database per test.                                           |
 | `backend/db/`                 | `Store` and its SQL, split by feature. `models.go` has row types, `errors.go` the sentinel errors.            |
 | `backend/db/migrations/`      | Goose files `N_name.sql`, numbered 1 to 24 so far.                                                            |
@@ -79,6 +80,7 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 | Change households                             | `backend/db/households.go`, `backend/internal/timeline/household.go`       | Migration 15; `frontend/src/features/household/`                           |
 | Change weather icons or caching               | `backend/internal/weather/`                                                | Migrations 22, 23; `frontend/src/features/weather/`                        |
 | Change quick add                              | `backend/internal/quickadd/`                                               | `frontend/src/features/quickAdd/`                                          |
+| Change .ics import or export                  | `backend/internal/ical/` (`parse.go`, `encode.go`)                         | `backend/db/ical.go`, migration 24; `frontend/src/features/icalendar/`     |
 | Change the assistant or add a tool            | `backend/internal/assistant/tools.go` (registry), one file per tool        | `frontend/src/features/assistant/`                                         |
 | Change what counts as busy                    | `backend/internal/assistant/busy.go` and `frontend/src/lib/timeline.ts`    | `frontend/src/lib/testdata/occupied-spans.json`                            |
 | Change the JSON shape of a timeline entry     | `TimelineEntry` in `backend/db/models.go`                                  | Frontend `types.ts` and grid rendering                                     |

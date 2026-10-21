@@ -258,6 +258,28 @@ separate from events and tasks.
 - [x] Days where the sun does not rise or set (polar day or night) show no
       line for the missing event, and no shading when both are missing.
 
+### Import and export (Demo)
+
+- [x] Settings can download the user's own events as an .ics file (iCalendar)
+      that other calendar apps open. Tags are written as categories and the
+      user's reminders as alarms. Events shared with the user are left out.
+- [x] An .ics file from another calendar (e.g. Google, Outlook, Apple) can be
+      imported into the user's own events. A preview first shows how many
+      events will be imported and which are skipped and why; nothing is saved
+      until the user confirms.
+- [x] Imported events get a chosen tag, or the default tag, plus any existing
+      tags whose names match the file's categories. Tags are never created.
+      Alarms become reminders. Transparent ("free") events become heads-ups.
+- [x] Importing the same file again, or the user's own export, skips the
+      events that are already there. Imported events are never updated from a
+      file.
+- [x] Fields only this app has (approximate times, commute, gathering,
+      skipped) are kept in the file, so exporting and importing again restores
+      them.
+- [ ] Recurring events are skipped and listed in the preview until recurrence
+      exists. Tasks are neither imported nor exported. Subscribing to other
+      calendars by URL and publishing a calendar feed are **Future**.
+
 ### Week view
 
 - [x] Zoom fits 24, 16, or 12 hours on screen; the rest scrolls. The choice
@@ -280,14 +302,14 @@ The following product ideas are intentionally deferred from the first demo:
 - [ ] task reminders, and reminder delivery while the app is closed (web push or
       a phone app)
 - [ ] recurring events, including birthdays, name days, and holidays
-- [ ] external calendar integration or import
+- [ ] calendar subscriptions by URL (webcal), and publishing a subscribable feed
 - [ ] automatic task scheduling and scheduled task sessions
 - [ ] task priorities, richer statuses, estimated duration, and event attachments
 - [ ] busy-only sharing and advanced per-field sharing policies
 - [ ] recipient tag adoption workflows
 - [ ] regex triggers and title/color automation
 - [ ] title templates
-- [ ] backup, import/export, and audit/history features
+- [ ] full backup (tasks, shares, settings), and audit/history features
 - [ ] connect commute time to SL API or other transit data to show expected arrival times and delays
 
 ---

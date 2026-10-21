@@ -40,7 +40,7 @@ Every package that uses the database needs this in `main_test.go`, so the contai
 func TestMain(m *testing.M) { testutil.Run(m) }
 ```
 
-`timeline`, `auth`, and `weather` have one. `quickadd` does not, because it never touches the database.
+`timeline`, `auth`, `weather`, `ical`, and `db` have one. `db` tests are in the external `db_test` package, because `testutil` imports `db`. `quickadd` does not, because it never touches the database.
 
 ### Writing a store test
 

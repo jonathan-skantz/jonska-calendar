@@ -85,6 +85,16 @@ On a clock-change day, items after the change can be off by up to an hour in rea
 
 The server rejects a `from` earlier than yesterday in UTC, because it does not know your zone. Near midnight, that can reject a day that is "today" for you. The frontend checks the local day first.
 
+### Imports read times in the browser's zone
+
+- Floating times (no `Z`, no `TZID`) and all-day dates in an `.ics` file are read in the `time_zone` the browser sends. The same file imported from another zone lands at other times.
+- A `TZID` that is neither an IANA nor a Windows zone name is also read in that zone, with a warning.
+- The library would read floating times in the server's zone, so `backend/internal/ical/parse.go` reads the time values itself.
+
+### Imported reminders that already passed count as delivered
+
+`Store.ImportEvents` sets `notified_at` on imported reminders whose time has passed. Otherwise they would all show as "Missed reminder" on the next open.
+
 ## Setup and tooling
 
 ### `goose` does not read `.env`
@@ -123,7 +133,7 @@ These are not bugs. [PRODUCT.md](../PRODUCT.md) lists the full set of **Future**
 - **Reminders need an open tab.** No push, no background worker. A reminder whose time passed while no tab was open shows as an in-page toast on the next load, not a system notification.
 - **No task reminders.** Event reminders exist.
 - **No task scheduling.** Tasks get no time slots.
-- **No calendar import, export, or backup.**
+- **Import and export cover events only.** Recurring events in a file are skipped, and tasks and shares are not exported. There are no calendar subscriptions.
 - **No password reset, email verification, password change, or account deletion.**
 - **No login throttling, CSRF token, or `Secure` cookie flag.** The cookie is `HttpOnly` and `SameSite=Lax`.
 - **No shared tags or tag adoption.**
