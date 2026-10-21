@@ -1,5 +1,6 @@
 import { addMinutes, subDays } from "date-fns";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { DateTimeField } from "../../components/DateTimeField";
 import {
   DEFAULT_EVENT_DURATION_MINUTES,
@@ -16,6 +17,7 @@ import type { ReminderItem } from "../reminders/ReminderEditor";
 import { requestNotificationPermission } from "../reminders/useReminders";
 import { EventTagPicker } from "../tags/EventTagPicker";
 import type { FieldState } from "./fieldState";
+import { MoreDetails } from "./MoreDetails";
 
 export type TagSelection = {
   tags: Tag[];
@@ -44,6 +46,8 @@ type EventFieldsProps = {
   // reminder_offset form values until it is created.
   savedReminders?: SavedReminders;
   draftReminderOffsets?: number[];
+  // Fields shared with tasks that go in the More details section too.
+  moreDetails?: ReactNode;
 };
 
 const KINDS = [
@@ -62,6 +66,16 @@ const MINUTE_FIELDS = [
   ["commute_after_minutes", "Commute after (min)"],
 ] as const;
 
+// Fields in the More details section, which opens when one is invalid.
+const MORE_DETAIL_FIELDS = [
+  "description",
+  "url",
+  "gathering_minutes",
+  "gathering_label",
+  "commute_before_minutes",
+  "commute_after_minutes",
+] as const;
+
 const minutesFrom = (seconds?: number) =>
   seconds ? String(Math.round(seconds / SECONDS_PER_MINUTE)) : "";
 
@@ -73,6 +87,7 @@ export const EventFields = ({
   tagSelection,
   savedReminders,
   draftReminderOffsets = [],
+  moreDetails,
 }: EventFieldsProps) => {
   const { timeFormat } = usePreferences().preferences;
   const [isAllDay, setIsAllDay] = useState(Boolean(initial?.is_all_day));
@@ -181,27 +196,6 @@ export const EventFields = ({
           required
         />
       </label>
-      {!isAllDay && (
-        <div className="approximate-fields">
-          {APPROXIMATE_FIELDS.map(([name, label]) => (
-            <label key={name} className="all-day-toggle">
-              <input
-                type="checkbox"
-                name={name}
-                value="true"
-                checked={approximate[name]}
-                onChange={(event) =>
-                  setApproximate((current) => ({
-                    ...current,
-                    [name]: event.target.checked,
-                  }))
-                }
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-      )}
       <label className={fields.labelClass("location")}>
         Location
         <input
@@ -211,66 +205,6 @@ export const EventFields = ({
           placeholder="Home, online, or somewhere else"
         />
       </label>
-      {allowsCommute && (
-        <div className="commute-fields">
-          {MINUTE_FIELDS.map(([name, label]) => (
-            <label key={name} className={fields.labelClass(name)}>
-              {label}
-              <input
-                name={name}
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={MAX_COMMUTE_MINUTES}
-                step={1}
-                {...fields.inputProps(name)}
-                value={minutes[name]}
-                onChange={(event) =>
-                  setMinutes((current) => ({
-                    ...current,
-                    [name]: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          ))}
-          {Number(minutes.gathering_minutes) > 0 && (
-            <div className="gathering-details">
-              <label className="all-day-toggle">
-                <input
-                  type="checkbox"
-                  name="gathering_is_optional"
-                  value="true"
-                  checked={gatheringDetails.gathering_is_optional}
-                  onChange={(event) =>
-                    setGatheringDetails((current) => ({
-                      ...current,
-                      gathering_is_optional: event.target.checked,
-                    }))
-                  }
-                />
-                Optional (drop-in)
-              </label>
-              <label className={fields.labelClass("gathering_label")}>
-                Gathering label
-                <input
-                  name="gathering_label"
-                  maxLength={MAX_GATHERING_LABEL_LENGTH}
-                  placeholder="Warm-up, Mingle…"
-                  {...fields.inputProps("gathering_label")}
-                  value={gatheringDetails.gathering_label}
-                  onChange={(event) =>
-                    setGatheringDetails((current) => ({
-                      ...current,
-                      gathering_label: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-            </div>
-          )}
-        </div>
-      )}
       {savedReminders ? (
         <ReminderEditor
           reminders={savedReminders.items}
@@ -316,6 +250,101 @@ export const EventFields = ({
         onSelectedTagIdsChange={tagSelection.onSelectedTagIdsChange}
         onMainTagIdChange={tagSelection.onMainTagIdChange}
       />
+      <MoreDetails
+        defaultOpen={Boolean(
+          initial?.description ||
+          initial?.url ||
+          initial?.start_is_approximate ||
+          initial?.end_is_approximate ||
+          initial?.gathering_seconds ||
+          initial?.commute_before_seconds ||
+          initial?.commute_after_seconds,
+        )}
+        hasError={MORE_DETAIL_FIELDS.some(fields.isInvalid)}
+      >
+        {moreDetails}
+        {!isAllDay && (
+          <div className="approximate-fields">
+            {APPROXIMATE_FIELDS.map(([name, label]) => (
+              <label key={name} className="all-day-toggle">
+                <input
+                  type="checkbox"
+                  name={name}
+                  value="true"
+                  checked={approximate[name]}
+                  onChange={(event) =>
+                    setApproximate((current) => ({
+                      ...current,
+                      [name]: event.target.checked,
+                    }))
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        )}
+        {allowsCommute && (
+          <div className="commute-fields">
+            {MINUTE_FIELDS.map(([name, label]) => (
+              <label key={name} className={fields.labelClass(name)}>
+                {label}
+                <input
+                  name={name}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={MAX_COMMUTE_MINUTES}
+                  step={1}
+                  {...fields.inputProps(name)}
+                  value={minutes[name]}
+                  onChange={(event) =>
+                    setMinutes((current) => ({
+                      ...current,
+                      [name]: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            ))}
+            {Number(minutes.gathering_minutes) > 0 && (
+              <div className="gathering-details">
+                <label className="all-day-toggle">
+                  <input
+                    type="checkbox"
+                    name="gathering_is_optional"
+                    value="true"
+                    checked={gatheringDetails.gathering_is_optional}
+                    onChange={(event) =>
+                      setGatheringDetails((current) => ({
+                        ...current,
+                        gathering_is_optional: event.target.checked,
+                      }))
+                    }
+                  />
+                  Optional (drop-in)
+                </label>
+                <label className={fields.labelClass("gathering_label")}>
+                  Gathering label
+                  <input
+                    name="gathering_label"
+                    maxLength={MAX_GATHERING_LABEL_LENGTH}
+                    placeholder="Warm-up, Mingle…"
+                    {...fields.inputProps("gathering_label")}
+                    value={gatheringDetails.gathering_label}
+                    onChange={(event) =>
+                      setGatheringDetails((current) => ({
+                        ...current,
+                        gathering_label: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+      </MoreDetails>
     </>
   );
 };

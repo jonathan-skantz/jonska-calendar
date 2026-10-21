@@ -5,6 +5,7 @@ import type { TimelineEntry } from "../../types";
 import type { ResolvedDraft } from "../quickAdd/resolveDraft";
 import { EventFields } from "./EventFields";
 import type { SavedReminders, TagSelection } from "./EventFields";
+import { MoreDetails } from "./MoreDetails";
 import { TaskFields } from "./TaskFields";
 import { COMPOSER_ERROR_ID, getFieldState } from "./fieldState";
 import { getComposerFieldErrors } from "./formValidation";
@@ -73,6 +74,29 @@ export const ComposerDrawer = ({
     }
   };
 
+  const descriptionAndUrl = (
+    <>
+      <label className={fields.labelClass("description")}>
+        Description
+        <textarea
+          name="description"
+          {...fields.inputProps("description")}
+          defaultValue={initial?.description}
+        />
+      </label>
+      <label className={fields.labelClass("url")}>
+        URL
+        <input
+          name="url"
+          {...fields.inputProps("url")}
+          type="url"
+          defaultValue={initial?.url}
+          placeholder="https://"
+        />
+      </label>
+    </>
+  );
+
   return (
     <Drawer
       eyebrow={editingItem ? "Edit item" : "New item"}
@@ -123,24 +147,6 @@ export const ComposerDrawer = ({
             autoFocus
           />
         </label>
-        <label className={fields.labelClass("description")}>
-          Description
-          <textarea
-            name="description"
-            {...fields.inputProps("description")}
-            defaultValue={initial?.description}
-          />
-        </label>
-        <label className={fields.labelClass("url")}>
-          URL
-          <input
-            name="url"
-            {...fields.inputProps("url")}
-            type="url"
-            defaultValue={initial?.url}
-            placeholder="https://"
-          />
-        </label>
         {type === "event" ? (
           <EventFields
             initial={initial}
@@ -150,14 +156,25 @@ export const ComposerDrawer = ({
             tagSelection={tagSelection}
             savedReminders={savedReminders}
             draftReminderOffsets={draft?.reminderOffsets}
+            moreDetails={descriptionAndUrl}
           />
         ) : (
-          <TaskFields
-            initial={initial}
-            draftEventStart={draftEventStart}
-            selectedDate={selectedDate}
-            fields={fields}
-          />
+          <>
+            <TaskFields
+              initial={initial}
+              draftEventStart={draftEventStart}
+              selectedDate={selectedDate}
+              fields={fields}
+            />
+            <MoreDetails
+              defaultOpen={Boolean(initial?.description || initial?.url)}
+              hasError={
+                fields.isInvalid("description") || fields.isInvalid("url")
+              }
+            >
+              {descriptionAndUrl}
+            </MoreDetails>
+          </>
         )}
         {onShare && (
           <button

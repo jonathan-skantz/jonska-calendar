@@ -172,6 +172,25 @@
   gap: inherit;
 }
 
+.more-details {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.more-details summary {
+  color: var(--moss);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Same rhythm as the form around it. */
+.more-details-fields {
+  display: grid;
+  gap: 17px;
+  padding-top: 14px;
+}
+
 .gathering-details {
   display: grid;
   grid-column: 1 / -1;

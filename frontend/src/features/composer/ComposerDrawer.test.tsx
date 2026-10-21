@@ -406,3 +406,78 @@ describe("ComposerDrawer quick add draft", () => {
     expect(screen.getByText('Couldn\'t place "after work"')).toBeTruthy();
   });
 });
+
+describe("ComposerDrawer more details", () => {
+  const oneTag = {
+    ...noTags,
+    tags: [{ id: "home", name: "home", color: "#547968", is_default: true }],
+    selectedTagIds: ["home"],
+    mainTagId: "home",
+  };
+  const renderEvent = (editingItem: TimelineEntry | null = null) => {
+    const onSave = vi.fn();
+    const { container } = render(
+      <ComposerDrawer
+        type="event"
+        editingItem={editingItem}
+        selectedDate="2026-10-15"
+        draftEventStart={null}
+        tagSelection={oneTag}
+        onSave={onSave}
+        onClose={vi.fn()}
+        onTypeChange={vi.fn()}
+      />,
+    );
+    return {
+      onSave,
+      form: container.querySelector("form")!,
+      details: container.querySelector("details")!,
+    };
+  };
+
+  it("folds optional fields away on a new event and still submits them", () => {
+    const { onSave, form, details } = renderEvent();
+    expect(details.open).toBe(false);
+
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Gym" },
+    });
+    fireEvent.change(screen.getByLabelText("URL"), {
+      target: { value: "https://example.com" },
+    });
+    fireEvent.submit(form);
+
+    expect(onSave).toHaveBeenCalledOnce();
+    expect((onSave.mock.calls[0][0] as FormData).get("url")).toBe(
+      "https://example.com",
+    );
+  });
+
+  it("starts open when the edited event uses one of its fields", () => {
+    const { details } = renderEvent({
+      id: "event-1",
+      type: "event",
+      title: "Football",
+      kind: "attendable",
+      starts_at: "2026-10-15T18:00:00",
+      ends_at: "2026-10-15T19:30:00",
+      commute_before_seconds: 1200,
+      is_completed: false,
+    });
+    expect(details.open).toBe(true);
+  });
+
+  it("opens when a field inside fails validation", () => {
+    const { onSave, form, details } = renderEvent();
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Gym" },
+    });
+    fireEvent.change(screen.getByLabelText("Commute before (min)"), {
+      target: { value: "-5" },
+    });
+    fireEvent.submit(form);
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(details.open).toBe(true);
+  });
+});
