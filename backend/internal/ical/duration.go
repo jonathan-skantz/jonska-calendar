@@ -101,3 +101,31 @@ func (length duration) nominal() time.Duration {
 	}
 	return total
 }
+
+// String formats the duration for iCalendar, such as -PT15M or P1DT2H.
+func (length duration) String() string {
+	var builder strings.Builder
+	if length.negative {
+		builder.WriteByte('-')
+	}
+	builder.WriteByte('P')
+	if length.days > 0 {
+		fmt.Fprintf(&builder, "%dD", length.days)
+	}
+	if length.clock > 0 || length.days == 0 {
+		builder.WriteByte('T')
+		hours := length.clock / time.Hour
+		minutes := length.clock % time.Hour / time.Minute
+		seconds := length.clock % time.Minute / time.Second
+		if hours > 0 {
+			fmt.Fprintf(&builder, "%dH", hours)
+		}
+		if minutes > 0 {
+			fmt.Fprintf(&builder, "%dM", minutes)
+		}
+		if seconds > 0 || length.clock == 0 {
+			fmt.Fprintf(&builder, "%dS", seconds)
+		}
+	}
+	return builder.String()
+}
