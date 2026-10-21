@@ -67,6 +67,26 @@ type Event struct {
 	CommuteBeforeSeconds int
 	CommuteAfterSeconds  int
 	MainTagID            uuid.UUID
+	// A repeating event has a rule, an RRULE value, and the time zone its
+	// wall-clock times repeat in; StartsAt and EndsAt are its first
+	// occurrence. RecurrenceEndsAt is when the last occurrence ends, nil
+	// when it never ends.
+	RecurrenceRule     *string
+	RecurrenceTimeZone *string
+	RecurrenceEndsAt   *time.Time
+}
+
+// OccurrenceException is an occurrence of a repeating event that differs
+// from its series, identified by the start the rule gives it.
+type OccurrenceException struct {
+	OriginalStart time.Time
+	IsCancelled   bool
+	// StartsAt and EndsAt are set together when the occurrence was moved.
+	StartsAt *time.Time
+	EndsAt   *time.Time
+	// IsSkipped is the owner's decision; nil follows the series. It is never
+	// shown to recipients.
+	IsSkipped *bool
 }
 
 type Task struct {
@@ -146,6 +166,12 @@ type TimelineEntry struct {
 	ShareCount           int        `json:"share_count,omitempty"`
 	Tags                 []Tag      `json:"tags,omitempty"`
 	MainTagID            *uuid.UUID `json:"main_tag_id,omitempty"`
+	// The series fields of a repeating event, expanded into occurrences
+	// before they reach a client.
+	RecurrenceRule     *string               `json:"-"`
+	RecurrenceTimeZone *string               `json:"-"`
+	RecurrenceEndsAt   *time.Time            `json:"-"`
+	Exceptions         []OccurrenceException `json:"-"`
 }
 
 // Event returns the stored fields of one of the user's own events, ready to
@@ -158,6 +184,8 @@ func (entry TimelineEntry) Event() Event {
 		IsSkipped: entry.IsSkipped, Location: entry.Location,
 		GatheringSeconds: entry.GatheringSeconds, GatheringIsOptional: entry.GatheringIsOptional, GatheringLabel: entry.GatheringLabel,
 		CommuteBeforeSeconds: entry.CommuteBeforeSeconds, CommuteAfterSeconds: entry.CommuteAfterSeconds,
+		RecurrenceRule: entry.RecurrenceRule, RecurrenceTimeZone: entry.RecurrenceTimeZone,
+		RecurrenceEndsAt: entry.RecurrenceEndsAt,
 	}
 	if entry.StartsAt != nil && entry.EndsAt != nil {
 		event.StartsAt, event.EndsAt = *entry.StartsAt, *entry.EndsAt

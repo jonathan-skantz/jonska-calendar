@@ -62,7 +62,7 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 | `backend/internal/ical/`      | `.ics` import and export. Parses and writes iCalendar with `arran4/golang-ical`; the handler validates.       |
 | `backend/internal/testutil/`  | Starts a PostgreSQL container for tests, and one database per test.                                           |
 | `backend/db/`                 | `Store` and its SQL, split by feature. `models.go` has row types, `errors.go` the sentinel errors.            |
-| `backend/db/migrations/`      | Goose files `N_name.sql`, numbered 1 to 24 so far.                                                            |
+| `backend/db/migrations/`      | Goose files `N_name.sql`, numbered 1 to 25 so far.                                                            |
 | `frontend/src/`               | See [frontend](frontend.md).                                                                                  |
 
 ## Where to change things

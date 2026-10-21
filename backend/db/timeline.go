@@ -25,6 +25,9 @@ func (s *Store) ListTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineE
 	if err := s.populateTimelineTags(ctx, userID, entries); err != nil {
 		return nil, err
 	}
+	if err := s.populateExceptions(ctx, userID, entries); err != nil {
+		return nil, err
+	}
 
 	sort.SliceStable(entries, func(i, j int) bool {
 		return timelineEntryTime(entries[i]).Before(timelineEntryTime(entries[j]))
@@ -66,7 +69,7 @@ func (s *Store) populateTimelineTags(ctx context.Context, userID uuid.UUID, entr
 }
 
 func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
-	events, err := s.listOwnedEvents(ctx, userID)
+	events, err := s.listOwnedEvents(ctx, userID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +80,9 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 	return append(events, tasks...), nil
 }
 
-func (s *Store) listOwnedEvents(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
+// listOwnedEvents lists the user's own events, or only eventID when it is
+// not nil.
+func (s *Store) listOwnedEvents(ctx context.Context, userID uuid.UUID, eventID *uuid.UUID) ([]TimelineEntry, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT item.id, item.title, item.description, item.url,
 			event.starts_at, event.ends_at, event.is_all_day, event.kind, event.location,
@@ -85,11 +90,12 @@ func (s *Store) listOwnedEvents(ctx context.Context, userID uuid.UUID) ([]Timeli
 			event.gathering_is_optional, event.gathering_label,
 			event.commute_before_seconds, event.commute_after_seconds, event.main_tag_id,
 			event.is_skipped,
-			(SELECT count(*) FROM event_shares AS share WHERE share.event_id = item.id)
+			(SELECT count(*) FROM event_shares AS share WHERE share.event_id = item.id),
+			event.recurrence_rule, event.recurrence_time_zone, event.recurrence_ends_at
 		FROM timeline_items AS item
 		JOIN events AS event ON event.timeline_item_id = item.id
-		WHERE item.user_id = $1
-	`, userID)
+		WHERE item.user_id = $1 AND ($2::uuid IS NULL OR item.id = $2)
+	`, userID, eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +108,7 @@ func (s *Store) listOwnedEvents(ctx context.Context, userID uuid.UUID) ([]Timeli
 			&entry.GatheringIsOptional, &entry.GatheringLabel,
 			&entry.CommuteBeforeSeconds, &entry.CommuteAfterSeconds,
 			&entry.MainTagID, &entry.IsSkipped, &entry.ShareCount,
+			&entry.RecurrenceRule, &entry.RecurrenceTimeZone, &entry.RecurrenceEndsAt,
 		)
 		return entry, err
 	})
@@ -144,7 +151,8 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 			event.start_is_approximate, event.end_is_approximate, event.gathering_seconds,
 			event.gathering_is_optional, event.gathering_label,
 			COALESCE(share.location, event.location),
-			user_display_name(owner.display_name, owner.email)
+			user_display_name(owner.display_name, owner.email),
+			event.recurrence_rule, event.recurrence_time_zone, event.recurrence_ends_at
 		FROM event_shares AS share
 		JOIN timeline_items AS item ON item.id = share.event_id
 		JOIN events AS event ON event.timeline_item_id = share.event_id
@@ -163,6 +171,7 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 			&entry.GatheringIsOptional, &entry.GatheringLabel,
 			&entry.Location,
 			&entry.SharedBy,
+			&entry.RecurrenceRule, &entry.RecurrenceTimeZone, &entry.RecurrenceEndsAt,
 		)
 		return entry, err
 	})

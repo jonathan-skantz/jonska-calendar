@@ -178,6 +178,6 @@ weather_forecasts (latitude, longitude, fetched_at, hourly JSONB, daily JSONB)
 
 - Files are `N_name.sql` in `backend/db/migrations`.
 - Numbers are **not zero-padded**. Sorting by name puts `10_` before `2_`. Goose and the tests sort by number.
-- The next file is `25_...`.
+- The next file is `26_...`.
 - Never edit an applied migration. Add a new one.
 - Each file has an `Up` part and a `Down` part, split by `-- +goose Down`. Tests run only `Up`.
