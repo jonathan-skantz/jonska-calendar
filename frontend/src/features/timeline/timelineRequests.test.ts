@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEventPayload,
+  buildMoveRequest,
   buildTimelineItemRequest,
   getEventTagChanges,
 } from "./timelineRequests";
@@ -142,5 +143,65 @@ describe("timeline requests", () => {
 
     form.set("kind", "informational");
     expect(buildEventPayload(form).is_skipped).toBe(false);
+  });
+
+  it("moves an event with its own fields and keeps its main tag", () => {
+    const request = buildMoveRequest({
+      id: "event-1",
+      type: "event",
+      title: "Football",
+      description: "Bring shoes",
+      kind: "attendable",
+      starts_at: "2026-10-15T18:30:00.000Z",
+      ends_at: "2026-10-15T20:00:00.000Z",
+      start_is_approximate: true,
+      location: "Field",
+      gathering_seconds: 900,
+      gathering_label: "Warm-up",
+      commute_before_seconds: 1200,
+      is_completed: false,
+      main_tag_id: "sport",
+    });
+    expect(request).toEqual({
+      path: "/api/events/event-1",
+      body: {
+        title: "Football",
+        description: "Bring shoes",
+        url: null,
+        kind: "attendable",
+        is_skipped: false,
+        starts_at: "2026-10-15T18:30:00.000Z",
+        ends_at: "2026-10-15T20:00:00.000Z",
+        is_all_day: false,
+        start_is_approximate: true,
+        end_is_approximate: false,
+        location: "Field",
+        gathering_seconds: 900,
+        gathering_is_optional: false,
+        gathering_label: "Warm-up",
+        commute_before_seconds: 1200,
+        commute_after_seconds: 0,
+      },
+    });
+  });
+
+  it("moves a task's deadline", () => {
+    expect(
+      buildMoveRequest({
+        id: "task-1",
+        type: "task",
+        title: "Report",
+        deadline_at: "2026-10-16T09:30:00.000Z",
+        is_completed: false,
+      }),
+    ).toEqual({
+      path: "/api/tasks/task-1",
+      body: {
+        title: "Report",
+        description: null,
+        url: null,
+        deadline_at: "2026-10-16T09:30:00.000Z",
+      },
+    });
   });
 });

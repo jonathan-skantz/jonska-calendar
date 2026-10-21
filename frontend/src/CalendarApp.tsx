@@ -92,7 +92,7 @@ export function CalendarApp({ user }: { user: User }) {
     useCalendarState(today, weekStartsOn, dayCount);
   const dates = getCalendarDates(rangeStart, dayCount);
   const { createTag } = useTagMutations(removeHiddenTag);
-  const { toggleTask } = useTimelineMutations();
+  const { toggleTask, moveItem } = useTimelineMutations();
   const transitCardViews = useTransitCardViews(dates, today, user.id);
   const weatherByDay = useWeather();
   const { reminders, remindersByEvent } = useReminderActions();
@@ -145,7 +145,7 @@ export function CalendarApp({ user }: { user: User }) {
   if (workspaceQuery.isLoading) return <LoadingScreen />;
 
   const pageError = getErrorText(
-    toggleTask.error ?? createTag.error,
+    toggleTask.error ?? moveItem.error ?? createTag.error,
     "Unable to update",
   );
   const weekEntries = getVisibleWeekEntries(entries, dates, hiddenTagIds);

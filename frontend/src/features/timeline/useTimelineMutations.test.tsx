@@ -185,4 +185,53 @@ describe("useTimelineMutations", () => {
     expect(completed()).toBe(false);
     queryClient.clear();
   });
+
+  it("moves an item at once and rolls back when the request fails", async () => {
+    const event: TimelineEntry = {
+      id: "event-1",
+      type: "event",
+      title: "Planning",
+      kind: "attendable",
+      starts_at: "2026-10-15T10:00:00.000Z",
+      ends_at: "2026-10-15T11:00:00.000Z",
+      is_completed: false,
+    };
+    const moved = {
+      ...event,
+      starts_at: "2026-10-16T14:00:00.000Z",
+      ends_at: "2026-10-16T15:00:00.000Z",
+    };
+    let rejectMove: (error: Error) => void = () => {};
+    mockedApi.mockImplementation((path, options) => {
+      if (path === "/api/events/event-1" && options?.method === "PUT") {
+        return new Promise((_, reject) => {
+          rejectMove = reject;
+        });
+      }
+      if (path === "/api/timeline") return Promise.resolve([event]);
+      return Promise.resolve([]);
+    });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(queryKeys.workspace, { entries: [event], tags });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useTimelineMutations(), { wrapper });
+    const startsAt = () =>
+      queryClient.getQueryData<{ entries: TimelineEntry[] }>(
+        queryKeys.workspace,
+      )?.entries[0].starts_at;
+
+    act(() => result.current.moveItem.mutate(moved));
+    await waitFor(() => expect(startsAt()).toBe("2026-10-16T14:00:00.000Z"));
+
+    await act(async () => rejectMove(new Error("Event update failed")));
+    await waitFor(() =>
+      expect(result.current.moveItem.error?.message).toBe(
+        "Event update failed",
+      ),
+    );
+    expect(startsAt()).toBe("2026-10-15T10:00:00.000Z");
+    queryClient.clear();
+  });
 });

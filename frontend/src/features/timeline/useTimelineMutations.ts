@@ -3,6 +3,7 @@ import { api } from "../../lib/api";
 import { invalidateWorkspace } from "../../lib/queryInvalidation";
 import { queryKeys } from "../../lib/queryKeys";
 import {
+  buildMoveRequest,
   buildTimelineItemRequest,
   getEventTagChanges,
 } from "./timelineRequests";
@@ -92,6 +93,38 @@ const saveItem = async ({
 export const useTimelineMutations = () => {
   const queryClient = useQueryClient();
   const refreshWorkspace = () => invalidateWorkspace(queryClient);
+  // Shows a change to one entry at once. A failed request puts the old
+  // workspace back, and either way the workspace is refetched afterwards.
+  const optimisticEntryUpdate = (
+    toUpdated: (input: TimelineEntry) => TimelineEntry,
+  ) => ({
+    onMutate: async (input: TimelineEntry) => {
+      const updated = toUpdated(input);
+      await queryClient.cancelQueries({ queryKey: queryKeys.workspace });
+      const previous = queryClient.getQueryData<Workspace>(queryKeys.workspace);
+      queryClient.setQueryData<Workspace>(
+        queryKeys.workspace,
+        (workspace) =>
+          workspace && {
+            ...workspace,
+            entries: workspace.entries.map((item) =>
+              item.id === updated.id ? updated : item,
+            ),
+          },
+      );
+      return { previous };
+    },
+    onError: (
+      _error: Error,
+      _input: TimelineEntry,
+      context?: { previous?: Workspace },
+    ) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.workspace, context.previous);
+      }
+    },
+    onSettled: refreshWorkspace,
+  });
 
   return {
     saveItem: useMutation({
@@ -109,33 +142,18 @@ export const useTimelineMutations = () => {
           method: "PATCH",
           body: JSON.stringify({ is_completed: !entry.is_completed }),
         }),
-      // The checkbox flips at once; a failed request puts the old workspace
-      // back, and either way the workspace is refetched afterwards.
-      onMutate: async (entry) => {
-        await queryClient.cancelQueries({ queryKey: queryKeys.workspace });
-        const previous = queryClient.getQueryData<Workspace>(
-          queryKeys.workspace,
-        );
-        queryClient.setQueryData<Workspace>(
-          queryKeys.workspace,
-          (workspace) =>
-            workspace && {
-              ...workspace,
-              entries: workspace.entries.map((item) =>
-                item.id === entry.id
-                  ? { ...item, is_completed: !entry.is_completed }
-                  : item,
-              ),
-            },
-        );
-        return { previous };
+      ...optimisticEntryUpdate((entry) => ({
+        ...entry,
+        is_completed: !entry.is_completed,
+      })),
+    }),
+    // Takes the item at its new time, as dragged in the week view.
+    moveItem: useMutation({
+      mutationFn: (moved: TimelineEntry) => {
+        const { path, body } = buildMoveRequest(moved);
+        return api(path, { method: "PUT", body: JSON.stringify(body) });
       },
-      onError: (_error, _entry, context) => {
-        if (context?.previous) {
-          queryClient.setQueryData(queryKeys.workspace, context.previous);
-        }
-      },
-      onSettled: refreshWorkspace,
+      ...optimisticEntryUpdate((moved) => moved),
     }),
   };
 };

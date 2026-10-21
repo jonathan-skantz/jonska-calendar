@@ -1,5 +1,5 @@
 import { SECONDS_PER_MINUTE, localDateTime } from "../../lib/calendar";
-import type { Tag } from "../../types";
+import type { Tag, TimelineEntry } from "../../types";
 
 type EventPayload = {
   title: string;
@@ -126,3 +126,40 @@ export const buildTimelineItemRequest = (
     body,
   };
 };
+
+// Saves an item moved in the week view: its own fields with the new times.
+// Leaving out main_tag_id keeps the event's main tag.
+export const buildMoveRequest = (
+  moved: TimelineEntry,
+): { path: string; body: EventPayload | TaskPayload } =>
+  moved.type === "task"
+    ? {
+        path: `/api/tasks/${moved.id}`,
+        body: {
+          title: moved.title,
+          description: moved.description ?? null,
+          url: moved.url ?? null,
+          deadline_at: moved.deadline_at,
+        },
+      }
+    : {
+        path: `/api/events/${moved.id}`,
+        body: {
+          title: moved.title,
+          description: moved.description ?? null,
+          url: moved.url ?? null,
+          kind: moved.kind ?? "attendable",
+          is_skipped: Boolean(moved.is_skipped),
+          starts_at: moved.starts_at,
+          ends_at: moved.ends_at,
+          is_all_day: Boolean(moved.is_all_day),
+          start_is_approximate: Boolean(moved.start_is_approximate),
+          end_is_approximate: Boolean(moved.end_is_approximate),
+          location: moved.location ?? null,
+          gathering_seconds: moved.gathering_seconds ?? 0,
+          gathering_is_optional: Boolean(moved.gathering_is_optional),
+          gathering_label: moved.gathering_label ?? null,
+          commute_before_seconds: moved.commute_before_seconds ?? 0,
+          commute_after_seconds: moved.commute_after_seconds ?? 0,
+        },
+      };
