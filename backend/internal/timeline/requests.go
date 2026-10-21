@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/recurrence"
 )
 
 // decodeJSON reads the request body into dst. On malformed JSON it answers
@@ -49,6 +50,11 @@ type eventRequest struct {
 	CommuteBeforeSeconds int       `json:"commute_before_seconds"`
 	CommuteAfterSeconds  int       `json:"commute_after_seconds"`
 	MainTagID            uuid.UUID `json:"main_tag_id"`
+	// Recurrence makes the event repeat; nil makes it a plain event.
+	// TimeZone is the browser's, which its times repeat in, and is required
+	// with a rule.
+	Recurrence *recurrence.Rule `json:"recurrence"`
+	TimeZone   string           `json:"time_zone"`
 }
 
 func (request eventRequest) toEvent() db.Event {

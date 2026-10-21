@@ -24,6 +24,7 @@ var (
 	ErrInvalidApproximate = errors.New("approximate start or end is only allowed on timed events")
 	ErrInvalidGathering   = errors.New("gathering must be whole minutes up to 24 hours on a timed attendable event, with a label of at most 40 characters")
 
+	ErrInvalidTimelineRange    = errors.New("from and to must be RFC 3339 times, with to after from and at most 92 days later")
 	ErrInvalidDate             = errors.New("dates must use the YYYY-MM-DD format")
 	ErrInvalidDateRange        = errors.New("date range must cover 1 to 62 days")
 	ErrInvalidTransitCardDates = errors.New("needed and maybe dates must be unique and inside the range")
@@ -33,6 +34,8 @@ var (
 )
 
 const (
+	// maxTimelineRangeDays bounds how many occurrences one request expands.
+	maxTimelineRangeDays    = 92
 	dateLayout              = "2006-01-02"
 	maxTransitCardRangeDays = 62
 	maxTransitCardCount     = 20
@@ -143,6 +146,15 @@ func validTagColor(color string) bool {
 		}
 	}
 	return true
+}
+
+func parseTimelineRange(fromValue, toValue string) (from, to time.Time, err error) {
+	from, fromErr := time.Parse(time.RFC3339, fromValue)
+	to, toErr := time.Parse(time.RFC3339, toValue)
+	if fromErr != nil || toErr != nil || !to.After(from) || to.Sub(from) > maxTimelineRangeDays*24*time.Hour {
+		return time.Time{}, time.Time{}, ErrInvalidTimelineRange
+	}
+	return from, to, nil
 }
 
 type dateRange struct {

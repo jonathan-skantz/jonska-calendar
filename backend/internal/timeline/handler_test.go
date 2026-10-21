@@ -57,6 +57,9 @@ func TestEventMainTagCannotBeRemoved(t *testing.T) {
 	}
 }
 
+// testTimelinePath lists the weeks around the dates these tests use.
+const testTimelinePath = "/api/timeline?from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z"
+
 func setupTestStore(t *testing.T) (*db.Store, uuid.UUID) {
 	ctx := context.Background()
 	store := testutil.NewStore(t)
@@ -250,7 +253,7 @@ func TestGatheringIsStoredAndShared(t *testing.T) {
 	} {
 		currentUser = test.userID
 		response = httptest.NewRecorder()
-		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, testTimelinePath, nil))
 		var entries []db.TimelineEntry
 		if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
 			t.Fatal(err)
@@ -327,7 +330,7 @@ func TestSkippedEventKeepsCommuteAndIsNotShared(t *testing.T) {
 	timeline := func(userID uuid.UUID) []db.TimelineEntry {
 		currentUser = userID
 		response := httptest.NewRecorder()
-		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, testTimelinePath, nil))
 		var entries []db.TimelineEntry
 		if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
 			t.Fatal(err)
@@ -395,7 +398,7 @@ func TestApproximateTimesAreStoredAndShared(t *testing.T) {
 	for name, userID := range map[string]uuid.UUID{"owner": ownerID, "recipient": recipientID} {
 		currentUser = userID
 		response = httptest.NewRecorder()
-		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, testTimelinePath, nil))
 		var entries []db.TimelineEntry
 		if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
 			t.Fatal(err)
@@ -601,7 +604,7 @@ func TestSetTaskCompleted(t *testing.T) {
 	}
 
 	listResponse := httptest.NewRecorder()
-	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, testTimelinePath, nil))
 	var entries []db.TimelineEntry
 	if err := json.NewDecoder(listResponse.Body).Decode(&entries); err != nil {
 		t.Fatal(err)
@@ -652,7 +655,7 @@ func TestDeleteTimelineItem(t *testing.T) {
 	}
 
 	listResponse := httptest.NewRecorder()
-	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, testTimelinePath, nil))
 	var entries []db.TimelineEntry
 	if err := json.NewDecoder(listResponse.Body).Decode(&entries); err != nil {
 		t.Fatal(err)
@@ -740,7 +743,7 @@ func TestPersonalTags(t *testing.T) {
 	}
 
 	listResponse := httptest.NewRecorder()
-	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, testTimelinePath, nil))
 	if listResponse.Code != http.StatusOK {
 		t.Fatalf("list timeline: expected status %d, got %d", http.StatusOK, listResponse.Code)
 	}
@@ -788,7 +791,7 @@ func TestPersonalTags(t *testing.T) {
 	}
 
 	listResponse = httptest.NewRecorder()
-	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+	handler.ListTimeline(listResponse, httptest.NewRequest(http.MethodGet, testTimelinePath, nil))
 	if listResponse.Code != http.StatusOK {
 		t.Fatalf("list timeline after deleting main tag: expected status %d, got %d", http.StatusOK, listResponse.Code)
 	}
@@ -860,7 +863,7 @@ func TestShareEventWithPerRecipientFields(t *testing.T) {
 		currentUser = userID
 		defer func() { currentUser = ownerID }()
 		response := httptest.NewRecorder()
-		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, "/api/timeline", nil))
+		handler.ListTimeline(response, httptest.NewRequest(http.MethodGet, testTimelinePath, nil))
 		body := response.Body.String()
 		var entries []db.TimelineEntry
 		if err := json.Unmarshal([]byte(body), &entries); err != nil {

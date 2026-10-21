@@ -16,7 +16,7 @@ import (
 // GetOwnEvent returns one of the user's own events with its tags and, for a
 // series, its exceptions.
 func (s *Store) GetOwnEvent(ctx context.Context, userID, eventID uuid.UUID) (TimelineEntry, error) {
-	entries, err := s.listOwnedEvents(ctx, userID, &eventID)
+	entries, err := s.listOwnedEvents(ctx, userID, &eventID, nil)
 	if err != nil {
 		return TimelineEntry{}, err
 	}

@@ -72,10 +72,32 @@ func (h *Handler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entries, err := h.Store.ListTimeline(r.Context(), userID)
+	query := r.URL.Query()
+	// Until the frontend loads by range, a request without one gets every
+	// item, with repeating events as their first occurrence.
+	if !query.Has("from") && !query.Has("to") {
+		entries, err := h.Store.ListTimeline(r.Context(), userID)
+		if err != nil {
+			writeServerError(w, "failed to list timeline", err)
+			return
+		}
+		writeJSON(w, http.StatusOK, entries)
+		return
+	}
+	from, to, err := parseTimelineRange(query.Get("from"), query.Get("to"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	entries, err := h.Store.ListTimelineRange(r.Context(), userID, from, to)
 	if err != nil {
 		writeServerError(w, "failed to list timeline", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, entries)
+	items, err := ExpandTimeline(entries, from, to)
+	if err != nil {
+		writeServerError(w, "failed to list timeline", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
 }

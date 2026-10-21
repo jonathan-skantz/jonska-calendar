@@ -9,15 +9,53 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// ListTimeline returns all of the user's items and the events shared with
+// them. Repeating events are returned as series, not occurrences.
 func (s *Store) ListTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
+	return s.listTimeline(ctx, userID, nil)
+}
+
+// ListTimelineRange is ListTimeline for the events that may happen in
+// [from, to): plain events that overlap it, and series that may have an
+// occurrence in it. Tasks are all returned.
+func (s *Store) ListTimelineRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]TimelineEntry, error) {
+	return s.listTimeline(ctx, userID, &timeWindow{from: from, to: to})
+}
+
+type timeWindow struct {
+	from, to time.Time
+}
+
+// bounds returns the window as query arguments; both are NULL without one.
+func (window *timeWindow) bounds() (from, to *time.Time) {
+	if window == nil {
+		return nil, nil
+	}
+	return &window.from, &window.to
+}
+
+// inWindowSQL keeps the events that may happen in the window given as $2
+// and $3, or every event when they are NULL. A series lasts until its last
+// occurrence ends, or forever, and a moved occurrence may start before the
+// series does.
+const inWindowSQL = `($2::timestamptz IS NULL OR (
+	LEAST(event.starts_at, (
+		SELECT min(exception.starts_at) FROM event_occurrence_exceptions AS exception
+		WHERE exception.event_id = event.timeline_item_id
+	)) < $3
+	AND CASE WHEN event.recurrence_rule IS NULL THEN event.ends_at
+		ELSE COALESCE(event.recurrence_ends_at, 'infinity') END > $2
+))`
+
+func (s *Store) listTimeline(ctx context.Context, userID uuid.UUID, window *timeWindow) ([]TimelineEntry, error) {
 	// Shared events are projected into the recipient's timeline; they are not
 	// copied into timeline_items owned by the recipient.
-	entries, err := s.listOwnedTimeline(ctx, userID)
+	entries, err := s.listOwnedTimeline(ctx, userID, window)
 	if err != nil {
 		return nil, err
 	}
 
-	sharedEntries, err := s.listSharedTimeline(ctx, userID)
+	sharedEntries, err := s.listSharedTimeline(ctx, userID, window)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +106,8 @@ func (s *Store) populateTimelineTags(ctx context.Context, userID uuid.UUID, entr
 	return nil
 }
 
-func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
-	events, err := s.listOwnedEvents(ctx, userID, nil)
+func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID, window *timeWindow) ([]TimelineEntry, error) {
+	events, err := s.listOwnedEvents(ctx, userID, nil, window)
 	if err != nil {
 		return nil, err
 	}
@@ -80,9 +118,10 @@ func (s *Store) listOwnedTimeline(ctx context.Context, userID uuid.UUID) ([]Time
 	return append(events, tasks...), nil
 }
 
-// listOwnedEvents lists the user's own events, or only eventID when it is
-// not nil.
-func (s *Store) listOwnedEvents(ctx context.Context, userID uuid.UUID, eventID *uuid.UUID) ([]TimelineEntry, error) {
+// listOwnedEvents lists the user's own events, only eventID when it is not
+// nil, and only those in the window when there is one.
+func (s *Store) listOwnedEvents(ctx context.Context, userID uuid.UUID, eventID *uuid.UUID, window *timeWindow) ([]TimelineEntry, error) {
+	from, to := window.bounds()
 	rows, err := s.db.Query(ctx, `
 		SELECT item.id, item.title, item.description, item.url,
 			event.starts_at, event.ends_at, event.is_all_day, event.kind, event.location,
@@ -94,8 +133,8 @@ func (s *Store) listOwnedEvents(ctx context.Context, userID uuid.UUID, eventID *
 			event.recurrence_rule, event.recurrence_time_zone, event.recurrence_ends_at
 		FROM timeline_items AS item
 		JOIN events AS event ON event.timeline_item_id = item.id
-		WHERE item.user_id = $1 AND ($2::uuid IS NULL OR item.id = $2)
-	`, userID, eventID)
+		WHERE item.user_id = $1 AND ($4::uuid IS NULL OR item.id = $4) AND `+inWindowSQL+`
+	`, userID, from, to, eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +174,8 @@ func (s *Store) listOwnedTasks(ctx context.Context, userID uuid.UUID) ([]Timelin
 	})
 }
 
-func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
+func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID, window *timeWindow) ([]TimelineEntry, error) {
+	from, to := window.bounds()
 	rows, err := s.db.Query(ctx, `
 		-- Recipients only ever see the effective values: the owner's
 		-- per-recipient field when set, otherwise the event's own value. The
@@ -157,8 +197,8 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID) ([]Tim
 		JOIN timeline_items AS item ON item.id = share.event_id
 		JOIN events AS event ON event.timeline_item_id = share.event_id
 		JOIN users AS owner ON owner.id = item.user_id
-		WHERE share.recipient_user_id = $1
-	`, userID)
+		WHERE share.recipient_user_id = $1 AND `+inWindowSQL+`
+	`, userID, from, to)
 	if err != nil {
 		return nil, err
 	}
