@@ -42,46 +42,47 @@ func validCommuteSeconds(seconds int) bool {
 	return seconds >= 0 && seconds <= db.MaxCommuteSeconds && seconds%60 == 0
 }
 
-// validateEventRequest returns the request with its title and gathering label
-// trimmed; a blank label means no label.
-func validateEventRequest(request eventRequest) (eventRequest, error) {
-	request.Title = strings.TrimSpace(request.Title)
-	request.GatheringLabel = normalizeOptionalText(request.GatheringLabel)
-	if request.Title == "" {
-		return request, ErrTitleRequired
+// ValidateEvent returns the event with its title and gathering label trimmed;
+// a blank label means no label. Every path that writes an event uses it: the
+// event routes and the assistant.
+func ValidateEvent(event db.Event) (db.Event, error) {
+	event.Title = strings.TrimSpace(event.Title)
+	event.GatheringLabel = normalizeOptionalText(event.GatheringLabel)
+	if event.Title == "" {
+		return event, ErrTitleRequired
 	}
-	if request.Kind != db.EventKindAttendable && request.Kind != db.EventKindInformational {
-		return request, ErrInvalidKind
+	if event.Kind != db.EventKindAttendable && event.Kind != db.EventKindInformational {
+		return event, ErrInvalidKind
 	}
-	if request.IsSkipped && request.Kind != db.EventKindAttendable {
-		return request, ErrInvalidSkip
+	if event.IsSkipped && event.Kind != db.EventKindAttendable {
+		return event, ErrInvalidSkip
 	}
-	if !request.EndsAt.After(request.StartsAt) {
-		return request, ErrInvalidTimes
+	if !event.EndsAt.After(event.StartsAt) {
+		return event, ErrInvalidTimes
 	}
 	// Commute and gathering only make sense for timed events the user attends.
-	timedAttendable := request.Kind == db.EventKindAttendable && !request.IsAllDay
-	if !validCommuteSeconds(request.CommuteBeforeSeconds) || !validCommuteSeconds(request.CommuteAfterSeconds) {
-		return request, ErrInvalidCommute
+	timedAttendable := event.Kind == db.EventKindAttendable && !event.IsAllDay
+	if !validCommuteSeconds(event.CommuteBeforeSeconds) || !validCommuteSeconds(event.CommuteAfterSeconds) {
+		return event, ErrInvalidCommute
 	}
-	hasCommute := request.CommuteBeforeSeconds > 0 || request.CommuteAfterSeconds > 0
+	hasCommute := event.CommuteBeforeSeconds > 0 || event.CommuteAfterSeconds > 0
 	if hasCommute && !timedAttendable {
-		return request, ErrInvalidCommute
+		return event, ErrInvalidCommute
 	}
-	if !validCommuteSeconds(request.GatheringSeconds) || (request.GatheringSeconds > 0 && !timedAttendable) {
-		return request, ErrInvalidGathering
+	if !validCommuteSeconds(event.GatheringSeconds) || (event.GatheringSeconds > 0 && !timedAttendable) {
+		return event, ErrInvalidGathering
 	}
-	hasGatheringDetails := request.GatheringIsOptional || request.GatheringLabel != nil
-	if hasGatheringDetails && request.GatheringSeconds == 0 {
-		return request, ErrInvalidGathering
+	hasGatheringDetails := event.GatheringIsOptional || event.GatheringLabel != nil
+	if hasGatheringDetails && event.GatheringSeconds == 0 {
+		return event, ErrInvalidGathering
 	}
-	if request.GatheringLabel != nil && utf8.RuneCountInString(*request.GatheringLabel) > db.MaxGatheringLabelLength {
-		return request, ErrInvalidGathering
+	if event.GatheringLabel != nil && utf8.RuneCountInString(*event.GatheringLabel) > db.MaxGatheringLabelLength {
+		return event, ErrInvalidGathering
 	}
-	if request.IsAllDay && (request.StartIsApproximate || request.EndIsApproximate) {
-		return request, ErrInvalidApproximate
+	if event.IsAllDay && (event.StartIsApproximate || event.EndIsApproximate) {
+		return event, ErrInvalidApproximate
 	}
-	return request, nil
+	return event, nil
 }
 
 func validateReminderRequest(request reminderRequest) error {

@@ -21,13 +21,13 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	request, err := validateEventRequest(request)
+	event, err := ValidateEvent(request.toEvent())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	id, err := h.Store.CreateEvent(r.Context(), userID, request.toEvent())
+	id, err := h.Store.CreateEvent(r.Context(), userID, event)
 	if err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to create event"},
@@ -51,12 +51,12 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	request, err := validateEventRequest(request)
+	event, err := ValidateEvent(request.toEvent())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.Store.UpdateEvent(r.Context(), userID, eventID, request.toEvent()); err != nil {
+	if err := h.Store.UpdateEvent(r.Context(), userID, eventID, event); err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update event"},
 			mainTagNotFound,

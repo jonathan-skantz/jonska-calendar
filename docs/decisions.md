@@ -43,7 +43,7 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 
 ## No service layer
 
-- **Chosen:** handlers call the store directly. Rules that touch one store live in store methods. Rules shared across handlers live in `backend/internal/timeline`.
+- **Chosen:** handlers call the store directly. Rules that touch one store live in store methods. Rules shared across handlers live in `backend/internal/timeline`, such as `ValidateEvent`, which the assistant uses too.
 - **Why:** one store, most operations are single transactions. A service layer would add indirection without removing code.
 - **Reconsider if:** a workflow spans several stores, or a background job needs the same rules.
 
@@ -79,12 +79,13 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 
 ## The assistant is a tool loop in the Go API
 
-- **Chosen:** `backend/internal/assistant` runs the agent with the Go SDK's tool runner (`client.Beta.Messages.NewToolRunner`). The model picks tools (`list_events`, `find_free_slots`, `propose_event`), sees their results, and repeats, up to 8 model calls per message. The tools call `db.Store` with the signed-in user's ID.
+- **Chosen:** `backend/internal/assistant` runs the agent with the Go SDK's tool runner (`client.Beta.Messages.NewToolRunner`). The model picks tools (`list_events`, `find_free_slots`, `create_event`, `move_event`, `skip_event`, `delete_event`), sees their results, and repeats, up to 8 model calls per message. The tools call `db.Store` with the signed-in user's ID.
 - **Why not the Claude Agent SDK or `claude -p`:** both run Claude Code, a coding agent with its own file and shell tools, as a separate process. They are made for Python or TypeScript programs and for working in a repository, not for a multi-user API. Using them would need a second service, a sandbox, and a way to pass the user's identity. The tool runner is part of the SDK the API already uses, and authorization stays the same as every other route.
-- **Proposal-only, for now:** like quick add, the assistant writes nothing. Proposals open in the event form. Its input includes text written by other users (titles of shared events), so any future write tool needs a confirmation step for anything beyond creating the user's own events.
-- **Conversations live in memory** on the server, keyed by ID and owner, for 30 minutes. The client never sends history back, so it cannot forge tool results. A restart ends every conversation.
+- **Writes by risk:** creating one of the user's own events runs at once and can be undone. Moving, skipping and deleting change what exists, so they are queued as actions the user applies or declines. The agent's input includes text from other users (titles of shared events), so a prompt injection can at worst create an event the user sees and can undo.
+- **One action model:** every write is an `Action` with a kind and a status, decided through one route. A queued action stores the intent (new times, skipped), not a copy of the event, and is applied to the event as it is then through `timeline.ValidateEvent`, the same rules as the event routes. A new kind of change (sharing) is a new kind plus a case in `change` or `carryOut`.
+- **Conversations live in memory** on the server, keyed by ID and owner, for 30 minutes. The client never sends history back, so it cannot forge tool results, and can only decide actions the agent actually created. A restart ends every conversation and drops its undecided actions.
 - **Busy rules are written twice:** in Go for the assistant (`busy.go`) and in TypeScript for the week view (`lib/timeline.ts`). Both test suites run `frontend/src/lib/testdata/occupied-spans.json`, so a change to one that is not made to the other fails a test.
-- **Reconsider if:** the app runs on more than one server (conversations and rate limits would need the database), or the assistant gets write tools.
+- **Reconsider if:** the app runs on more than one server (conversations, actions and rate limits would need the database), or actions should survive a restart.
 
 ## Reminders are client-driven
 

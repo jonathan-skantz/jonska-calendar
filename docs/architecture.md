@@ -56,7 +56,7 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 | `backend/internal/auth/`      | Register, login, logout, `me`. Argon2id passwords, session cookie.                                            |
 | `backend/internal/timeline/`  | Handlers for events, tasks, tags, sharing, reminders, households, transit card. Validation and error mapping. |
 | `backend/internal/quickadd/`  | `POST /api/events/parse`. Sends text to Anthropic, returns a draft. Never writes.                             |
-| `backend/internal/assistant/` | `POST /api/assistant/messages`. Agent loop over read-only calendar tools; proposes events. Never writes.      |
+| `backend/internal/assistant/` | Agent loop over calendar tools. Creates events at once; other changes wait for the user's decision.           |
 | `backend/internal/ratelimit/` | Per-user fixed-window rate limit, in memory. Used by quick add and the assistant.                             |
 | `backend/internal/weather/`   | `GET /api/weather`. Fetches from Open-Meteo and caches in the database.                                       |
 | `backend/internal/testutil/`  | Starts a PostgreSQL container for tests, and one database per test.                                           |

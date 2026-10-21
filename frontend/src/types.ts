@@ -156,17 +156,26 @@ export type ParseEventResponse = {
   unresolved: string[];
 };
 
-// An event the assistant suggests. Nothing is saved: it opens in the event
-// form like a quick add draft.
-export type AssistantProposal = {
+export type AssistantActionKind =
+  "create" | "move" | "skip" | "unskip" | "delete";
+
+// "done" ran at once and can be undone; "pending" waits for the user.
+export type AssistantActionStatus =
+  "done" | "pending" | "applied" | "declined" | "undone";
+
+export type AssistantDecision = "apply" | "decline" | "undo";
+
+// Something the assistant did or asks to do to one of the user's own events.
+// starts_at and ends_at are the event's times after the action.
+export type AssistantAction = {
+  id: string;
+  kind: AssistantActionKind;
+  status: AssistantActionStatus;
+  event_id: string;
   title: string;
   starts_at: string;
   ends_at: string;
   is_all_day: boolean;
-  location?: string;
-  kind?: "attendable" | "informational";
-  tag_ids?: string[];
-  reminder_minutes?: number[];
   warnings?: string[];
 };
 
@@ -179,7 +188,7 @@ export type AssistantStep = {
 export type AssistantReply = {
   conversation_id: string;
   reply: string;
-  proposals: AssistantProposal[];
+  actions: AssistantAction[];
   steps: AssistantStep[];
   // The conversation cannot take another message.
   ended: boolean;

@@ -11,7 +11,7 @@ const mockedApi = vi.mocked(api);
 const reply = (text: string): AssistantReply => ({
   conversation_id: "c1",
   reply: text,
-  proposals: [],
+  actions: [],
   steps: [],
   ended: false,
 });
@@ -65,8 +65,46 @@ describe("useAssistantConversation", () => {
     await act(() => result.current.send("hello").catch(() => undefined));
 
     await waitFor(() =>
-      expect(result.current.error?.message).toBe("Too many messages"),
+      expect(result.current.sendError?.message).toBe("Too many messages"),
     );
     expect(result.current.turns).toEqual([]);
+  });
+
+  it("updates an action in the thread once a decision is carried out", async () => {
+    const move = {
+      id: "a1",
+      kind: "move",
+      status: "pending",
+      event_id: "e1",
+      title: "Dentist",
+      starts_at: "2026-10-23T10:00:00+02:00",
+      ends_at: "2026-10-23T11:00:00+02:00",
+      is_all_day: false,
+    } as const;
+    mockedApi.mockResolvedValueOnce({ ...reply("Waiting."), actions: [move] });
+    const { result } = renderConversation();
+    await act(() => result.current.send("move the dentist"));
+
+    mockedApi.mockResolvedValueOnce({ ...move, status: "applied" });
+    act(() => result.current.decide(move, "apply"));
+
+    await waitFor(() => {
+      const answer = result.current.turns[1];
+      expect(answer.role === "assistant" && answer.actions[0].status).toBe(
+        "applied",
+      );
+    });
+    expect(mockedApi.mock.calls[1][0]).toBe(
+      "/api/assistant/conversations/c1/actions/a1",
+    );
+
+    mockedApi.mockRejectedValueOnce(new Error("Already decided"));
+    act(() => result.current.decide(move, "apply"));
+    await waitFor(() =>
+      expect(result.current.failedDecision).toEqual({
+        actionId: "a1",
+        error: new Error("Already decided"),
+      }),
+    );
   });
 });

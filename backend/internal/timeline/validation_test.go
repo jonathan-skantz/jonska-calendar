@@ -49,7 +49,7 @@ func TestValidateTagRequests(t *testing.T) {
 
 func TestValidatorsReturnNormalizedRequests(t *testing.T) {
 	label := "  Warm-up  "
-	event, err := validateEventRequest(eventRequest{
+	event, err := ValidateEvent(db.Event{
 		Title:            "Football",
 		Kind:             db.EventKindAttendable,
 		StartsAt:         time.Date(2026, 10, 15, 18, 0, 0, 0, time.UTC),
@@ -74,17 +74,17 @@ func TestValidatorsReturnNormalizedRequests(t *testing.T) {
 }
 
 func TestTitlesAreTrimmedAndMustNotBeBlank(t *testing.T) {
-	event := eventRequest{
+	event := db.Event{
 		Title:    "   ",
 		Kind:     db.EventKindInformational,
 		StartsAt: time.Date(2026, 10, 15, 18, 0, 0, 0, time.UTC),
 		EndsAt:   time.Date(2026, 10, 15, 19, 0, 0, 0, time.UTC),
 	}
-	if _, err := validateEventRequest(event); !errors.Is(err, ErrTitleRequired) {
+	if _, err := ValidateEvent(event); !errors.Is(err, ErrTitleRequired) {
 		t.Fatalf("blank event title: expected %v, got %v", ErrTitleRequired, err)
 	}
 	event.Title = "  Lecture "
-	if validated, err := validateEventRequest(event); err != nil || validated.Title != "Lecture" {
+	if validated, err := ValidateEvent(event); err != nil || validated.Title != "Lecture" {
 		t.Fatalf("expected trimmed event title, got %q (err %v)", validated.Title, err)
 	}
 

@@ -1,39 +1,38 @@
 import { Drawer } from "../../components/Drawer";
 import { cx } from "../../lib/classNames";
-import type { AssistantProposal } from "../../types";
+import { getErrorText } from "../../lib/requestErrors";
+import { ActionCard } from "./ActionCard";
 import { MessageForm } from "./MessageForm";
-import { ProposalCard } from "./ProposalCard";
-import type { AssistantTurn } from "./useAssistantConversation";
+import type { AssistantConversation } from "./useAssistantConversation";
 
 type AssistantDrawerProps = {
-  turns: AssistantTurn[];
-  ended: boolean;
-  // The message waiting for an answer.
-  pendingText?: string;
-  error: string;
-  onSend: (text: string) => Promise<unknown>;
-  onReset: () => void;
-  onOpenProposal: (proposal: AssistantProposal) => void;
+  conversation: AssistantConversation;
+  onOpenEvent: (eventId: string) => void;
   onClose: () => void;
 };
 
-// A conversation with the calendar assistant. It reads the calendar and
-// proposes events; each proposal opens in the event form for the user to
-// review and save.
+// A conversation with the calendar assistant. It creates events right away,
+// and asks before changing existing ones.
 export const AssistantDrawer = ({
-  turns,
-  ended,
-  pendingText,
-  error,
-  onSend,
-  onReset,
-  onOpenProposal,
+  conversation,
+  onOpenEvent,
   onClose,
 }: AssistantDrawerProps) => {
+  const {
+    turns,
+    ended,
+    pendingText,
+    sendError,
+    send,
+    deciding,
+    failedDecision,
+    decide,
+    reset,
+  } = conversation;
   const pending = pendingText !== undefined;
   return (
     <Drawer
-      eyebrow="Reads your calendar, saves nothing"
+      eyebrow="Asks before changing your events"
       title="Assistant"
       className="assistant-drawer"
       onClose={onClose}
@@ -62,11 +61,18 @@ export const AssistantDrawer = ({
                   </ul>
                 )}
                 {turn.reply && <p>{turn.reply}</p>}
-                {turn.proposals.map((proposal, proposalIndex) => (
-                  <ProposalCard
-                    key={proposalIndex}
-                    proposal={proposal}
-                    onOpen={() => onOpenProposal(proposal)}
+                {turn.actions.map((action) => (
+                  <ActionCard
+                    key={action.id}
+                    action={action}
+                    busy={deciding}
+                    error={
+                      failedDecision?.actionId === action.id
+                        ? getErrorText(failedDecision.error, "Couldn't do that")
+                        : undefined
+                    }
+                    onDecide={(decision) => decide(action, decision)}
+                    onOpen={() => onOpenEvent(action.event_id)}
                   />
                 ))}
               </>
@@ -80,18 +86,18 @@ export const AssistantDrawer = ({
           </>
         )}
       </ol>
-      {error && (
+      {sendError && (
         <p className="error" role="alert">
-          {error}
+          {getErrorText(sendError, "Couldn't reach the assistant")}
         </p>
       )}
       {ended ? (
         <p className="form-hint">This conversation has ended.</p>
       ) : (
-        <MessageForm pending={pending} onSend={onSend} />
+        <MessageForm pending={pending} onSend={send} />
       )}
       {turns.length > 0 && !pending && (
-        <button type="button" className="text-button" onClick={onReset}>
+        <button type="button" className="text-button" onClick={reset}>
           New conversation
         </button>
       )}

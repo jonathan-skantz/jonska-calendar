@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -133,19 +134,6 @@ func answer(text string) map[string]any {
 	return map[string]any{"content": []map[string]any{{"type": "text", "text": text}}, "stop_reason": "end_turn"}
 }
 
-type fakeStore struct {
-	entries map[uuid.UUID][]db.TimelineEntry
-	tags    map[uuid.UUID][]db.Tag
-}
-
-func (f fakeStore) ListTimeline(_ context.Context, userID uuid.UUID) ([]db.TimelineEntry, error) {
-	return f.entries[userID], nil
-}
-
-func (f fakeStore) ListTags(_ context.Context, userID uuid.UUID) ([]db.Tag, error) {
-	return f.tags[userID], nil
-}
-
 var stockholm = func() *time.Location {
 	location, err := time.LoadLocation("Europe/Stockholm")
 	if err != nil {
@@ -154,27 +142,60 @@ var stockholm = func() *time.Location {
 	return location
 }()
 
-func attended(title string, start, end time.Time) db.TimelineEntry {
-	kind := db.EventKindAttendable
-	return db.TimelineEntry{ID: uuid.New(), Type: "event", Title: title, Kind: &kind, StartsAt: &start, EndsAt: &end}
+// monday is the test's "now": Monday 19 October 2026, 09:00 in Stockholm.
+var monday = time.Date(2026, 10, 19, 9, 0, 0, 0, stockholm)
+
+func at(day, hour, minute int) time.Time {
+	return time.Date(2026, 10, day, hour, minute, 0, 0, stockholm)
+}
+
+// setup returns a store with one registered user, and a handler signed in as
+// that user whose clock reads monday.
+func setup(t *testing.T) (*db.Store, uuid.UUID, *fakeAnthropic, *Handler) {
+	t.Helper()
+	store := testutil.NewStore(t)
+	userID := register(t, store, "me@example.com")
+	upstream := newFakeAnthropic(t)
+	handler := New(store, testutil.SignedInAs(userID), upstream.client())
+	handler.now = func() time.Time { return monday }
+	return store, userID, upstream, handler
+}
+
+func register(t *testing.T, store *db.Store, email string) uuid.UUID {
+	t.Helper()
+	userID, err := store.Register(context.Background(), email, "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return userID
+}
+
+func seedEvent(t *testing.T, store *db.Store, userID uuid.UUID, event db.Event) uuid.UUID {
+	t.Helper()
+	if event.Kind == "" {
+		event.Kind = db.EventKindAttendable
+	}
+	id, err := store.CreateEvent(context.Background(), userID, event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// storedEvent returns the user's own event id, and false once it is gone.
+func storedEvent(t *testing.T, store *db.Store, userID, id uuid.UUID) (db.TimelineEntry, bool) {
+	t.Helper()
+	entries, err := store.ListTimeline(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ownedEvent(entries, id)
 }
 
 func send(handler *Handler, body string) *httptest.ResponseRecorder {
 	response := httptest.NewRecorder()
 	handler.Message(response, httptest.NewRequest(http.MethodPost, "/api/assistant/messages", strings.NewReader(body)))
 	return response
-}
-
-func decode(t *testing.T, response *httptest.ResponseRecorder) messageResponse {
-	t.Helper()
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, response.Code, response.Body)
-	}
-	var result messageResponse
-	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
-	return result
 }
 
 func message(conversationID uuid.UUID, text string) string {
@@ -184,8 +205,30 @@ func message(conversationID uuid.UUID, text string) string {
 	return string(body)
 }
 
+func decide(handler *Handler, conversationID, actionID uuid.UUID, decision string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(http.MethodPost, "/api/assistant/conversations/x/actions/y",
+		strings.NewReader(`{"decision":"`+decision+`"}`))
+	request.SetPathValue("conversationID", conversationID.String())
+	request.SetPathValue("actionID", actionID.String())
+	response := httptest.NewRecorder()
+	handler.Decide(response, request)
+	return response
+}
+
+func decodeOK[T any](t *testing.T, response *httptest.ResponseRecorder) T {
+	t.Helper()
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, response.Code, response.Body)
+	}
+	var result T
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
 func TestMessageValidatesRequest(t *testing.T) {
-	unauthenticated := New(fakeStore{}, func(*http.Request) (uuid.UUID, error) {
+	unauthenticated := New(nil, func(*http.Request) (uuid.UUID, error) {
 		return uuid.Nil, errors.New("not authenticated")
 	}, nil)
 	if code := send(unauthenticated, message(uuid.Nil, "lunch")).Code; code != http.StatusUnauthorized {
@@ -193,7 +236,7 @@ func TestMessageValidatesRequest(t *testing.T) {
 	}
 
 	upstream := newFakeAnthropic(t)
-	handler := New(fakeStore{}, testutil.SignedInAs(uuid.New()), upstream.client())
+	handler := New(nil, testutil.SignedInAs(uuid.New()), upstream.client())
 	for _, body := range []string{
 		`{`,
 		`{"text":"   ","time_zone":"Europe/Stockholm"}`,
@@ -211,43 +254,43 @@ func TestMessageValidatesRequest(t *testing.T) {
 		t.Fatalf("expected no upstream calls for invalid requests, got %d", calls)
 	}
 
-	unconfigured := New(fakeStore{}, testutil.SignedInAs(uuid.New()), nil)
+	unconfigured := New(nil, testutil.SignedInAs(uuid.New()), nil)
 	if code := send(unconfigured, message(uuid.Nil, "lunch")).Code; code != http.StatusServiceUnavailable {
 		t.Fatalf("expected status %d without a key, got %d", http.StatusServiceUnavailable, code)
+	}
+	if code := decide(handler, uuid.New(), uuid.New(), "maybe").Code; code != http.StatusBadRequest {
+		t.Fatalf("expected status %d for an unknown decision, got %d", http.StatusBadRequest, code)
 	}
 }
 
 // The example the assistant was built for: Friday is busy, so it checks
-// Monday and proposes lunch there, then takes a follow-up in the same
-// conversation.
-func TestLunchFallsBackToMondayWhenFridayIsBusy(t *testing.T) {
-	upstream := newFakeAnthropic(t)
-	userID, otherID, friendsID := uuid.New(), uuid.New(), uuid.New()
-	store := fakeStore{
-		entries: map[uuid.UUID][]db.TimelineEntry{
-			userID: {attended("Workshop",
-				time.Date(2026, 10, 23, 10, 30, 0, 0, stockholm), time.Date(2026, 10, 23, 14, 30, 0, 0, stockholm))},
-			otherID: {attended("Secret", time.Date(2026, 10, 26, 12, 0, 0, 0, stockholm), time.Date(2026, 10, 26, 13, 0, 0, 0, stockholm))},
-		},
-		tags: map[uuid.UUID][]db.Tag{userID: {{ID: friendsID, Name: "Friends"}}},
+// Monday and creates lunch there. The user undoes it, and the agent hears
+// about that with the next message.
+func TestLunchIsCreatedOnMondayWhenFridayIsBusy(t *testing.T) {
+	store, userID, upstream, handler := setup(t)
+	ctx := context.Background()
+	friends, err := store.CreateTag(ctx, userID, "Friends")
+	if err != nil {
+		t.Fatal(err)
 	}
-	handler := New(store, testutil.SignedInAs(userID), upstream.client())
-	handler.now = func() time.Time { return time.Date(2026, 10, 19, 9, 0, 0, 0, stockholm) }
+	seedEvent(t, store, userID, db.Event{Title: "Workshop", StartsAt: at(23, 10, 30), EndsAt: at(23, 14, 30)})
+	otherID := register(t, store, "other@example.com")
+	seedEvent(t, store, otherID, db.Event{Title: "Secret", StartsAt: at(26, 12, 0), EndsAt: at(26, 13, 0)})
 
 	upstream.script(
 		toolUse("toolu_1", "find_free_slots", map[string]any{"date": "2026-10-23", "earliest": "11:00", "latest": "14:00", "duration_minutes": 60}),
 		toolUse("toolu_2", "find_free_slots", map[string]any{"date": "2026-10-26", "earliest": "11:00", "latest": "14:00", "duration_minutes": 60}),
-		toolUse("toolu_3", "propose_event", map[string]any{
-			"title": "Lunch with my friend", "date": "2026-10-26", "start_time": "12:00", "end_time": "13:00", "all_day": false,
-			"location": nil, "kind": "attendable", "tags": []string{"friends", "gym"}, "reminder_minutes": []int{30},
+		toolUse("toolu_3", "create_event", map[string]any{
+			"title": "Lunch with my friend", "date": "2026-10-26", "start_time": "12:00", "end_time": "13:00",
+			"tags": []string{"friends", "gym"}, "reminder_minutes": []int{30},
 		}),
-		answer("Friday is taken by the workshop, so I suggested Monday at 12:00."),
+		answer("Friday is taken by the workshop, so I put lunch on Monday at 12:00."),
 	)
-	result := decode(t, send(handler, message(uuid.Nil, "I might eat lunch with my friend on Friday. If I'm busy, I'll do it next week on Monday instead")))
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "I might eat lunch with my friend on Friday. If I'm busy, I'll do it next week on Monday instead")))
 
 	first := upstream.request(0)
-	if first.Model != string(DefaultModel) || len(first.Tools) != 3 {
-		t.Fatalf("expected the default model with three tools, got %s and %+v", first.Model, first.Tools)
+	if first.Model != string(DefaultModel) || len(first.Tools) != 6 {
+		t.Fatalf("expected the default model with six tools, got %s and %+v", first.Model, first.Tools)
 	}
 	if first.Fallbacks != "default" || !strings.Contains(first.Beta, "server-side-fallback-2026-07-01") || first.CacheControl["type"] != "ephemeral" {
 		t.Fatalf("expected default fallbacks and prompt caching, got %v, %q, %v", first.Fallbacks, first.Beta, first.CacheControl)
@@ -261,91 +304,174 @@ func TestLunchFallsBackToMondayWhenFridayIsBusy(t *testing.T) {
 	if !strings.Contains(friday, `"free":[]`) || !strings.Contains(friday, "Workshop") {
 		t.Fatalf("expected Friday to come back busy, got %s", friday)
 	}
-	monday := upstream.request(2).toolResults()["toolu_2"]
-	if !strings.Contains(monday, `"from":"Mon 2026-10-26 11:00","to":"Mon 2026-10-26 14:00"`) || strings.Contains(monday, "Secret") {
-		t.Fatalf("expected all of Monday free and no other user's events, got %s", monday)
+	mondayResult := upstream.request(2).toolResults()["toolu_2"]
+	if !strings.Contains(mondayResult, `"from":"Mon 2026-10-26 11:00","to":"Mon 2026-10-26 14:00"`) || strings.Contains(mondayResult, "Secret") {
+		t.Fatalf("expected all of Monday free and no other user's events, got %s", mondayResult)
 	}
 
-	if result.Reply != "Friday is taken by the workshop, so I suggested Monday at 12:00." || result.Ended {
-		t.Fatalf("unexpected reply %+v", result)
+	if len(result.Actions) != 1 || len(result.Steps) != 3 || result.Ended {
+		t.Fatalf("expected one action after three steps, got %+v", result)
 	}
-	if len(result.Steps) != 3 || result.Steps[2].Tool != "propose_event" {
-		t.Fatalf("expected three steps ending in a proposal, got %+v", result.Steps)
-	}
-	if len(result.Proposals) != 1 {
-		t.Fatalf("expected one proposal, got %+v", result.Proposals)
-	}
-	proposal := result.Proposals[0]
+	created := result.Actions[0]
 	// Monday is after the switch from summer time, so the offset is +01:00.
-	if proposal.Title != "Lunch with my friend" ||
-		!proposal.StartsAt.Equal(time.Date(2026, 10, 26, 11, 0, 0, 0, time.UTC)) ||
-		!proposal.EndsAt.Equal(time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)) ||
-		len(proposal.TagIDs) != 1 || proposal.TagIDs[0] != friendsID ||
-		len(proposal.ReminderMinutes) != 1 || proposal.ReminderMinutes[0] != 30 ||
-		len(proposal.Warnings) != 1 || proposal.Warnings[0] != `No tag named "gym"` {
-		t.Fatalf("unexpected proposal %+v", proposal)
+	if created.Kind != kindCreate || created.Status != statusDone || created.Title != "Lunch with my friend" ||
+		!created.StartsAt.Equal(time.Date(2026, 10, 26, 11, 0, 0, 0, time.UTC)) ||
+		len(created.Warnings) != 1 || created.Warnings[0] != `No tag named "gym"` {
+		t.Fatalf("unexpected action %+v", created)
+	}
+	entry, ok := storedEvent(t, store, userID, created.EventID)
+	if !ok || *entry.MainTagID != friends.ID || !entry.EndsAt.Equal(at(26, 13, 0)) {
+		t.Fatalf("expected the lunch saved with the Friends tag, got %+v", entry)
+	}
+	reminders, err := store.ListReminders(ctx, userID)
+	if err != nil || len(reminders) != 1 || reminders[0].OffsetSeconds != 1800 {
+		t.Fatalf("expected one reminder 30 minutes before, got %+v, %v", reminders, err)
 	}
 
-	// A follow-up continues the same history.
-	upstream.script(answer("Sure, any time that day works."))
-	followUp := decode(t, send(handler, message(result.ConversationID, "Could it be later?")))
-	if followUp.ConversationID != result.ConversationID || len(followUp.Proposals) != 0 {
-		t.Fatalf("unexpected follow-up %+v", followUp)
-	}
-	// The first message, three tool rounds, the answer, and the follow-up.
-	if history := upstream.request(4).Messages; len(history) != 9 || history[8].Content[1].Text != "Could it be later?" {
-		t.Fatalf("expected the follow-up after the whole history, got %d messages", len(history))
-	}
-
-	// The conversation belongs to the user who started it.
+	// Only the owner of the conversation can decide, and only once.
 	handler.CurrentUser = testutil.SignedInAs(otherID)
-	if code := send(handler, message(result.ConversationID, "hi")).Code; code != http.StatusNotFound {
-		t.Fatalf("expected status %d for another user's conversation, got %d", http.StatusNotFound, code)
+	if code := decide(handler, result.ConversationID, created.ID, decisionUndo).Code; code != http.StatusNotFound {
+		t.Fatalf("expected status %d for another user, got %d", http.StatusNotFound, code)
+	}
+	handler.CurrentUser = testutil.SignedInAs(userID)
+	if undone := decodeOK[Action](t, decide(handler, result.ConversationID, created.ID, decisionUndo)); undone.Status != statusUndone {
+		t.Fatalf("expected the action undone, got %+v", undone)
+	}
+	if _, ok := storedEvent(t, store, userID, created.EventID); ok {
+		t.Fatal("expected undo to delete the event")
+	}
+	if code := decide(handler, result.ConversationID, created.ID, decisionUndo).Code; code != http.StatusConflict {
+		t.Fatalf("expected status %d for a second undo, got %d", http.StatusConflict, code)
+	}
+
+	upstream.script(answer("Okay, I removed it."))
+	decodeOK[messageResponse](t, send(handler, message(result.ConversationID, "Never mind")))
+	// The first message, three tool rounds, the answer, and the follow-up.
+	history := upstream.request(4).Messages
+	if len(history) != 9 || history[8].Content[1].Text != "Never mind" ||
+		!strings.Contains(history[8].Content[0].Text, `The user's undo of create "Lunch with my friend": undone.`) {
+		t.Fatalf("expected the follow-up with the undo note after the whole history, got %+v", history[len(history)-1])
+	}
+}
+
+func TestChangesWaitForTheUser(t *testing.T) {
+	store, userID, upstream, handler := setup(t)
+	dentist := seedEvent(t, store, userID, db.Event{
+		Title: "Dentist", StartsAt: at(22, 10, 0), EndsAt: at(22, 11, 0), CommuteBeforeSeconds: 900,
+	})
+	lecture := seedEvent(t, store, userID, db.Event{Title: "Lecture", StartsAt: at(22, 13, 0), EndsAt: at(22, 15, 0)})
+
+	upstream.script(
+		toolUse("toolu_1", "move_event", map[string]any{"event_id": dentist, "date": "2026-10-23"}),
+		toolUse("toolu_2", "skip_event", map[string]any{"event_id": lecture, "skipped": true}),
+		answer("Both are waiting for you."),
+	)
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "Move the dentist to Friday and skip the lecture")))
+	if len(result.Actions) != 2 || result.Actions[0].Status != statusPending || result.Actions[1].Kind != kindSkip {
+		t.Fatalf("expected two pending actions, got %+v", result.Actions)
+	}
+	move, skip := result.Actions[0], result.Actions[1]
+	if entry, _ := storedEvent(t, store, userID, dentist); !entry.StartsAt.Equal(at(22, 10, 0)) {
+		t.Fatalf("expected nothing to change before the user decides, got %+v", entry)
+	}
+
+	// The move keeps the time of day, the duration and everything else.
+	if applied := decodeOK[Action](t, decide(handler, result.ConversationID, move.ID, decisionApply)); applied.Status != statusApplied {
+		t.Fatalf("expected the move applied, got %+v", applied)
+	}
+	entry, _ := storedEvent(t, store, userID, dentist)
+	if !entry.StartsAt.Equal(at(23, 10, 0)) || !entry.EndsAt.Equal(at(23, 11, 0)) || entry.CommuteBeforeSeconds != 900 {
+		t.Fatalf("expected the dentist moved to Friday with its commute, got %+v", entry)
+	}
+	if code := decide(handler, result.ConversationID, move.ID, decisionApply).Code; code != http.StatusConflict {
+		t.Fatalf("expected status %d when applying twice, got %d", http.StatusConflict, code)
+	}
+	if code := decide(handler, result.ConversationID, move.ID, decisionUndo).Code; code != http.StatusConflict {
+		t.Fatalf("expected status %d when undoing a move, got %d", http.StatusConflict, code)
+	}
+
+	if declined := decodeOK[Action](t, decide(handler, result.ConversationID, skip.ID, decisionDecline)); declined.Status != statusDeclined {
+		t.Fatalf("expected the skip declined, got %+v", declined)
+	}
+	if entry, _ := storedEvent(t, store, userID, lecture); entry.IsSkipped {
+		t.Fatal("expected a declined skip to change nothing")
+	}
+}
+
+func TestApplyingAfterTheEventIsGoneKeepsTheActionOpen(t *testing.T) {
+	store, userID, upstream, handler := setup(t)
+	dentist := seedEvent(t, store, userID, db.Event{Title: "Dentist", StartsAt: at(22, 10, 0), EndsAt: at(22, 11, 0)})
+	upstream.script(
+		toolUse("toolu_1", "delete_event", map[string]any{"event_id": dentist}),
+		answer("Waiting for you."),
+	)
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "Cancel the dentist")))
+	if err := store.DeleteTimelineItem(context.Background(), userID, dentist); err != nil {
+		t.Fatal(err)
+	}
+
+	action := result.Actions[0]
+	if code := decide(handler, result.ConversationID, action.ID, decisionApply).Code; code != http.StatusNotFound {
+		t.Fatalf("expected status %d for a deleted event, got %d", http.StatusNotFound, code)
+	}
+	if declined := decodeOK[Action](t, decide(handler, result.ConversationID, action.ID, decisionDecline)); declined.Status != statusDeclined {
+		t.Fatalf("expected the failed action to stay open, got %+v", declined)
 	}
 }
 
 func TestToolErrorsGoBackToTheModel(t *testing.T) {
-	upstream := newFakeAnthropic(t)
-	handler := New(fakeStore{}, testutil.SignedInAs(uuid.New()), upstream.client())
-	handler.now = func() time.Time { return time.Date(2026, 10, 19, 9, 0, 0, 0, stockholm) }
-	upstream.script(
-		toolUse("toolu_1", "propose_event", map[string]any{
-			"title": "Lunch", "date": "2026-10-16", "start_time": "12:00", "end_time": nil, "all_day": false,
-			"location": nil, "kind": nil, "tags": []string{}, "reminder_minutes": []int{},
-		}),
-		answer("That day has passed."),
-	)
-	result := decode(t, send(handler, message(uuid.Nil, "lunch last Friday")))
-	if len(result.Proposals) != 0 || len(result.Steps) != 0 {
-		t.Fatalf("expected no proposal for a past date, got %+v", result)
+	store, userID, upstream, handler := setup(t)
+	headsUp := seedEvent(t, store, userID, db.Event{
+		Title: "Phone release", StartsAt: at(22, 10, 0), EndsAt: at(22, 11, 0), Kind: db.EventKindInformational,
+	})
+	ownerID := register(t, store, "owner@example.com")
+	shared := seedEvent(t, store, ownerID, db.Event{Title: "Party", StartsAt: at(24, 18, 0), EndsAt: at(24, 22, 0)})
+	if _, err := store.ShareEvent(context.Background(), ownerID, shared, userID, db.ShareFields{}); err != nil {
+		t.Fatal(err)
 	}
-	request := upstream.request(1)
-	block := request.Messages[len(request.Messages)-1].Content[0]
-	if !block.IsError || !strings.Contains(block.Content[0].Text, "start_time has already passed") {
-		t.Fatalf("expected the validation error as the tool result, got %+v", block)
+
+	upstream.script(
+		toolUse("toolu_1", "create_event", map[string]any{"title": "Lunch", "date": "2026-10-16", "start_time": "12:00"}),
+		toolUse("toolu_2", "skip_event", map[string]any{"event_id": headsUp, "skipped": true}),
+		toolUse("toolu_3", "delete_event", map[string]any{"event_id": shared}),
+		answer("None of that worked."),
+	)
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "do things")))
+	if len(result.Actions) != 0 || len(result.Steps) != 0 {
+		t.Fatalf("expected no actions, got %+v", result)
+	}
+	for i, want := range []string{"start_time has already passed", "only attendable events can be skipped", "cannot be changed"} {
+		request := upstream.request(i + 1)
+		block := request.Messages[len(request.Messages)-1].Content[0]
+		if !block.IsError || !strings.Contains(block.Content[0].Text, want) {
+			t.Fatalf("expected %q as the tool error, got %+v", want, block)
+		}
 	}
 }
 
-func TestStepLimitEndsTheConversation(t *testing.T) {
-	upstream := newFakeAnthropic(t)
-	handler := New(fakeStore{}, testutil.SignedInAs(uuid.New()), upstream.client())
-	for i := range maxIterations {
-		upstream.script(toolUse("toolu_"+string(rune('a'+i)), "list_events", map[string]any{"from_date": "2026-10-19", "to_date": "2026-10-25"}))
+func TestStepLimitEndsMessagesButNotDecisions(t *testing.T) {
+	store, userID, upstream, handler := setup(t)
+	upstream.script(toolUse("toolu_0", "create_event", map[string]any{"title": "Gym", "date": "2026-10-20", "start_time": "18:00"}))
+	for i := 1; i < maxIterations; i++ {
+		upstream.script(toolUse(fmt.Sprintf("toolu_%d", i), "list_events", map[string]any{"from_date": "2026-10-19", "to_date": "2026-10-25"}))
 	}
-	result := decode(t, send(handler, message(uuid.Nil, "plan my week")))
-	if !result.Ended || upstream.calls() != maxIterations {
-		t.Fatalf("expected the conversation to end after %d calls, got %+v after %d", maxIterations, result, upstream.calls())
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "plan my week")))
+	if !result.Ended || upstream.calls() != maxIterations || len(result.Actions) != 1 {
+		t.Fatalf("expected the conversation to end after %d calls with one action, got %+v", maxIterations, result)
 	}
 	if code := send(handler, message(result.ConversationID, "go on")).Code; code != http.StatusNotFound {
-		t.Fatalf("expected status %d after the conversation ended, got %d", http.StatusNotFound, code)
+		t.Fatalf("expected status %d for a message after the end, got %d", http.StatusNotFound, code)
+	}
+	decodeOK[Action](t, decide(handler, result.ConversationID, result.Actions[0].ID, decisionUndo))
+	if _, ok := storedEvent(t, store, userID, result.Actions[0].EventID); ok {
+		t.Fatal("expected the created event to be undone")
 	}
 }
 
 func TestUpstreamFailureKeepsTheConversation(t *testing.T) {
-	upstream := newFakeAnthropic(t)
-	handler := New(fakeStore{}, testutil.SignedInAs(uuid.New()), upstream.client())
+	_, _, upstream, handler := setup(t)
 	upstream.script(answer("Hi!"))
-	result := decode(t, send(handler, message(uuid.Nil, "hello")))
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "hello")))
 
 	upstream.mu.Lock()
 	upstream.failing = true
@@ -358,7 +484,7 @@ func TestUpstreamFailureKeepsTheConversation(t *testing.T) {
 	upstream.failing = false
 	upstream.mu.Unlock()
 	upstream.script(answer("Still here."))
-	decode(t, send(handler, message(result.ConversationID, "again")))
+	decodeOK[messageResponse](t, send(handler, message(result.ConversationID, "again")))
 	// The retry sends the first exchange and the new message, not the failed one.
 	if history := upstream.request(2).Messages; len(history) != 3 {
 		t.Fatalf("expected 3 messages on retry, got %d", len(history))
@@ -366,12 +492,44 @@ func TestUpstreamFailureKeepsTheConversation(t *testing.T) {
 }
 
 func TestMessagesAreRateLimitedPerUser(t *testing.T) {
-	upstream := newFakeAnthropic(t)
-	handler := New(fakeStore{}, testutil.SignedInAs(uuid.New()), upstream.client())
+	_, _, upstream, handler := setup(t)
 	handler.limiter = ratelimit.New(1, time.Hour)
 	upstream.script(answer("Hi!"))
-	decode(t, send(handler, message(uuid.Nil, "hello")))
+	decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "hello")))
 	if code := send(handler, message(uuid.Nil, "hello")).Code; code != http.StatusTooManyRequests {
 		t.Fatalf("expected status %d over the limit, got %d", http.StatusTooManyRequests, code)
+	}
+}
+
+func TestLaterToolsSeeCreatedEvents(t *testing.T) {
+	_, _, upstream, handler := setup(t)
+	upstream.script(
+		toolUse("toolu_1", "find_free_slots", map[string]any{"date": "2026-10-20", "earliest": "17:00", "latest": "19:00", "duration_minutes": 60}),
+		toolUse("toolu_2", "create_event", map[string]any{"title": "Gym", "date": "2026-10-20", "start_time": "17:00", "end_time": "18:00"}),
+		toolUse("toolu_3", "find_free_slots", map[string]any{"date": "2026-10-20", "earliest": "17:00", "latest": "19:00", "duration_minutes": 60}),
+		answer("Done."),
+	)
+	decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "gym tomorrow, then dinner after")))
+	if after := upstream.request(3).toolResults()["toolu_3"]; !strings.Contains(after, `"title":"Gym"`) {
+		t.Fatalf("expected the new gym session to block the time, got %s", after)
+	}
+}
+
+func TestMovesCannotBeAppliedOnceTheirTimeHasPassed(t *testing.T) {
+	store, userID, upstream, handler := setup(t)
+	dentist := seedEvent(t, store, userID, db.Event{Title: "Dentist", StartsAt: at(22, 10, 0), EndsAt: at(22, 11, 0)})
+	upstream.script(
+		toolUse("toolu_1", "move_event", map[string]any{"event_id": dentist, "date": "2026-10-19", "start_time": "15:00"}),
+		answer("Waiting for you."),
+	)
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "dentist this afternoon instead")))
+
+	handler.now = func() time.Time { return at(19, 16, 0) }
+	response := decide(handler, result.ConversationID, result.Actions[0].ID, decisionApply)
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "already passed") {
+		t.Fatalf("expected status %d for a move into the past, got %d: %s", http.StatusBadRequest, response.Code, response.Body)
+	}
+	if entry, _ := storedEvent(t, store, userID, dentist); !entry.StartsAt.Equal(at(22, 10, 0)) {
+		t.Fatalf("expected the dentist to stay, got %+v", entry)
 	}
 }

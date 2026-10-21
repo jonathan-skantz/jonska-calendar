@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
 )
 
@@ -20,19 +21,20 @@ type listEventsInput struct {
 }
 
 type listedItem struct {
-	Type      string  `json:"type"`
-	Title     string  `json:"title"`
-	Start     string  `json:"start,omitempty"`
-	End       string  `json:"end,omitempty"`
-	Deadline  string  `json:"deadline,omitempty"`
-	AllDay    bool    `json:"all_day,omitempty"`
-	Kind      string  `json:"kind,omitempty"`
-	Skipped   bool    `json:"skipped,omitempty"`
-	Completed bool    `json:"completed,omitempty"`
-	SharedBy  *string `json:"shared_by,omitempty"`
-	Location  *string `json:"location,omitempty"`
-	BusyFrom  string  `json:"busy_from,omitempty"`
-	BusyTo    string  `json:"busy_to,omitempty"`
+	ID        uuid.UUID `json:"id"`
+	Type      string    `json:"type"`
+	Title     string    `json:"title"`
+	Start     string    `json:"start,omitempty"`
+	End       string    `json:"end,omitempty"`
+	Deadline  string    `json:"deadline,omitempty"`
+	AllDay    bool      `json:"all_day,omitempty"`
+	Kind      string    `json:"kind,omitempty"`
+	Skipped   bool      `json:"skipped,omitempty"`
+	Completed bool      `json:"completed,omitempty"`
+	SharedBy  *string   `json:"shared_by,omitempty"`
+	Location  *string   `json:"location,omitempty"`
+	BusyFrom  string    `json:"busy_from,omitempty"`
+	BusyTo    string    `json:"busy_to,omitempty"`
 }
 
 func (t *turn) listEvents(ctx context.Context, input listEventsInput) (any, string, error) {
@@ -70,14 +72,14 @@ func (t *turn) listed(entry db.TimelineEntry, from, end time.Time) (listedItem, 
 		if entry.DeadlineAt == nil || entry.DeadlineAt.Before(from) || !entry.DeadlineAt.Before(end) {
 			return listedItem{}, false
 		}
-		return listedItem{Type: "task", Title: entry.Title, Deadline: t.format(*entry.DeadlineAt), Completed: entry.IsCompleted}, true
+		return listedItem{ID: entry.ID, Type: "task", Title: entry.Title, Deadline: t.format(*entry.DeadlineAt), Completed: entry.IsCompleted}, true
 	}
 	if entry.StartsAt == nil || entry.EndsAt == nil || !entry.StartsAt.Before(end) || !entry.EndsAt.After(from) {
 		return listedItem{}, false
 	}
 
 	item := listedItem{
-		Type: "event", Title: entry.Title, AllDay: entry.IsAllDay, Skipped: entry.IsSkipped,
+		ID: entry.ID, Type: "event", Title: entry.Title, AllDay: entry.IsAllDay, Skipped: entry.IsSkipped,
 		SharedBy: entry.SharedBy, Location: entry.Location,
 	}
 	if entry.Kind != nil {

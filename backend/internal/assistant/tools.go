@@ -26,11 +26,17 @@ const (
 
 var errToolLimit = errors.New("tool call limit reached for this message; answer with what you have")
 
-// Store is the read access the tools need. Every call is scoped to the
-// signed-in user, like the rest of the API.
+// Store is what the agent may read and write. Every call is scoped to the
+// signed-in user, like the rest of the API, so it only reaches the user's own
+// data.
 type Store interface {
 	ListTimeline(ctx context.Context, userID uuid.UUID) ([]db.TimelineEntry, error)
 	ListTags(ctx context.Context, userID uuid.UUID) ([]db.Tag, error)
+	CreateEvent(ctx context.Context, userID uuid.UUID, event db.Event) (uuid.UUID, error)
+	UpdateEvent(ctx context.Context, userID, eventID uuid.UUID, event db.Event) error
+	DeleteTimelineItem(ctx context.Context, userID, itemID uuid.UUID) error
+	AddTagToItem(ctx context.Context, userID, itemID, tagID uuid.UUID) error
+	CreateReminder(ctx context.Context, userID, eventID uuid.UUID, offsetSeconds int) (uuid.UUID, error)
 }
 
 // Step is one tool call, summarized for the user to see what the agent did.
@@ -48,18 +54,18 @@ type turn struct {
 	now      time.Time
 	tags     []db.Tag
 
-	mu        sync.Mutex
-	calls     int
-	entries   []db.TimelineEntry
-	loaded    bool
-	proposals []Proposal
-	steps     []Step
+	mu      sync.Mutex
+	calls   int
+	entries []db.TimelineEntry
+	loaded  bool
+	actions []Action
+	steps   []Step
 }
 
 func newTurn(store Store, userID uuid.UUID, location *time.Location, now time.Time, tags []db.Tag) *turn {
 	return &turn{
 		store: store, userID: userID, location: location, now: now, tags: tags,
-		proposals: []Proposal{}, steps: []Step{},
+		actions: []Action{}, steps: []Step{},
 	}
 }
 
@@ -69,7 +75,10 @@ func (t *turn) tools() []anthropic.BetaTool {
 	return []anthropic.BetaTool{
 		newTool(t, "list_events", listEventsDescription, t.listEvents),
 		newTool(t, "find_free_slots", findFreeSlotsDescription, t.findFreeSlots),
-		newTool(t, "propose_event", proposeEventDescription, t.proposeEvent),
+		newTool(t, "create_event", createEventDescription, t.createEvent),
+		newTool(t, "move_event", moveEventDescription, t.moveEvent),
+		newTool(t, "skip_event", skipEventDescription, t.skipEvent),
+		newTool(t, "delete_event", deleteEventDescription, t.deleteEvent),
 	}
 }
 
@@ -107,7 +116,8 @@ func newTool[T any](t *turn, name, description string, run toolRun[T]) anthropic
 	return tool
 }
 
-// timeline reads the user's timeline once per message. The caller holds mu.
+// timeline reads the user's timeline once per message, and again after the
+// agent created an event, so later tools see it. The caller holds mu.
 func (t *turn) timeline(ctx context.Context) ([]db.TimelineEntry, error) {
 	if !t.loaded {
 		entries, err := t.store.ListTimeline(ctx, t.userID)
@@ -117,6 +127,15 @@ func (t *turn) timeline(ctx context.Context) ([]db.TimelineEntry, error) {
 		t.entries, t.loaded = entries, true
 	}
 	return t.entries, nil
+}
+
+// canAct refuses another change once the message has made its share. Tools
+// check it before writing anything.
+func (t *turn) canAct() error {
+	if len(t.actions) >= maxActions {
+		return fmt.Errorf("at most %d changes per message", maxActions)
+	}
+	return nil
 }
 
 // date reads a YYYY-MM-DD date as local midnight in the user's zone.
@@ -137,10 +156,45 @@ func (t *turn) at(day time.Time, value, field string) (time.Time, error) {
 	return time.Date(day.Year(), day.Month(), day.Day(), clock.Hour(), clock.Minute(), 0, 0, t.location), nil
 }
 
-// today is the start of the current day in the user's zone.
-func (t *turn) today() time.Time {
+// timedRange is the span from startClock on day to endClock, or lasting
+// duration without an end. It must not have started yet.
+func (t *turn) timedRange(day time.Time, startClock, endClock string, duration time.Duration) (time.Time, time.Time, error) {
+	start, err := t.at(day, startClock, "start_time")
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	end := start.Add(duration)
+	if endClock != "" {
+		if end, err = t.at(day, endClock, "end_time"); err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+	}
+	switch {
+	case !end.After(start):
+		return time.Time{}, time.Time{}, errors.New("end_time must be after start_time on the same date")
+	case start.Before(t.now):
+		return time.Time{}, time.Time{}, errors.New("start_time has already passed")
+	}
+	return start, end, nil
+}
+
+// allDayRange is days whole days from day, ending at midnight after the last
+// one. It must not be in the past.
+func (t *turn) allDayRange(day time.Time, days int) (time.Time, time.Time, error) {
 	local := t.now.In(t.location)
-	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, t.location)
+	if day.Before(time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, t.location)) {
+		return time.Time{}, time.Time{}, errors.New("date has already passed")
+	}
+	return day, day.AddDate(0, 0, days), nil
+}
+
+// eventID reads an event id the model took from list_events.
+func eventID(value string) (uuid.UUID, error) {
+	id, err := uuid.Parse(value)
+	if err != nil {
+		return uuid.Nil, errors.New("event_id must be an id from list_events")
+	}
+	return id, nil
 }
 
 func (t *turn) format(value time.Time) string {

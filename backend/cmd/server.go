@@ -99,6 +99,7 @@ func main() {
 	mux.HandleFunc("DELETE /api/household/members/me", timelineHandler.LeaveHousehold)
 	mux.HandleFunc("GET /api/weather", weatherHandler.Forecast)
 	mux.HandleFunc("POST /api/assistant/messages", assistantHandler.Message)
+	mux.HandleFunc("POST /api/assistant/conversations/{conversationID}/actions/{actionID}", assistantHandler.Decide)
 
 	server := &http.Server{
 		Addr:    ":8080",

@@ -17,7 +17,6 @@ import { LoadingScreen } from "./components/LoadingScreen";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { AssistantDrawer } from "./features/assistant/AssistantDrawer";
-import { proposalToDraft } from "./features/assistant/assistantApi";
 import { useAssistantConversation } from "./features/assistant/useAssistantConversation";
 import { useAuthActions } from "./features/auth/useAuth";
 import { AllDayEvent } from "./features/calendar/AllDayEvent";
@@ -295,17 +294,8 @@ export function CalendarApp({ user }: { user: User }) {
       )}
       {drawer?.kind === "assistant" && (
         <AssistantDrawer
-          turns={assistant.turns}
-          ended={assistant.ended}
-          pendingText={assistant.pendingText}
-          error={getErrorText(assistant.error, "Couldn't reach the assistant")}
-          onSend={assistant.send}
-          onReset={assistant.reset}
-          onOpenProposal={(proposal) => {
-            // The conversation is kept, so reopening the drawer continues it.
-            setDrawer(null);
-            composer.openNew(undefined, proposalToDraft(proposal));
-          }}
+          conversation={assistant}
+          onOpenEvent={openEventById}
           onClose={closeDrawer}
         />
       )}

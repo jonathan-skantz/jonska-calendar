@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { proposalToDraft, sendAssistantMessage } from "./assistantApi";
+import { decideAction, sendAssistantMessage } from "./assistantApi";
 
 describe("assistant API", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -10,7 +10,7 @@ describe("assistant API", () => {
         JSON.stringify({
           conversation_id: "c1",
           reply: "Hi",
-          proposals: [],
+          actions: [],
           steps: [],
           ended: false,
         }),
@@ -31,29 +31,16 @@ describe("assistant API", () => {
     });
   });
 
-  it("turns a proposal into an event form draft", () => {
-    expect(
-      proposalToDraft({
-        title: "Lunch",
-        starts_at: "2026-10-26T12:00:00+01:00",
-        ends_at: "2026-10-26T13:00:00+01:00",
-        is_all_day: false,
-        kind: "attendable",
-        tag_ids: ["tag-1"],
-        reminder_minutes: [30],
-      }),
-    ).toEqual({
-      values: {
-        title: "Lunch",
-        starts_at: "2026-10-26T12:00:00+01:00",
-        ends_at: "2026-10-26T13:00:00+01:00",
-        is_all_day: false,
-        location: undefined,
-        kind: "attendable",
-      },
-      tagIds: ["tag-1"],
-      reminderOffsets: [1800],
-      warnings: [],
-    });
+  it("posts a decision on an action", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+
+    await decideAction("c1", "a1", "apply");
+
+    const [path, options] = fetch.mock.calls[0];
+    expect(path).toBe("/api/assistant/conversations/c1/actions/a1");
+    expect(JSON.parse(options.body)).toEqual({ decision: "apply" });
   });
 });

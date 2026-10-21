@@ -1,7 +1,10 @@
 import { api } from "../../lib/api";
-import { SECONDS_PER_MINUTE, type WeekStartsOn } from "../../lib/calendar";
-import type { AssistantProposal, AssistantReply } from "../../types";
-import type { ResolvedDraft } from "../quickAdd/resolveDraft";
+import type { WeekStartsOn } from "../../lib/calendar";
+import type {
+  AssistantAction,
+  AssistantDecision,
+  AssistantReply,
+} from "../../types";
 
 // The server keeps the conversation; the browser only sends its id with the
 // next message. The time zone and week start are the browser's, because the
@@ -21,21 +24,14 @@ export const sendAssistantMessage = (
     }),
   });
 
-// A proposal opens in the event form the same way a quick add draft does.
-export const proposalToDraft = (
-  proposal: AssistantProposal,
-): ResolvedDraft => ({
-  values: {
-    title: proposal.title,
-    starts_at: proposal.starts_at,
-    ends_at: proposal.ends_at,
-    is_all_day: proposal.is_all_day,
-    location: proposal.location,
-    kind: proposal.kind,
-  },
-  tagIds: proposal.tag_ids ?? [],
-  reminderOffsets: (proposal.reminder_minutes ?? []).map(
-    (minutes) => minutes * SECONDS_PER_MINUTE,
-  ),
-  warnings: proposal.warnings ?? [],
-});
+// Applies or declines a pending change, or undoes a created event. Returns
+// the action with its new status.
+export const decideAction = (
+  conversationId: string,
+  actionId: string,
+  decision: AssistantDecision,
+) =>
+  api<AssistantAction>(
+    `/api/assistant/conversations/${conversationId}/actions/${actionId}`,
+    { method: "POST", body: JSON.stringify({ decision }) },
+  );

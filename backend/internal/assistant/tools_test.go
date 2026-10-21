@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jonathan-skantz/calendar/backend/db"
 )
 
 func TestToolSchemasComeFromInputTypes(t *testing.T) {
-	tools := newTurn(fakeStore{}, uuid.New(), time.UTC, time.Now(), nil).tools()
+	tools := newTurn(nil, uuid.New(), time.UTC, time.Now(), nil).tools()
 	schemas := map[string]struct {
 		Required             []string                  `json:"required"`
 		AdditionalProperties bool                      `json:"additionalProperties"`
@@ -30,10 +31,11 @@ func TestToolSchemasComeFromInputTypes(t *testing.T) {
 		schemas[tool.Name()] = schema
 	}
 
-	if got := slices.Sorted(maps.Keys(schemas)); !slices.Equal(got, []string{"find_free_slots", "list_events", "propose_event"}) {
+	want := []string{"create_event", "delete_event", "find_free_slots", "list_events", "move_event", "skip_event"}
+	if got := slices.Sorted(maps.Keys(schemas)); !slices.Equal(got, want) {
 		t.Fatalf("unexpected tools %v", got)
 	}
-	propose := schemas["propose_event"]
+	propose := schemas["create_event"]
 	if !slices.Equal(propose.Required, []string{"title", "date"}) || propose.AdditionalProperties {
 		t.Fatalf("expected only title and date required and no extra properties, got %+v", propose)
 	}
@@ -102,27 +104,67 @@ func TestReminderMinutes(t *testing.T) {
 	}
 }
 
-func TestProposalTimes(t *testing.T) {
+func TestNewEventTimes(t *testing.T) {
 	now := time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)
-	current := newTurn(fakeStore{}, uuid.New(), time.UTC, now, nil)
+	current := newTurn(nil, uuid.New(), time.UTC, now, nil)
 	at := func(day, hour int) time.Time { return time.Date(2026, 10, day, hour, 0, 0, 0, time.UTC) }
 	tests := []struct {
 		name       string
-		input      proposeEventInput
+		input      createEventInput
 		start, end time.Time
 		err        string
 	}{
-		{"a timed event without an end lasts an hour", proposeEventInput{Date: "2026-10-20", StartTime: "12:00"}, at(20, 12), at(20, 13), ""},
-		{"an all-day event today ends at midnight", proposeEventInput{Date: "2026-10-19", AllDay: true}, at(19, 0), at(20, 0), ""},
-		{"a start earlier today has passed", proposeEventInput{Date: "2026-10-19", StartTime: "08:00"}, time.Time{}, time.Time{}, "start_time has already passed"},
-		{"an all-day event yesterday has passed", proposeEventInput{Date: "2026-10-18", AllDay: true}, time.Time{}, time.Time{}, "date has already passed"},
-		{"an end before the start is rejected", proposeEventInput{Date: "2026-10-20", StartTime: "12:00", EndTime: "11:00"}, time.Time{}, time.Time{}, "end_time must be after"},
-		{"an all-day event takes no times", proposeEventInput{Date: "2026-10-20", AllDay: true, StartTime: "12:00"}, time.Time{}, time.Time{}, "no start_time"},
-		{"a timed event needs a start", proposeEventInput{Date: "2026-10-20"}, time.Time{}, time.Time{}, "start_time is required"},
+		{"a timed event without an end lasts an hour", createEventInput{Date: "2026-10-20", StartTime: "12:00"}, at(20, 12), at(20, 13), ""},
+		{"an all-day event today ends at midnight", createEventInput{Date: "2026-10-19", AllDay: true}, at(19, 0), at(20, 0), ""},
+		{"a start earlier today has passed", createEventInput{Date: "2026-10-19", StartTime: "08:00"}, time.Time{}, time.Time{}, "start_time has already passed"},
+		{"an all-day event yesterday has passed", createEventInput{Date: "2026-10-18", AllDay: true}, time.Time{}, time.Time{}, "date has already passed"},
+		{"an end before the start is rejected", createEventInput{Date: "2026-10-20", StartTime: "12:00", EndTime: "11:00"}, time.Time{}, time.Time{}, "end_time must be after"},
+		{"an all-day event takes no times", createEventInput{Date: "2026-10-20", AllDay: true, StartTime: "12:00"}, time.Time{}, time.Time{}, "no start_time"},
+		{"a timed event needs a start", createEventInput{Date: "2026-10-20"}, time.Time{}, time.Time{}, "start_time is required"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			start, end, err := current.proposalTimes(test.input)
+			test.input.Title = "Lunch"
+			event, _, _, err := current.newEvent(test.input)
+			if test.err != "" {
+				if err == nil || !strings.Contains(err.Error(), test.err) {
+					t.Fatalf("expected an error containing %q, got %v", test.err, err)
+				}
+				return
+			}
+			if err != nil || !event.StartsAt.Equal(test.start) || !event.EndsAt.Equal(test.end) || event.Kind != db.EventKindAttendable {
+				t.Fatalf("expected an attended event %s–%s, got %+v, %v", test.start, test.end, event, err)
+			}
+		})
+	}
+}
+
+func TestMovedTimes(t *testing.T) {
+	stockholm, err := time.LoadLocation("Europe/Stockholm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := newTurn(nil, uuid.New(), stockholm, time.Date(2026, 10, 19, 9, 0, 0, 0, stockholm), nil)
+	at := func(day, hour, minute int) time.Time { return time.Date(2026, 10, day, hour, minute, 0, 0, stockholm) }
+	timed := db.Event{StartsAt: at(22, 10, 30), EndsAt: at(22, 12, 0)}
+	allDay := db.Event{IsAllDay: true, StartsAt: at(23, 0, 0), EndsAt: at(25, 0, 0)}
+	tests := []struct {
+		name       string
+		event      db.Event
+		input      moveEventInput
+		start, end time.Time
+		err        string
+	}{
+		{"a new date keeps the time and duration", timed, moveEventInput{Date: "2026-10-27"}, at(27, 10, 30), at(27, 12, 0), ""},
+		{"a new start keeps the duration", timed, moveEventInput{Date: "2026-10-22", StartTime: "14:00"}, at(22, 14, 0), at(22, 15, 30), ""},
+		{"a new end changes the duration", timed, moveEventInput{Date: "2026-10-22", EndTime: "11:00"}, at(22, 10, 30), at(22, 11, 0), ""},
+		{"an all-day event keeps its days across the time change", allDay, moveEventInput{Date: "2026-10-24"}, at(24, 0, 0), at(26, 0, 0), ""},
+		{"an all-day event moves by date only", allDay, moveEventInput{Date: "2026-10-24", StartTime: "10:00"}, time.Time{}, time.Time{}, "by date only"},
+		{"a move into the past is rejected", timed, moveEventInput{Date: "2026-10-18"}, time.Time{}, time.Time{}, "already passed"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			start, end, err := current.movedTimes(test.event, test.input)
 			if test.err != "" {
 				if err == nil || !strings.Contains(err.Error(), test.err) {
 					t.Fatalf("expected an error containing %q, got %v", test.err, err)

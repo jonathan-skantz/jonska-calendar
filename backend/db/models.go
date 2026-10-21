@@ -147,3 +147,26 @@ type TimelineEntry struct {
 	Tags                 []Tag      `json:"tags,omitempty"`
 	MainTagID            *uuid.UUID `json:"main_tag_id,omitempty"`
 }
+
+// Event returns the stored fields of one of the user's own events, ready to
+// change and pass to UpdateEvent. Entries of events shared with the user hold
+// the recipient's view instead, so they must not be written back.
+func (entry TimelineEntry) Event() Event {
+	event := Event{
+		ID: entry.ID, Title: entry.Title, Description: entry.Description, URL: entry.URL,
+		IsAllDay: entry.IsAllDay, StartIsApproximate: entry.StartIsApproximate, EndIsApproximate: entry.EndIsApproximate,
+		IsSkipped: entry.IsSkipped, Location: entry.Location,
+		GatheringSeconds: entry.GatheringSeconds, GatheringIsOptional: entry.GatheringIsOptional, GatheringLabel: entry.GatheringLabel,
+		CommuteBeforeSeconds: entry.CommuteBeforeSeconds, CommuteAfterSeconds: entry.CommuteAfterSeconds,
+	}
+	if entry.StartsAt != nil && entry.EndsAt != nil {
+		event.StartsAt, event.EndsAt = *entry.StartsAt, *entry.EndsAt
+	}
+	if entry.Kind != nil {
+		event.Kind = *entry.Kind
+	}
+	if entry.MainTagID != nil {
+		event.MainTagID = *entry.MainTagID
+	}
+	return event
+}

@@ -588,7 +588,7 @@
   content: "✓ ";
 }
 
-.assistant-proposal {
+.assistant-action {
   display: grid;
   gap: 4px;
   padding: 10px 12px;
@@ -596,9 +596,29 @@
   border-left: 3px solid var(--moss);
 }
 
-.assistant-proposal .primary-button {
-  justify-self: start;
-  margin: 6px 0 0;
+.assistant-action.pending {
+  border-left-color: var(--yellow);
+}
+
+.assistant-action.declined,
+.assistant-action.undone {
+  opacity: 0.6;
+}
+
+.assistant-action-kind {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.assistant-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.assistant-action-buttons .primary-button {
+  margin: 0;
   padding: 8px 12px;
 }
 

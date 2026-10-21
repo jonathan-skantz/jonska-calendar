@@ -174,16 +174,22 @@ instead".
       commute, mandatory gathering, and attended all-day events are busy;
       optional gathering is busy only after a commute. This is the only part
       of conflict detection in the demo.
-- [x] It can propose new events. A proposal shows the date and time and opens
-      in the new-event form, like quick add. Nothing is saved until the user
-      presses Save, and the assistant never changes existing data.
+- [x] It creates new events right away. Each one shows as a card with Open
+      (edit it in the event form) and Undo (delete it).
+- [x] It can move, skip, unskip, or delete the user's own events, but only
+      asks: each change shows as a card with Apply and Decline, and nothing
+      changes until the user applies it. A change is applied to the event as
+      it is then and checked like any edit. Events shared with the user are
+      never changed.
+- [x] The assistant hears what the user applied, declined, or undid with
+      their next message, along with what still waits for them.
 - [x] Each answer lists what the assistant checked. It may ask a follow-up
       question; the conversation keeps its context for 30 minutes or 10
-      messages. Each user can send 20 messages per hour.
-- [ ] Changing, moving, skipping, or deleting events from the assistant (moves
-      and deletes after the user confirms them), sharing (always confirmed),
-      weather-aware suggestions, and fitting tasks into free time are
-      **Future**.
+      messages, and its cards work for those 30 minutes even after it can
+      take no more messages. Each user can send 20 messages per hour.
+- [ ] Sharing from the assistant (always confirmed), weather-aware
+      suggestions, undoing applied changes, and fitting tasks into free time
+      are **Future**.
 
 ### Timeline Item Type 2: Tasks
 
