@@ -93,6 +93,7 @@ func createdID(t *testing.T, response *httptest.ResponseRecorder) uuid.UUID {
 func TestListTimelineNeedsARange(t *testing.T) {
 	handler := New(nil, testutil.SignedInAs(uuid.New()))
 	for name, query := range map[string]string{
+		"missing":   "",
 		"only from": "?from=2026-10-01T00:00:00Z",
 		"not times": "?from=monday&to=friday",
 		"reversed":  "?from=2026-10-02T00:00:00Z&to=2026-10-01T00:00:00Z",

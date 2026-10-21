@@ -84,7 +84,10 @@ describe("AssistantDrawer", () => {
     expect(screen.getByText('No tag named "gym"')).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Open" }));
-    expect(props.onOpenEvent).toHaveBeenCalledWith("e1");
+    expect(props.onOpenEvent).toHaveBeenCalledWith(
+      "e1",
+      "2026-10-26T12:00:00+01:00",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(props.decide).toHaveBeenCalledWith(created, "undo");
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));

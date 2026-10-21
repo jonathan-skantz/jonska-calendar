@@ -120,7 +120,7 @@ func TestStrangersCannotChangeSeries(t *testing.T) {
 		weeklySeries("Taken"), nil); !errors.Is(err, db.ErrEventNotFound) {
 		t.Fatalf("split: expected ErrEventNotFound, got %v", err)
 	}
-	if entries, _ := store.ListTimeline(ctx, strangerID); len(entries) != 0 {
+	if entries, _ := store.ListTimeline(ctx, strangerID, week(-1), week(10)); len(entries) != 0 {
 		t.Fatalf("a failed split must create nothing, got %+v", entries)
 	}
 	entry, err := store.GetOwnEvent(ctx, ownerID, eventID)
@@ -148,7 +148,7 @@ func TestRecipientsSeeSeriesWithoutTheOwnersSkips(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries, err := store.ListTimeline(ctx, recipientID)
+	entries, err := store.ListTimeline(ctx, recipientID, week(-1), week(10))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestRecipientsSeeSeriesWithoutTheOwnersSkips(t *testing.T) {
 	if exception := entries[0].Exceptions[0]; exception.IsSkipped != nil || exception.StartsAt == nil {
 		t.Fatalf("recipients see moves but never skips, got %+v", exception)
 	}
-	owned, err := store.ListTimeline(ctx, ownerID)
+	owned, err := store.ListTimeline(ctx, ownerID, week(-1), week(10))
 	if err != nil {
 		t.Fatal(err)
 	}

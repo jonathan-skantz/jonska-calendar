@@ -14,6 +14,11 @@ export const getDefaultEventTagSelection = (tags: Tag[]): EventTagSelection => {
   };
 };
 
+// Identifies an entry on screen: an item, or one occurrence of a repeating
+// event, which shares its event's id.
+export const entryKey = (entry: TimelineEntry) =>
+  entry.occurrence_start ? `${entry.id}@${entry.occurrence_start}` : entry.id;
+
 export const getTimelineEntryDate = (entry: TimelineEntry) =>
   entry.type === "event" ? entry.starts_at : entry.deadline_at;
 

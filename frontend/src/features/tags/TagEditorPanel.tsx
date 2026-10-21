@@ -1,6 +1,6 @@
 import { getErrorText } from "../../lib/requestErrors";
 import type { Tag } from "../../types";
-import { useWorkspace } from "../timeline/useWorkspace";
+import { useTags } from "./useTags";
 import { TagEditorDrawer } from "./TagEditorDrawer";
 import { useTagMutations } from "./useTagMutations";
 
@@ -16,7 +16,7 @@ export const TagEditorPanel = ({
   onClose,
   onTagDeleted,
 }: TagEditorPanelProps) => {
-  const tags = useWorkspace().data?.tags ?? [];
+  const tags = useTags().data ?? [];
   const { updateTag, updateDefaultTag, deleteTag } =
     useTagMutations(onTagDeleted);
   const remove = (tag: Tag) => {

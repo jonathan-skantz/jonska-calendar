@@ -4,7 +4,7 @@ import { HouseholdSettings } from "../household/HouseholdSettings";
 import { useHousehold, useHouseholdMutations } from "../household/useHousehold";
 import { IcsSettings } from "../icalendar/IcsSettings";
 import { icsExportUrl, useIcsImport } from "../icalendar/useIcsImport";
-import { useWorkspace } from "../timeline/useWorkspace";
+import { useTags } from "../tags/useTags";
 import { SettingsPage } from "./SettingsPage";
 
 type SettingsScreenProps = {
@@ -18,7 +18,7 @@ export const SettingsScreen = ({ user, onBack }: SettingsScreenProps) => {
   const { updateDisplayName } = useAuthActions();
   const household = useHousehold().data ?? null;
   const householdMutations = useHouseholdMutations();
-  const tags = useWorkspace().data?.tags ?? [];
+  const tags = useTags().data ?? [];
   const icsImport = useIcsImport();
 
   return (

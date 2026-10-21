@@ -7,7 +7,7 @@ import type { AssistantConversation } from "./useAssistantConversation";
 
 type AssistantDrawerProps = {
   conversation: AssistantConversation;
-  onOpenEvent: (eventId: string) => void;
+  onOpenEvent: (eventId: string, startsAt: string) => void;
   onClose: () => void;
 };
 
@@ -72,7 +72,9 @@ export const AssistantDrawer = ({
                         : undefined
                     }
                     onDecide={(decision) => decide(action, decision)}
-                    onOpen={() => onOpenEvent(action.event_id)}
+                    onOpen={() =>
+                      onOpenEvent(action.event_id, action.starts_at)
+                    }
                   />
                 ))}
               </>

@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { entryKey } from "../../lib/timeline";
 import type { TimelineEntry } from "../../types";
 import {
   canDrag,
@@ -20,9 +21,9 @@ const LONG_PRESS_SLOP_PX = 8;
 const AUTO_SCROLL_EDGE_PX = 40;
 const AUTO_SCROLL_MAX_PX = 12;
 
-// The item being dragged and where it would land. After the drop it stays
-// there, no longer lifted, until its save has settled.
-export type EntryDrag = { entryId: string; start: Date; dropped?: boolean };
+// The item being dragged, by its entryKey, and where it would land. After the
+// drop it stays there, no longer lifted, until its save has settled.
+export type EntryDrag = { entryKey: string; start: Date; dropped?: boolean };
 
 type DragPointer = Pick<
   PointerEvent,
@@ -130,7 +131,7 @@ export const useEntryDrag = (
       ? setTimeout(() => {
           pickUp();
           navigator.vibrate?.(10);
-          setDrag({ entryId: press.entry.id, start: startTime });
+          setDrag({ entryKey: entryKey(press.entry), start: startTime });
         }, LONG_PRESS_MS)
       : undefined;
     // Moves the item to wherever the pointer now is on the grid.
@@ -145,7 +146,7 @@ export const useEntryDrag = (
       const next = getDropStart(time, press.grabOffset);
       if (start?.getTime() !== next.getTime()) {
         start = next;
-        setDrag({ entryId: press.entry.id, start: next });
+        setDrag({ entryKey: entryKey(press.entry), start: next });
       }
     };
     // Scrolls a frame at a time while the pointer is near an edge; the item
@@ -181,7 +182,11 @@ export const useEntryDrag = (
         event.preventDefault();
         swallowNextClick();
         if (start && start.getTime() !== startTime.getTime()) {
-          const landed = { entryId: press.entry.id, start, dropped: true };
+          const landed = {
+            entryKey: entryKey(press.entry),
+            start,
+            dropped: true,
+          };
           finish();
           setDrag(landed);
           // A failure is shown by the caller; the item then goes back.

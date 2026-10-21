@@ -7,13 +7,15 @@ import {
   useEventShareMutations,
   useEventShares,
 } from "../sharing/useEventShares";
+import { useTags } from "../tags/useTags";
 import { useTimelineMutations } from "../timeline/useTimelineMutations";
-import { useWorkspace } from "../timeline/useWorkspace";
 import { ComposerDrawer } from "./ComposerDrawer";
 import type { Composer } from "./useComposer";
 
 type ComposerPanelProps = {
   composer: Composer;
+  // The loaded entries, for the edited event's latest share count.
+  entries: TimelineEntry[];
   selectedDate: string;
 };
 
@@ -22,10 +24,11 @@ type ComposerPanelProps = {
 // per item (by key) so errors from a previous item don't carry over.
 export const ComposerPanel = ({
   composer,
+  entries,
   selectedDate,
 }: ComposerPanelProps) => {
   const { editingItem } = composer;
-  const { entries = [], tags = [] } = useWorkspace().data ?? {};
+  const tags = useTags().data ?? [];
   const { saveItem, deleteItem } = useTimelineMutations();
   const reminders = useReminderActions();
   const [sharingEvent, setSharingEvent] = useState<TimelineEntry | null>(null);

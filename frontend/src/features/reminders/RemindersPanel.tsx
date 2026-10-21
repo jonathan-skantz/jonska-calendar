@@ -3,7 +3,7 @@ import { useReminderActions } from "./useReminderActions";
 
 type RemindersPanelProps = {
   now: Date;
-  onOpenEvent: (eventId: string) => void;
+  onOpenEvent: (eventId: string, startsAt: string) => void;
   onClose: () => void;
 };
 

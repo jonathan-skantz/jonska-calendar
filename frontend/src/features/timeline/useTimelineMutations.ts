@@ -2,13 +2,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { invalidateWorkspace } from "../../lib/queryInvalidation";
 import { queryKeys } from "../../lib/queryKeys";
+import { entryKey } from "../../lib/timeline";
 import {
   buildMoveRequest,
   buildTimelineItemRequest,
   getEventTagChanges,
 } from "./timelineRequests";
 import type { Tag, TimelineEntry } from "../../types";
-import type { Workspace } from "./useWorkspace";
+
+type TimelineSnapshot = [readonly unknown[], TimelineEntry[] | undefined][];
 
 export type SaveItemInput = {
   type: "event" | "task";
@@ -93,34 +95,34 @@ const saveItem = async ({
 export const useTimelineMutations = () => {
   const queryClient = useQueryClient();
   const refreshWorkspace = () => invalidateWorkspace(queryClient);
-  // Shows a change to one entry at once. A failed request puts the old
-  // workspace back, and either way the workspace is refetched afterwards.
+  // Shows a change to one entry at once, in every loaded range. A failed
+  // request puts the old entries back, and either way the calendar is
+  // refetched afterwards.
   const optimisticEntryUpdate = (
     toUpdated: (input: TimelineEntry) => TimelineEntry,
   ) => ({
     onMutate: async (input: TimelineEntry) => {
       const updated = toUpdated(input);
-      await queryClient.cancelQueries({ queryKey: queryKeys.workspace });
-      const previous = queryClient.getQueryData<Workspace>(queryKeys.workspace);
-      queryClient.setQueryData<Workspace>(
-        queryKeys.workspace,
-        (workspace) =>
-          workspace && {
-            ...workspace,
-            entries: workspace.entries.map((item) =>
-              item.id === updated.id ? updated : item,
-            ),
-          },
+      await queryClient.cancelQueries({ queryKey: queryKeys.timelines });
+      const previous: TimelineSnapshot = queryClient.getQueriesData<
+        TimelineEntry[]
+      >({ queryKey: queryKeys.timelines });
+      queryClient.setQueriesData<TimelineEntry[]>(
+        { queryKey: queryKeys.timelines },
+        (entries) =>
+          entries?.map((item) =>
+            entryKey(item) === entryKey(updated) ? updated : item,
+          ),
       );
       return { previous };
     },
     onError: (
       _error: Error,
       _input: TimelineEntry,
-      context?: { previous?: Workspace },
+      context?: { previous: TimelineSnapshot },
     ) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKeys.workspace, context.previous);
+      for (const [queryKey, entries] of context?.previous ?? []) {
+        queryClient.setQueryData(queryKey, entries);
       }
     },
     onSettled: refreshWorkspace,

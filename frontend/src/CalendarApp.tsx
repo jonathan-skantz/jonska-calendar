@@ -54,7 +54,9 @@ import { TagEditorPanel } from "./features/tags/TagEditorPanel";
 import { useTagMutations } from "./features/tags/useTagMutations";
 import { useTagVisibility } from "./features/tags/useTagVisibility";
 import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
-import { useWorkspace } from "./features/timeline/useWorkspace";
+import { timelineRangeFor, useTimeline } from "./features/timeline/useTimeline";
+import { useTags } from "./features/tags/useTags";
+import { entryKey } from "./lib/timeline";
 import { TransitCardDayPills } from "./features/transitCard/TransitCardPill";
 import { TransitCardPanel } from "./features/transitCard/TransitCardPanel";
 import { useTransitCardViews } from "./features/transitCard/useTransitCard";
@@ -70,14 +72,14 @@ type OpenDrawer =
   | { kind: "reminders" }
   | { kind: "sharedEvent"; entry: TimelineEntry };
 
+// An event to open, and the start of the occurrence that is meant.
+type EventToOpen = { eventId: string; startsAt: string };
+
 // The calendar for a signed-in user: the week grid and the state shared
 // across features. Each drawer is a feature container that loads and saves
 // its own data. Rendered inside PreferencesProvider.
 export function CalendarApp({ user }: { user: User }) {
   const { logout } = useAuthActions();
-  const workspaceQuery = useWorkspace();
-  const entries = workspaceQuery.data?.entries ?? [];
-  const tags = workspaceQuery.data?.tags ?? [];
   const [showSettings, setShowSettings] = useState(false);
   const [drawer, setDrawer] = useState<OpenDrawer | null>(null);
   const { preferences } = usePreferences();
@@ -90,9 +92,19 @@ export function CalendarApp({ user }: { user: User }) {
   const isPhone = useMediaQuery(PHONE_MEDIA_QUERY);
   const dayCount = isPhone ? PHONE_DAY_COUNT : WEEK_DAY_COUNT;
   const sidebar = useSidebarState(isPhone);
-  const { rangeStart, selectedDate, setSelectedDate, moveRange, goToToday } =
-    useCalendarState(today, weekStartsOn, dayCount);
+  const {
+    rangeStart,
+    selectedDate,
+    setSelectedDate,
+    moveRange,
+    goToToday,
+    goToDate,
+  } = useCalendarState(today, weekStartsOn, dayCount);
   const dates = getCalendarDates(rangeStart, dayCount);
+  const timelineQuery = useTimeline(timelineRangeFor(dates));
+  const tagsQuery = useTags();
+  const entries = timelineQuery.data ?? [];
+  const tags = tagsQuery.data ?? [];
   const { createTag } = useTagMutations(removeHiddenTag);
   const { toggleTask, moveItem } = useTimelineMutations();
   const { drag, startDrag } = useEntryDrag((moved) =>
@@ -127,13 +139,35 @@ export function CalendarApp({ user }: { user: User }) {
     if (entry.is_shared) setDrawer({ kind: "sharedEvent", entry });
     else composer.edit(entry);
   };
-  // Reminders and their notifications refer to events by id.
-  const openEventById = (eventId: string) => {
-    const entry = entries.find((candidate) => candidate.id === eventId);
-    if (!entry) return;
+  // Reminders, their notifications and the assistant open an event by its id
+  // and the start of the occurrence they mean. One outside the loaded weeks
+  // opens once the calendar has moved to it and loaded it.
+  const [pendingOpen, setPendingOpen] = useState<EventToOpen | null>(null);
+  const findEvent = ({ eventId, startsAt }: EventToOpen) =>
+    entries.find(
+      (candidate) =>
+        candidate.id === eventId &&
+        (!candidate.occurrence_start ||
+          new Date(candidate.starts_at ?? "").getTime() ===
+            new Date(startsAt).getTime()),
+    );
+  const openEvent = (eventId: string, startsAt: string) => {
     setDrawer(null);
-    openEntry(entry);
+    const entry = findEvent({ eventId, startsAt });
+    if (entry) {
+      openEntry(entry);
+      return;
+    }
+    goToDate(new Date(startsAt));
+    setPendingOpen({ eventId, startsAt });
   };
+  // Once the weeks of an event to open have loaded, open it, or give up
+  // when it is not there.
+  if (pendingOpen && timelineQuery.data && !timelineQuery.isPlaceholderData) {
+    const entry = findEvent(pendingOpen);
+    setPendingOpen(null);
+    if (entry) openEntry(entry);
+  }
   const promptForTag = () => {
     const name = window.prompt("Tag name")?.trim();
     if (name) createTag.mutate(name);
@@ -147,7 +181,7 @@ export function CalendarApp({ user }: { user: User }) {
   const closeDrawer = () => setDrawer(null);
   const signOut = () => logout.mutate();
 
-  if (workspaceQuery.isLoading) return <LoadingScreen />;
+  if (timelineQuery.isLoading || tagsQuery.isLoading) return <LoadingScreen />;
 
   const pageError = getErrorText(
     toggleTask.error ?? moveItem.error ?? createTag.error,
@@ -158,7 +192,9 @@ export function CalendarApp({ user }: { user: User }) {
   // The dragged item is drawn where it would land, through the same layout.
   const draggedWeekEntries = drag
     ? weekEntries.map((entry) =>
-        entry.id === drag.entryId ? moveEntry(entry, drag.start) : entry,
+        entryKey(entry) === drag.entryKey
+          ? moveEntry(entry, drag.start)
+          : entry,
       )
     : weekEntries;
   const formatRangeDate = isPhone ? formatShortDate : formatDate;
@@ -239,7 +275,7 @@ export function CalendarApp({ user }: { user: User }) {
               renderAllDay={() =>
                 allDayEventSpans.map((span) => (
                   <AllDayEvent
-                    key={span.entry.id}
+                    key={entryKey(span.entry)}
                     {...span}
                     onEdit={openEntry}
                     reminders={remindersByEvent.get(span.entry.id)}
@@ -269,7 +305,7 @@ export function CalendarApp({ user }: { user: User }) {
                     onEdit={openEntry}
                     onToggleTask={(entry) => toggleTask.mutate(entry)}
                     onDragStart={startDrag}
-                    draggingId={drag?.dropped ? undefined : drag?.entryId}
+                    draggingKey={drag?.dropped ? undefined : drag?.entryKey}
                   />
                   <CalendarDayIndicators
                     preview={
@@ -297,6 +333,7 @@ export function CalendarApp({ user }: { user: User }) {
         <ComposerPanel
           key={`${editingItem?.id ?? "new"}-${composer.type}`}
           composer={composer}
+          entries={entries}
           selectedDate={selectedDate}
         />
       )}
@@ -310,20 +347,20 @@ export function CalendarApp({ user }: { user: User }) {
       {drawer?.kind === "assistant" && (
         <AssistantDrawer
           conversation={assistant}
-          onOpenEvent={openEventById}
+          onOpenEvent={openEvent}
           onClose={closeDrawer}
         />
       )}
       {drawer?.kind === "reminders" && (
         <RemindersPanel
           now={today}
-          onOpenEvent={openEventById}
+          onOpenEvent={openEvent}
           onClose={closeDrawer}
         />
       )}
       <ReminderToasts
         toasts={reminderDelivery.toasts}
-        onOpenEvent={openEventById}
+        onOpenEvent={openEvent}
         onDismiss={reminderDelivery.dismiss}
       />
       {drawer?.kind === "transitCard" && (

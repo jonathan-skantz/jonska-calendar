@@ -14,6 +14,11 @@ const tags = [
   { id: "home", name: "Home", color: "#993366", is_default: false },
 ];
 
+const timelineKey = queryKeys.timeline(
+  "2026-10-08T00:00:00.000Z",
+  "2026-10-29T00:00:00.000Z",
+);
+
 describe("useTimelineMutations", () => {
   beforeEach(() => {
     mockedApi.mockReset();
@@ -159,19 +164,17 @@ describe("useTimelineMutations", () => {
         });
       }
       // The refetch after the failure returns the server's unchanged data.
-      if (path === "/api/timeline") return Promise.resolve([task]);
+      if (path.startsWith("/api/timeline")) return Promise.resolve([task]);
       return Promise.resolve([]);
     });
     const queryClient = new QueryClient();
-    queryClient.setQueryData(queryKeys.workspace, { entries: [task], tags });
+    queryClient.setQueryData(timelineKey, [task]);
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(() => useTimelineMutations(), { wrapper });
     const completed = () =>
-      queryClient.getQueryData<{ entries: TimelineEntry[] }>(
-        queryKeys.workspace,
-      )?.entries[0].is_completed;
+      queryClient.getQueryData<TimelineEntry[]>(timelineKey)?.[0].is_completed;
 
     act(() => result.current.toggleTask.mutate(task));
     await waitFor(() => expect(completed()).toBe(true));
@@ -208,19 +211,17 @@ describe("useTimelineMutations", () => {
           rejectMove = reject;
         });
       }
-      if (path === "/api/timeline") return Promise.resolve([event]);
+      if (path.startsWith("/api/timeline")) return Promise.resolve([event]);
       return Promise.resolve([]);
     });
     const queryClient = new QueryClient();
-    queryClient.setQueryData(queryKeys.workspace, { entries: [event], tags });
+    queryClient.setQueryData(timelineKey, [event]);
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(() => useTimelineMutations(), { wrapper });
     const startsAt = () =>
-      queryClient.getQueryData<{ entries: TimelineEntry[] }>(
-        queryKeys.workspace,
-      )?.entries[0].starts_at;
+      queryClient.getQueryData<TimelineEntry[]>(timelineKey)?.[0].starts_at;
 
     act(() => result.current.moveItem.mutate(moved));
     await waitFor(() => expect(startsAt()).toBe("2026-10-16T14:00:00.000Z"));
@@ -232,6 +233,51 @@ describe("useTimelineMutations", () => {
       ),
     );
     expect(startsAt()).toBe("2026-10-15T10:00:00.000Z");
+    queryClient.clear();
+  });
+
+  it("moves only the dragged occurrence of a repeating event", async () => {
+    const occurrence = (day: number): TimelineEntry => ({
+      id: "series-1",
+      type: "event",
+      title: "Lecture",
+      kind: "attendable",
+      starts_at: `2026-10-${day}T08:00:00.000Z`,
+      ends_at: `2026-10-${day}T09:00:00.000Z`,
+      occurrence_start: `2026-10-${day}T08:00:00.000Z`,
+      is_completed: false,
+    });
+    mockedApi.mockImplementation(() => new Promise(() => {}));
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(timelineKey, [occurrence(20), occurrence(22)]);
+    // Another loaded range that holds the same occurrence.
+    const otherKey = queryKeys.timeline(
+      "2026-10-22T00:00:00.000Z",
+      "2026-11-05T00:00:00.000Z",
+    );
+    queryClient.setQueryData(otherKey, [occurrence(22)]);
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useTimelineMutations(), { wrapper });
+
+    act(() =>
+      result.current.moveItem.mutate({
+        ...occurrence(22),
+        starts_at: "2026-10-23T08:00:00.000Z",
+        ends_at: "2026-10-23T09:00:00.000Z",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<TimelineEntry[]>(otherKey)?.[0].starts_at,
+      ).toBe("2026-10-23T08:00:00.000Z"),
+    );
+    expect(
+      queryClient
+        .getQueryData<TimelineEntry[]>(timelineKey)
+        ?.map((entry) => entry.starts_at),
+    ).toEqual(["2026-10-20T08:00:00.000Z", "2026-10-23T08:00:00.000Z"]);
     queryClient.clear();
   });
 });

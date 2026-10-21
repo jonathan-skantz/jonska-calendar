@@ -59,7 +59,7 @@ describe("useEntryDrag", () => {
 
     pointer("pointerMove", 150, 1440);
     expect(result.current.drag).toEqual({
-      entryId: "event-1",
+      entryKey: "event-1",
       start: new Date(2026, 9, 16, 14, 0),
     });
     expect(document.body.classList.contains("dragging-entry")).toBe(true);
@@ -73,7 +73,7 @@ describe("useEntryDrag", () => {
     expect(document.body.classList.contains("dragging-entry")).toBe(false);
     // Stays at its new place until the save settles.
     expect(result.current.drag).toEqual({
-      entryId: "event-1",
+      entryKey: "event-1",
       start: new Date(2026, 9, 16, 14, 0),
       dropped: true,
     });
@@ -158,7 +158,7 @@ describe("useEntryDrag on touch screens", () => {
     act(() => vi.advanceTimersByTime(1));
     // Lifted in place until the finger moves.
     expect(result.current.drag).toEqual({
-      entryId: "event-1",
+      entryKey: "event-1",
       start: new Date(2026, 9, 15, 10, 0),
     });
     // The page must not scroll under the finger.

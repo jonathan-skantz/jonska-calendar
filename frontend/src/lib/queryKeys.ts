@@ -1,6 +1,11 @@
 export const queryKeys = {
   currentUser: ["current-user"] as const,
+  // Everything the calendar shows; invalidating it refreshes all of these.
   workspace: ["workspace"] as const,
+  tags: ["workspace", "tags"] as const,
+  timelines: ["workspace", "timeline"] as const,
+  timeline: (from: string, to: string) =>
+    ["workspace", "timeline", from, to] as const,
   transitCard: ["transit-card"] as const,
   household: ["household"] as const,
   reminders: ["reminders"] as const,

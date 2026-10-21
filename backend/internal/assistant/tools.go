@@ -31,7 +31,7 @@ var errToolLimit = errors.New("tool call limit reached for this message; answer 
 // signed-in user, like the rest of the API, so it only reaches the user's own
 // data.
 type Store interface {
-	ListTimelineRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]db.TimelineEntry, error)
+	ListTimeline(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]db.TimelineEntry, error)
 	GetOwnEvent(ctx context.Context, userID, eventID uuid.UUID) (db.TimelineEntry, error)
 	ListTags(ctx context.Context, userID uuid.UUID) ([]db.Tag, error)
 	CreateEvent(ctx context.Context, userID uuid.UUID, event db.Event) (uuid.UUID, error)
@@ -119,7 +119,7 @@ func newTool[T any](t *turn, name, description string, run toolRun[T]) anthropic
 // timeline reads the user's items that may happen in [from, to), with each
 // occurrence of a repeating event as its own entry. Tasks are all returned.
 func (t *turn) timeline(ctx context.Context, from, to time.Time) ([]db.TimelineEntry, error) {
-	entries, err := t.store.ListTimelineRange(ctx, t.userID, from, to)
+	entries, err := t.store.ListTimeline(ctx, t.userID, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("loading the calendar failed: %w", err)
 	}

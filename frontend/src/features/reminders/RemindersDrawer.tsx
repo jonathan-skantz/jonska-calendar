@@ -8,7 +8,7 @@ import { usePreferences } from "../calendar/preferencesContext";
 type RemindersDrawerProps = {
   reminders: Reminder[];
   now: Date;
-  onOpenEvent: (eventId: string) => void;
+  onOpenEvent: (eventId: string, startsAt: string) => void;
   onRemove: (reminder: Reminder) => void;
   onClose: () => void;
 };
@@ -53,7 +53,9 @@ export const RemindersDrawer = ({
                     <button
                       type="button"
                       className="reminder-open"
-                      onClick={() => onOpenEvent(reminder.event_id)}
+                      onClick={() =>
+                        onOpenEvent(reminder.event_id, reminder.event_starts_at)
+                      }
                     >
                       <span className="reminder-time">
                         {group.label === "Later" || group.label === "Earlier"

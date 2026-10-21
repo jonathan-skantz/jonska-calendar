@@ -4,7 +4,7 @@ import { usePreferences } from "../calendar/preferencesContext";
 
 type ReminderToastsProps = {
   toasts: ReminderToast[];
-  onOpenEvent: (eventId: string) => void;
+  onOpenEvent: (eventId: string, startsAt: string) => void;
   onDismiss: (reminderId: string) => void;
 };
 
@@ -22,7 +22,7 @@ export const ReminderToasts = ({
             type="button"
             className="reminder-open"
             onClick={() => {
-              onOpenEvent(reminder.event_id);
+              onOpenEvent(reminder.event_id, reminder.event_starts_at);
               onDismiss(reminder.id);
             }}
           >

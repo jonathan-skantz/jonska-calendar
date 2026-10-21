@@ -37,6 +37,15 @@ describe("getRangeAnchor", () => {
 });
 
 describe("useCalendarState", () => {
+  it("goes to the week of a date", () => {
+    const { result } = renderHook(() =>
+      useCalendarState(today, 1, WEEK_DAY_COUNT),
+    );
+    act(() => result.current.goToDate(new Date(2026, 11, 3, 9)));
+    expect(dateKey(result.current.rangeStart)).toBe("2026-11-30");
+    expect(result.current.selectedDate).toBe("2026-12-03");
+  });
+
   it("steps by the visible day count", () => {
     const { result } = renderHook(() =>
       useCalendarState(today, 1, PHONE_DAY_COUNT),

@@ -9,16 +9,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ListTimeline returns all of the user's items and the events shared with
-// them. Repeating events are returned as series, not occurrences.
-func (s *Store) ListTimeline(ctx context.Context, userID uuid.UUID) ([]TimelineEntry, error) {
-	return s.listTimeline(ctx, userID, nil)
-}
-
-// ListTimelineRange is ListTimeline for the events that may happen in
-// [from, to): plain events that overlap it, and series that may have an
-// occurrence in it. Tasks are all returned.
-func (s *Store) ListTimelineRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]TimelineEntry, error) {
+// ListTimeline returns the user's events and the events shared with them
+// that may happen in [from, to): plain events that overlap it, and series
+// that may have an occurrence in it, as series. Tasks are all returned.
+func (s *Store) ListTimeline(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]TimelineEntry, error) {
 	return s.listTimeline(ctx, userID, &timeWindow{from: from, to: to})
 }
 

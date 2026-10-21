@@ -1,4 +1,5 @@
 import type { PointerEvent } from "react";
+import { entryKey } from "../../lib/timeline";
 import type { Reminder, TimelineEntry } from "../../types";
 import { CalendarEntry } from "./CalendarEntry";
 import { layoutDayEntries } from "./timelineView";
@@ -12,9 +13,10 @@ type DayEntriesProps = {
   remindersByEvent: Map<string, Reminder[]>;
   onEdit: (entry: TimelineEntry) => void;
   onToggleTask: (entry: TimelineEntry) => void;
-  // Moving items by dragging; draggingId is the item being dragged.
+  // Moving items by dragging; draggingKey is the entryKey of the item being
+  // dragged.
   onDragStart?: (entry: TimelineEntry, event: PointerEvent) => void;
-  draggingId?: string;
+  draggingKey?: string;
 };
 
 // The timed entries of one day column. Ghosts render first so busy blocks
@@ -27,18 +29,18 @@ export const DayEntries = ({
   onEdit,
   onToggleTask,
   onDragStart,
-  draggingId,
+  draggingKey,
 }: DayEntriesProps) => {
   const { ghosts, busy } = layoutDayEntries(entries, date, now);
   const renderEntry = (item: DayEntryLayout) => (
     <CalendarEntry
-      key={item.entry.id}
+      key={entryKey(item.entry)}
       {...item}
       reminders={remindersByEvent.get(item.entry.id)}
       onEdit={onEdit}
       onToggleTask={onToggleTask}
       onDragStart={onDragStart}
-      isDragging={item.entry.id === draggingId}
+      isDragging={entryKey(item.entry) === draggingKey}
     />
   );
   // Elapsed entries are dimmed together in one wrapper per layer, so a

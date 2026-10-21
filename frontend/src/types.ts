@@ -40,6 +40,24 @@ export type TimelineEntry = {
   share_count?: number;
   tags?: Tag[];
   main_tag_id?: string;
+  // On each occurrence of a repeating event: the start its rule gives it,
+  // which identifies it even when it was moved, and the series' rule.
+  occurrence_start?: string;
+  recurrence?: Recurrence;
+};
+
+export type Weekday = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
+
+// How an event repeats. A monthly rule repeats on the start's day of the
+// month, its weekday as the 1st to 4th of the month, or as the last one.
+// until (YYYY-MM-DD, inclusive) and count are never both set.
+export type Recurrence = {
+  frequency: "daily" | "weekly" | "monthly" | "yearly";
+  interval: number;
+  weekdays?: Weekday[];
+  monthly_by?: "day_of_month" | "weekday" | "last_weekday";
+  until?: string;
+  count?: number;
 };
 
 // A reminder belongs to the current user only and is never shared. It carries
