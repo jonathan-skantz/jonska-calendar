@@ -95,7 +95,9 @@ export function CalendarApp({ user }: { user: User }) {
   const dates = getCalendarDates(rangeStart, dayCount);
   const { createTag } = useTagMutations(removeHiddenTag);
   const { toggleTask, moveItem } = useTimelineMutations();
-  const { drag, startDrag } = useEntryDrag((moved) => moveItem.mutate(moved));
+  const { drag, startDrag } = useEntryDrag((moved) =>
+    moveItem.mutateAsync(moved),
+  );
   const transitCardViews = useTransitCardViews(dates, today, user.id);
   const weatherByDay = useWeather();
   const { reminders, remindersByEvent } = useReminderActions();
@@ -267,7 +269,7 @@ export function CalendarApp({ user }: { user: User }) {
                     onEdit={openEntry}
                     onToggleTask={(entry) => toggleTask.mutate(entry)}
                     onDragStart={startDrag}
-                    draggingId={drag?.entryId}
+                    draggingId={drag?.dropped ? undefined : drag?.entryId}
                   />
                   <CalendarDayIndicators
                     preview={

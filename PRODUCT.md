@@ -269,6 +269,7 @@ separate from events and tasks.
 - [x] Dragging an own event or a task moves it, also to another visible day.
       Its start (a task's deadline) snaps to the nearest half hour and the
       duration is kept. Escape cancels. Shared events can't be dragged.
+      On touch screens, press and hold an item to pick it up.
 
 ## Future Features
 

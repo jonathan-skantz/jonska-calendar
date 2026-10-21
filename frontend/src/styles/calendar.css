@@ -877,6 +877,8 @@
 .grid-entry.draggable {
   cursor: grab;
   user-select: none;
+  /* A long press picks the item up instead of opening the iOS callout. */
+  -webkit-touch-callout: none;
 }
 
 .grid-entry.dragging {

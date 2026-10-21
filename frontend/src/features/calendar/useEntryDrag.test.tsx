@@ -38,6 +38,7 @@ const press = (x: number, y: number, overrides = {}) => ({
   clientX: x,
   clientY: y,
   currentTarget: item,
+  target: item,
   ...overrides,
 });
 
@@ -47,8 +48,11 @@ const pointer = (type: "pointerMove" | "pointerUp", x: number, y: number) =>
   });
 
 describe("useEntryDrag", () => {
-  it("drags to a snapped start in another column and drops", () => {
-    const onDrop = vi.fn();
+  it("drags to a snapped start in another column and drops", async () => {
+    let saved: () => void = () => {};
+    const onDrop = vi.fn(
+      () => new Promise<void>((resolve) => (saved = resolve)),
+    );
     const { result } = renderHook(() => useEntryDrag(onDrop));
     // Grabbed 15 minutes into the event.
     act(() => result.current.startDrag(event, press(50, 1025)));
@@ -66,8 +70,30 @@ describe("useEntryDrag", () => {
       starts_at: new Date(2026, 9, 16, 14, 0).toISOString(),
       ends_at: new Date(2026, 9, 16, 15, 0).toISOString(),
     });
-    expect(result.current.drag).toBeNull();
     expect(document.body.classList.contains("dragging-entry")).toBe(false);
+    // Stays at its new place until the save settles.
+    expect(result.current.drag).toEqual({
+      entryId: "event-1",
+      start: new Date(2026, 9, 16, 14, 0),
+      dropped: true,
+    });
+    await act(async () => saved());
+    expect(result.current.drag).toBeNull();
+  });
+
+  it("lets a failed save put the item back", async () => {
+    let failed: () => void = () => {};
+    const onDrop = vi.fn(
+      () => new Promise<void>((_, reject) => (failed = () => reject())),
+    );
+    const { result } = renderHook(() => useEntryDrag(onDrop));
+    act(() => result.current.startDrag(event, press(50, 1025)));
+    pointer("pointerMove", 150, 1440);
+    pointer("pointerUp", 150, 1440);
+    expect(result.current.drag?.dropped).toBe(true);
+
+    await act(async () => failed());
+    expect(result.current.drag).toBeNull();
   });
 
   it("treats a press that barely moves as a click", () => {
@@ -105,17 +131,94 @@ describe("useEntryDrag", () => {
     expect(onDrop).not.toHaveBeenCalled();
   });
 
-  it("ignores shared events, other buttons and touch", () => {
+  it("ignores shared events and other buttons", () => {
     const { result } = renderHook(() => useEntryDrag(vi.fn()));
     act(() => {
       result.current.startDrag({ ...event, shared_by: "Ana" }, press(50, 1025));
       result.current.startDrag(event, press(50, 1025, { button: 2 }));
-      result.current.startDrag(
-        event,
-        press(50, 1025, { pointerType: "touch" }),
-      );
     });
     pointer("pointerMove", 150, 1440);
     expect(result.current.drag).toBeNull();
+  });
+});
+
+describe("useEntryDrag on touch screens", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const touch = { pointerType: "touch" };
+
+  it("picks an item up after a long press and drops it where it is moved", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useEntryDrag(onDrop));
+    act(() => result.current.startDrag(event, press(50, 1025, touch)));
+
+    act(() => vi.advanceTimersByTime(299));
+    expect(result.current.drag).toBeNull();
+    act(() => vi.advanceTimersByTime(1));
+    // Lifted in place until the finger moves.
+    expect(result.current.drag).toEqual({
+      entryId: "event-1",
+      start: new Date(2026, 9, 15, 10, 0),
+    });
+    // The page must not scroll under the finger.
+    expect(fireEvent.touchMove(window)).toBe(false);
+
+    pointer("pointerMove", 150, 1440);
+    pointer("pointerUp", 150, 1440);
+    expect(onDrop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        starts_at: new Date(2026, 9, 16, 14, 0).toISOString(),
+      }),
+    );
+  });
+
+  it("keeps the grid from scrolling after the pressed block is redrawn", () => {
+    const { result } = renderHook(() => useEntryDrag(vi.fn()));
+    act(() => result.current.startDrag(event, press(50, 1025, touch)));
+    act(() => vi.advanceTimersByTime(300));
+    pointer("pointerMove", 150, 1440);
+
+    // Dragged into another column, the block's old element leaves the page,
+    // but the finger's touch events keep going to it.
+    item.remove();
+    expect(fireEvent.touchMove(item)).toBe(false);
+  });
+
+  it("leaves a quick tap to open the item", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useEntryDrag(onDrop));
+    act(() => result.current.startDrag(event, press(50, 1025, touch)));
+    act(() => vi.advanceTimersByTime(100));
+    pointer("pointerUp", 50, 1025);
+
+    act(() => vi.advanceTimersByTime(500));
+    expect(result.current.drag).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("leaves a moving finger to scrolling and swiping", () => {
+    const { result } = renderHook(() => useEntryDrag(vi.fn()));
+    act(() => result.current.startDrag(event, press(50, 1025, touch)));
+    act(() => vi.advanceTimersByTime(100));
+    pointer("pointerMove", 50, 1060);
+
+    act(() => vi.advanceTimersByTime(500));
+    expect(result.current.drag).toBeNull();
+    expect(fireEvent.touchMove(window)).toBe(true);
+  });
+
+  it("does not save a long press released without moving", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useEntryDrag(onDrop));
+    // An event that starts off the half-hour grid stays where it was.
+    const offGrid = {
+      ...event,
+      starts_at: new Date(2026, 9, 15, 10, 10).toISOString(),
+    };
+    act(() => result.current.startDrag(offGrid, press(50, 1025, touch)));
+    act(() => vi.advanceTimersByTime(300));
+    pointer("pointerUp", 50, 1025);
+    expect(onDrop).not.toHaveBeenCalled();
   });
 });

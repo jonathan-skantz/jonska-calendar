@@ -115,7 +115,8 @@ export const WeekCalendar = ({
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const start = swipeStart.current;
     swipeStart.current = null;
-    if (!start || !onSwipe) return;
+    // A drag that moved an item claims its pointerup; it is not a swipe.
+    if (!start || !onSwipe || event.defaultPrevented) return;
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
     if (
