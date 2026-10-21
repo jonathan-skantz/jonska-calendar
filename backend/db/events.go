@@ -25,41 +25,47 @@ func (s *Store) CreateEvent(ctx context.Context, userID uuid.UUID, event Event) 
 		if err != nil {
 			return err
 		}
-
-		// Without a chosen main tag, the user's default tag is used.
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO events (
-				timeline_item_id, starts_at, ends_at, is_all_day, kind, location,
-				commute_before_seconds, commute_after_seconds, main_tag_id,
-				start_is_approximate, end_is_approximate, gathering_seconds,
-				gathering_is_optional, gathering_label, is_skipped
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE(NULLIF($9, '00000000-0000-0000-0000-000000000000'::uuid), (SELECT default_tag_id FROM users WHERE id = $10)), $11, $12, $13, $14, $15, $16)
-		`, itemID, event.StartsAt, event.EndsAt, event.IsAllDay, event.Kind, event.Location,
-			event.CommuteBeforeSeconds, event.CommuteAfterSeconds, event.MainTagID, userID,
-			event.StartIsApproximate, event.EndIsApproximate, event.GatheringSeconds,
-			event.GatheringIsOptional, event.GatheringLabel, event.IsSkipped); err != nil {
-			return err
-		}
-
-		// The main tag is also the event's first attached tag.
-		result, err := tx.Exec(ctx, `
-			INSERT INTO timeline_item_tags (timeline_item_id, tag_id)
-			SELECT $1, COALESCE(NULLIF($2, '00000000-0000-0000-0000-000000000000'::uuid), default_tag_id)
-			FROM users WHERE id = $3
-		`, itemID, event.MainTagID, userID)
-		if err != nil {
-			return err
-		}
-		if result.RowsAffected() != 1 {
-			return ErrDefaultTagNotFound
-		}
-		return nil
+		return insertEventRows(ctx, tx, userID, itemID, event)
 	})
 	if err != nil {
 		return uuid.Nil, err
 	}
 	return itemID, nil
+}
+
+// insertEventRows writes the event subtype row and attaches its main tag, for
+// a timeline item the caller just created in tx. The caller checks that the
+// main tag, when chosen, belongs to the user.
+func insertEventRows(ctx context.Context, tx pgx.Tx, userID, itemID uuid.UUID, event Event) error {
+	// Without a chosen main tag, the user's default tag is used.
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO events (
+			timeline_item_id, starts_at, ends_at, is_all_day, kind, location,
+			commute_before_seconds, commute_after_seconds, main_tag_id,
+			start_is_approximate, end_is_approximate, gathering_seconds,
+			gathering_is_optional, gathering_label, is_skipped
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE(NULLIF($9, '00000000-0000-0000-0000-000000000000'::uuid), (SELECT default_tag_id FROM users WHERE id = $10)), $11, $12, $13, $14, $15, $16)
+	`, itemID, event.StartsAt, event.EndsAt, event.IsAllDay, event.Kind, event.Location,
+		event.CommuteBeforeSeconds, event.CommuteAfterSeconds, event.MainTagID, userID,
+		event.StartIsApproximate, event.EndIsApproximate, event.GatheringSeconds,
+		event.GatheringIsOptional, event.GatheringLabel, event.IsSkipped); err != nil {
+		return err
+	}
+
+	// The main tag is also the event's first attached tag.
+	result, err := tx.Exec(ctx, `
+		INSERT INTO timeline_item_tags (timeline_item_id, tag_id)
+		SELECT $1, COALESCE(NULLIF($2, '00000000-0000-0000-0000-000000000000'::uuid), default_tag_id)
+		FROM users WHERE id = $3
+	`, itemID, event.MainTagID, userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrDefaultTagNotFound
+	}
+	return nil
 }
 
 func (s *Store) UpdateEvent(ctx context.Context, userID, eventID uuid.UUID, event Event) error {
