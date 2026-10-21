@@ -258,6 +258,15 @@ separate from events and tasks.
 - [x] Days where the sun does not rise or set (polar day or night) show no
       line for the missing event, and no shading when both are missing.
 
+### Week view
+
+- [x] Zoom fits 24, 16, or 12 hours on screen; the rest scrolls. The choice
+      is saved per user in the browser.
+- [x] A Today button returns to the range with today, and today's date is
+      marked in the day headings.
+- [x] Short or narrow blocks show a shorter label; hovering any block shows
+      its full title, time, and location.
+
 ## Future Features
 
 The following product ideas are intentionally deferred from the first demo:

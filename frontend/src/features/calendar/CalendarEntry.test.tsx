@@ -43,6 +43,33 @@ describe("CalendarEntry", () => {
     expect(screen.getByText("~10:00 – 18:00").title).toBe("Approximate start");
   });
 
+  it("keeps the full text in a tooltip for short or narrow blocks", () => {
+    const { container } = renderWithPreferences(
+      <CalendarEntry
+        entry={{ ...entry, location: "Lab", shared_by: "Ana" }}
+        startMinutes={600}
+        durationMinutes={480}
+        trimTop={false}
+        trimBottom={false}
+        placement={{ left: 0, right: 1, raised: false }}
+        continuesFromPreviousDay={false}
+        continuesToNextDay={false}
+        commuteSegments={[]}
+        showBody
+        onEdit={vi.fn()}
+        onToggleTask={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector("article")?.title).toBe(
+      "Workshop\n~10:00 – 18:00\nLab\nfrom Ana",
+    );
+    // Shown instead of the detail lines when the block is one line tall.
+    expect(container.querySelector(".entry-start")?.textContent).toBe(
+      "~10:00 ",
+    );
+  });
+
   const gatheringEntry: TimelineEntry = {
     ...entry,
     kind: "attendable",

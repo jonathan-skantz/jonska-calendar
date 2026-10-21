@@ -861,6 +861,46 @@
   color: inherit;
 }
 
+/* Each entry is a size container, so its text adapts to the zoom level and to
+   the width overlaps leave it. Short blocks get one line, the start time and
+   title; narrow ones drop the detail lines and let the title wrap. */
+.grid-entry {
+  container: entry / size;
+}
+
+.grid-entry:hover {
+  z-index: 5;
+}
+
+.grid-entry .entry-start {
+  display: none;
+  font-size: inherit;
+  font-weight: 500;
+}
+
+@container entry (max-height: 37px) {
+  .entry-start {
+    display: inline;
+  }
+
+  .entry-line {
+    display: none;
+  }
+}
+
+@container entry (max-width: 56px) {
+  .entry-start,
+  .entry-line {
+    display: none;
+  }
+
+  strong {
+    min-height: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 .grid-entry input {
   position: absolute;
   right: 5px;

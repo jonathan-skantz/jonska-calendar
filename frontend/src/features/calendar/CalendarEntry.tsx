@@ -139,6 +139,29 @@ export const CalendarEntry = ({
   const articleFadesStart =
     startIsApproximate && !optionalGathering && !continuesFromPreviousDay;
   const articleFadesEnd = endIsApproximate && !continuesToNextDay;
+  const timeRange =
+    entry.type === "event"
+      ? [
+          formatEventTime(entry.starts_at, startTimeIsApproximate, {
+            preference: timeFormat,
+          }),
+          formatEventTime(entry.ends_at, endIsApproximate, {
+            preference: timeFormat,
+          }),
+        ]
+          .filter(Boolean)
+          .join(" – ")
+      : "Task";
+  // Short or narrow blocks hide their detail lines (see the entry container
+  // queries in calendar.css), so the full text is always in the tooltip.
+  const tooltip = [
+    entry.title,
+    `${entry.is_skipped ? "Skipping · " : ""}${timeRange}`,
+    entry.location,
+    entry.shared_by && `from ${entry.shared_by}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
   const gatheringTime = formatEventTime(
     getGatheringStart(entry),
     startIsApproximate,
@@ -268,6 +291,7 @@ export const CalendarEntry = ({
                 : {}),
             } as CSSProperties
           }
+          title={tooltip}
           onClick={openOnClick}
         >
           {continuesFromPreviousDay && (
@@ -325,30 +349,31 @@ export const CalendarEntry = ({
                 ⇄{" "}
               </i>
             ) : null}
+            {entry.type === "event" && (
+              <span className="entry-start" aria-hidden="true">
+                {formatEventTime(entry.starts_at, startTimeIsApproximate, {
+                  preference: timeFormat,
+                })}{" "}
+              </span>
+            )}
             {entry.title}
           </strong>
           <span
+            className="entry-line"
             title={describeApproximateEdges(
               startIsApproximate,
               endIsApproximate,
             )}
           >
             {entry.is_skipped && "Skipping · "}
-            {entry.type === "event"
-              ? [
-                  formatEventTime(entry.starts_at, startTimeIsApproximate, {
-                    preference: timeFormat,
-                  }),
-                  formatEventTime(entry.ends_at, endIsApproximate, {
-                    preference: timeFormat,
-                  }),
-                ]
-                  .filter(Boolean)
-                  .join(" – ")
-              : "Task"}
+            {timeRange}
           </span>
-          {entry.location && <span>{entry.location}</span>}
-          {entry.shared_by && <span>from {entry.shared_by}</span>}
+          {entry.location && (
+            <span className="entry-line">{entry.location}</span>
+          )}
+          {entry.shared_by && (
+            <span className="entry-line">from {entry.shared_by}</span>
+          )}
           {continuesToNextDay && (
             <ContinuationMarkers
               position="bottom"
