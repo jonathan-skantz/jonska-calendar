@@ -12,6 +12,8 @@ type TransitCardPillProps = {
   // Grid column in the week's Card row; omitted for inline pills.
   column?: number;
   compact?: boolean;
+  // Only the name's initial, for the narrow week columns.
+  short?: boolean;
 };
 
 const describe = (name: string, variant: TransitCardPillVariant) => {
@@ -34,15 +36,22 @@ export const TransitCardPill = ({
   variant,
   column,
   compact = false,
+  short = false,
 }: TransitCardPillProps) => (
   <span
-    className={cx("transit-card-pill", variant, compact && "compact")}
+    className={cx(
+      "transit-card-pill",
+      variant,
+      compact && "compact",
+      short && "short",
+    )}
     style={column === undefined ? undefined : { gridColumn: column + 1 }}
     title={describe(name, variant)}
   >
     <BusIcon crossed={variant === "not_needed"} />
     <span className="all-day-title">
-      {variant === "maybe" ? `${name}?` : name}
+      {short ? name.slice(0, 1).toUpperCase() : name}
+      {variant === "maybe" && "?"}
     </span>
   </span>
 );
@@ -65,6 +74,7 @@ export const TransitCardDayPills = ({
         name={view.day?.display_name ?? fallbackName}
         variant={variant}
         column={index}
+        short
       />
     ) : null;
   });

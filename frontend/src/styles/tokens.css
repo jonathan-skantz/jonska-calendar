@@ -11,6 +11,7 @@
   --transit-conflict: #b8452f;
   --transit-pending: #a3aca6;
   --transit-maybe: #f0a04b;
+  --weekend-tint: #f4f3ee;
 }
 
 /* Layout. The phone breakpoint (max-width: 640px) can't be a custom property

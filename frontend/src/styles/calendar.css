@@ -146,7 +146,7 @@
 }
 
 .day-heading.weekend {
-  background: #fff0ee;
+  background: var(--weekend-tint);
 }
 
 .all-day-row {
@@ -324,6 +324,14 @@
   margin: 0;
 }
 
+/* The week's Card row shows only an initial; the name is in the tooltip. */
+.transit-card-pill.short {
+  justify-self: start;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .bus-icon {
   flex: none;
 }
@@ -373,7 +381,7 @@
 }
 
 .day-column.weekend {
-  background-color: #fff7f5;
+  background-color: var(--weekend-tint);
 }
 
 .day-elapsed-overlay {
