@@ -156,6 +156,7 @@ export function CalendarApp({ user }: { user: User }) {
     <main className="app-shell">
       <TopBar
         email={user.email}
+        displayName={user.display_name}
         sidebarOpen={sidebar.open}
         onToggleSidebar={sidebar.toggle}
         upcomingReminderCount={

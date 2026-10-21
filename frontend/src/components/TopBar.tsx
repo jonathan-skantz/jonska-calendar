@@ -1,5 +1,8 @@
+import { useRef } from "react";
+
 type TopBarProps = {
   email: string;
+  displayName?: string;
   upcomingReminderCount: number;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
@@ -11,6 +14,7 @@ type TopBarProps = {
 
 export function TopBar({
   email,
+  displayName,
   upcomingReminderCount,
   sidebarOpen,
   onToggleSidebar,
@@ -19,6 +23,13 @@ export function TopBar({
   onOpenSettings,
   onLogout,
 }: TopBarProps) {
+  const accountMenu = useRef<HTMLDivElement>(null);
+  // The menu is a native popover: it closes on Escape and outside clicks by
+  // itself, and is closed by hand before a menu action runs.
+  const chooseFromMenu = (action: () => void) => () => {
+    accountMenu.current?.hidePopover?.();
+    action();
+  };
   return (
     <header className="topbar">
       <div className="topbar-start">
@@ -51,13 +62,33 @@ export function TopBar({
           )}
         </button>
         <div className="topbar-account">
-          <button className="text-button" onClick={onOpenSettings}>
-            Settings
+          <button
+            className="account-button"
+            popoverTarget="account-menu"
+            aria-label={`Account menu for ${email}`}
+          >
+            <span className="account-initial" aria-hidden="true">
+              {(displayName || email).slice(0, 1).toUpperCase()}
+            </span>
+            <span aria-hidden="true">▾</span>
           </button>
-          <span className="user-email">{email}</span>
-          <button className="text-button" onClick={onLogout}>
-            Sign out
-          </button>
+          <div
+            id="account-menu"
+            className="account-menu"
+            popover="auto"
+            ref={accountMenu}
+          >
+            <span className="user-email">{email}</span>
+            <button
+              className="text-button"
+              onClick={chooseFromMenu(onOpenSettings)}
+            >
+              Settings
+            </button>
+            <button className="text-button" onClick={chooseFromMenu(onLogout)}>
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     </header>
