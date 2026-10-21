@@ -10,7 +10,9 @@ erDiagram
     tags ||--o{ timeline_item_tags : "is attached"
     events ||--o{ event_shares : "shared as"
     users ||--o{ event_shares : "receives"
+    events ||--o{ event_occurrence_exceptions : "differs in"
     events ||--o{ event_reminders : "has"
+    event_reminders ||--o{ reminder_deliveries : "delivered as"
     users ||--o{ event_reminders : "sets"
     users ||--o{ transit_card_days : "declares"
     households ||--o{ household_members : "has"
@@ -37,7 +39,8 @@ An event stores:
 - `is_skipped`, allowed only on `attendable` events;
 - `location`;
 - commute before and after, in seconds (whole minutes);
-- gathering before the start, in seconds, with an optional flag and label.
+- gathering before the start, in seconds, with an optional flag and label;
+- an optional repeat rule. See [repeating events](#repeating-events).
 
 Schema constraints:
 
@@ -48,6 +51,16 @@ Schema constraints:
 
 - An all-day event ends at **midnight after its last day**. A one-day event on 12 October ends at 00:00 on 13 October.
 - The frontend builds that value. The API only checks `ends_at > starts_at`. See [gotchas](gotchas.md#all-day-end-is-exclusive).
+
+### Repeating events
+
+- A repeating event is an ordinary event with a rule (migration 25): `recurrence_rule` (an RRULE value), `recurrence_time_zone` (the IANA zone its wall-clock times repeat in), and `recurrence_ends_at` (when the last occurrence ends, NULL when it never ends).
+- `starts_at` and `ends_at` are the **first occurrence**. Occurrences are not stored: `backend/internal/recurrence` expands them on read, in the series' zone, so 10:00 stays 10:00 across daylight saving changes.
+- `GET /api/timeline` finds series that may have an occurrence in its range through `recurrence_ends_at`, then `timeline.ExpandTimeline` expands them. The assistant and the reminder list use the same expansion.
+- `event_occurrence_exceptions` holds the occurrences that differ from their series, keyed by `(event_id, original_start)`, the start the rule gives them (an iCalendar RECURRENCE-ID). An occurrence can be cancelled, moved (`starts_at`, `ends_at`), or skipped. Nothing else differs per occurrence.
+- An exception's `is_skipped` is the owner's own decision and is never sent to recipients.
+- The handler works out the rule, the end, and which exceptions still match it (`backend/internal/timeline/scopes.go`). The store writes what it is given and checks ownership.
+- "This and following" is `Store.SplitSeries`. In one transaction it ends the old series the day before the occurrence, creates a new series, and copies the tags, the shares with their per-recipient fields, and everyone's reminders. Later exceptions move to the new series when they still match it.
 
 ### Gathering and commute
 
@@ -119,14 +132,17 @@ A share is a **projection**, not a copy. Nothing is written to the recipient's `
 
 ```text
 events ─── event_reminders ─── user_id
-           (offset_seconds before start, notified_at)
+           (offset_seconds before start)
+event_reminders ─── reminder_deliveries
+           (occurrence_start, notified_at)
 ```
 
 - Private to the user who set them. Nobody else sees them.
 - Anyone who can see an event can set reminders on it: the owner, or a recipient.
 - An offset from `starts_at`, so reminders move with the event. `remind_at` is calculated when listed.
-- `notified_at` records the first delivery, so other tabs and devices do not repeat it. The browser reports it with `POST /api/reminders/{id}/notified`.
-- Moving an event's start clears `notified_at` on its reminders, so they fire again.
+- A reminder fires once for each occurrence: a plain event has one, at its start. `GET /api/reminders` lists a repeating event's reminder for each occurrence that has not ended and starts in the next 31 days.
+- `reminder_deliveries` (migration 26) records the first delivery of each occurrence, by the occurrence's start, so other tabs and devices do not repeat it. The browser reports it with `POST /api/reminders/{id}/notified` and the `occurrence_start`.
+- Moving an event or an occurrence changes its start, so its reminders fire again.
 - Removing a share deletes that recipient's reminders for the event, in the same transaction.
 - Reminders fire only while a browser tab is open. See [gotchas](gotchas.md#not-built-yet).
 

@@ -26,13 +26,13 @@
 | `POST /api/auth/logout`                                                 | None                                                  | `204`; clears the cookie                                                             |
 | `GET /api/auth/me`                                                      | None                                                  | `{ "id", "email" }`, plus `display_name` when set                                    |
 | `PATCH /api/auth/me`                                                    | `display_name` (empty clears it)                      | `204`                                                                                |
-| `GET /api/timeline`                                                     | None                                                  | Array of timeline entries                                                            |
+| `GET /api/timeline?from=&to=`                                           | None                                                  | Events in the range, each occurrence on its own, and all tasks                       |
 | `POST /api/events`                                                      | Event fields                                          | `201` with `{ "id": "<uuid>" }`                                                      |
-| `PUT /api/events/{eventID}`                                             | Event fields                                          | `204`                                                                                |
+| `PUT /api/events/{eventID}?scope=&occurrence=`                          | Event fields                                          | `204`; `200` with `{ "id" }` of the new series for `following`                       |
 | `POST /api/tasks`                                                       | Task fields                                           | `201` with `{ "id": "<uuid>" }`                                                      |
 | `PUT /api/tasks/{taskID}`                                               | Task fields                                           | `204`                                                                                |
 | `PATCH /api/tasks/{taskID}`                                             | `is_completed`                                        | `204`                                                                                |
-| `DELETE /api/timeline/{itemID}`                                         | None                                                  | `204`                                                                                |
+| `DELETE /api/timeline/{itemID}?scope=&occurrence=`                      | None                                                  | `204`                                                                                |
 | `GET /api/tags`                                                         | None                                                  | Array of tags (`id`, `name`, `color`, `is_default`)                                  |
 | `POST /api/tags`                                                        | `name`                                                | `201` with a tag                                                                     |
 | `PATCH /api/tags/{tagID}`                                               | `name`, `color` (both required)                       | `204`                                                                                |
@@ -47,7 +47,7 @@
 | `GET /api/reminders`                                                    | None                                                  | Your reminders for events that have not ended                                        |
 | `POST /api/events/{eventID}/reminders`                                  | `offset_seconds`                                      | `201`; `404` event not visible; `409` offset already set                             |
 | `DELETE /api/reminders/{reminderID}`                                    | None                                                  | `204`; `404` not yours                                                               |
-| `POST /api/reminders/{reminderID}/notified`                             | None                                                  | `204`; keeps the first delivery time                                                 |
+| `POST /api/reminders/{reminderID}/notified`                             | `occurrence_start` (optional)                         | `204`; keeps the first delivery time                                                 |
 | `GET /api/transit-card/days?from=&to=`                                  | None                                                  | Array of reported transit-card days                                                  |
 | `PUT /api/transit-card/days`                                            | `from`, `to`, `needed_dates`, `maybe_dates`           | `204`                                                                                |
 | `POST /api/events/parse`                                                | `text` (1 to 500 characters)                          | `{draft, warnings, unresolved}`; `429`, `502`, `503`                                 |
@@ -80,6 +80,8 @@ Required: `title`, `starts_at`, `ends_at`, `kind`.
 | `gathering_label`                                 | Trimmed, at most 40 characters. Blank is stored as NULL. Requires `gathering_seconds`.                                |
 | `description`, `url`, `location`                  | Optional. Blank is stored as NULL.                                                                                    |
 | `main_tag_id`                                     | On create, defaults to your default tag. On update, omitting it keeps the current main tag. Must be one of your tags. |
+| `recurrence`                                      | Optional repeat rule. See [repeating events](#repeating-events). Omitting it makes the event a plain one.             |
+| `time_zone`                                       | The browser's IANA time zone. Required with `recurrence`; the times repeat in it.                                     |
 
 - The database repeats the commute, gathering, all-day, and skip rules as constraints (migrations 14, 18, 19, 20).
 - Durations are seconds in the API. The UI works in minutes and rounds to whole minutes before sending.
@@ -103,7 +105,22 @@ Required: `title`, `starts_at`, `ends_at`, `kind`.
 - Other fields appear only when they have a value. They include `kind`, `starts_at`, `ends_at`, `tags`, `main_tag_id`, and the commute and gathering fields.
 - `is_shared` and `shared_by` (the owner's display name) appear on items shared with you. Those never include tags, `main_tag_id`, commute, or `is_skipped`.
 - `share_count` appears on your own events that you have shared.
-- There is no pagination or date filter. The whole timeline is returned each time. See [gotchas](gotchas.md#the-whole-timeline-loads-every-time).
+- `from` and `to` are required RFC 3339 instants, at most 92 days apart. Events that overlap the range are returned; tasks are all returned. See [gotchas](gotchas.md#tasks-load-every-time).
+- Each occurrence of a repeating event is its own entry with the event's `id`, its own `starts_at` and `ends_at`, `occurrence_start` (the start its rule gives it, which identifies it even when moved), and `recurrence` (the rule).
+
+## Repeating events
+
+- `recurrence` is `{ frequency, interval, weekdays?, monthly_by?, until?, count? }`:
+  - `frequency` is `daily`, `weekly`, `monthly`, or `yearly`, and `interval` is 1 to 99.
+  - `weekdays` (`MO` to `SU`) is for weekly rules and must include the start's weekday; it defaults to it.
+  - `monthly_by` is `day_of_month` (default), `weekday` (the start's weekday as the 1st to 4th of the month), or `last_weekday`.
+  - `until` (`YYYY-MM-DD`, the last date an occurrence may start on) or `count` (1 to 999) ends it. Neither means it never ends.
+- `PUT /api/events/{id}` and `DELETE /api/timeline/{id}` take `scope` (`this`, `following`, or `all`) and `occurrence` (an `occurrence_start`) to change some occurrences of a series:
+  - `this` moves or skips one occurrence; any other change answers `400`. Deleting `this` cancels the occurrence.
+  - `following` ends the series before the occurrence. On `PUT` it starts a new series with the request's fields and answers its id; a `count` the request keeps goes on for the occurrences that are left.
+  - `all` changes the whole series. The series moves as the occurrence moved, keeping its local times, and a weekly series moves to the weekdays the occurrence moved to.
+  - Without `scope`, `PUT` saves the series as stored: its times are the first occurrence's.
+- `400` for an invalid rule or scope, or a scope on an event that does not repeat; `404` for an `occurrence` that the series does not have.
 
 ## Transit card
 
@@ -126,11 +143,12 @@ Required: `title`, `starts_at`, `ends_at`, `kind`.
 
 ## Import and export
 
-- The code is in `backend/internal/ical`. Only `VEVENT`s are read and written; tasks, recurrence, and attendees are not.
+- The code is in `backend/internal/ical`. Only `VEVENT`s are read and written; tasks and attendees are not.
+- Repeating events are read and written with RRULE, EXDATE (cancelled occurrences), and RECURRENCE-ID events (moved, cancelled, or skipped occurrences). A changed occurrence's other changes are dropped with a warning.
 - `POST /api/import/ics` takes the file's text in `ics` and the browser's IANA `time_zone`, used for floating times and all-day dates.
   - `tag_id` is the main tag of every imported event. Leave it out for your default tag. `CATEGORIES` that match your tag names, ignoring case, are attached too. Tags are never created.
   - `dry_run: true` answers what an import would do and writes nothing. The real import runs in one transaction.
-  - `skipped` lists `{title, reason}` for events not imported: recurring, cancelled, no start time, an unreadable time, failed event validation (the reason is the validation message), or `already imported`.
+  - `skipped` lists `{title, reason}` for events not imported: an unsupported repeat rule (RDATE, EXRULE, or a rule outside the ones above), a changed occurrence whose series is not in the file, cancelled, no start time, an unreadable time, failed event validation (the reason is the validation message), or `already imported`.
   - `warnings` lists details that were dropped, such as a reminder after the start or an unknown time zone.
   - A file holds at most 5000 events. A file that is not iCalendar answers `400`.
 - `GET /api/export.ics` returns your own events, not events shared with you, with your tags as `CATEGORIES` and your reminders as `VALARM`s. Fields only this app has are written as `X-JONSKA-*` properties, so importing the file again restores them.

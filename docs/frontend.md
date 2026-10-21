@@ -28,10 +28,10 @@ frontend/src/
 
 All server data lives in TanStack Query. There is no Redux or other global store.
 
-- **Keys:** `lib/queryKeys.ts`, for example `["workspace"]`, `["reminders"]`, `["transit-card", from, to]`.
+- **Keys:** `lib/queryKeys.ts`, for example `["workspace", "timeline", from, to]`, `["workspace", "tags"]`, `["reminders"]`. Invalidating `["workspace"]` refreshes the timeline and tags.
 - **Invalidation:** `lib/queryInvalidation.ts`. Each helper names one user action and the keys it changes. `invalidateWorkspace` also refreshes reminders, because reminders copy the event's title and times.
 - **API wrapper:** `lib/api.ts` sends cookies, throws on non-2xx with the server's text, and returns `undefined` for `204`.
-- **Workspace query:** `features/timeline/useWorkspace.ts` fetches the whole timeline and all tags. The grid filters the visible days in memory.
+- **Timeline query:** `features/timeline/useTimeline.ts` fetches the visible days and a week on each side, with each occurrence of a repeating event as its own entry, and keeps the previous range on screen while the next loads. Tags come from `features/tags/useTags.ts`. The grid filters the visible days in memory.
 
 ### Mutation patterns
 

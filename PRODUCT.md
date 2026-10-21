@@ -208,6 +208,29 @@ instead".
 
 - [ ] The ability to prevent task completion until a starting date/time is **Future**.
 
+### Repeating events (Demo)
+
+- [x] An event can repeat daily, weekly on chosen weekdays, monthly (on its
+      date, on its weekday as the 1st to 4th of the month, or on the last such
+      weekday), or yearly, every N days, weeks, months or years. It repeats
+      forever, until a date, or a number of times. Timed and all-day events
+      can repeat, and times stay at the same local time across daylight
+      saving changes.
+- [x] Repeating events show a 🔁 marker, and hovering one shows how it
+      repeats.
+- [x] Changing, dragging, or deleting an occurrence asks whether it applies to
+      this event, this and following events, or all events. One occurrence can
+      only be moved, skipped, or deleted on its own; other changes apply to
+      several. Changing the following events starts a new series that keeps
+      the tags, shares, and reminders.
+- [x] Recipients of a shared repeating event see every occurrence, including
+      moved and deleted ones. The owner's skips stay private.
+- [x] Reminders fire for each occurrence.
+- [x] The assistant sees occurrences, but repeating events are changed in the
+      app, not by the assistant.
+- [ ] Repeating tasks, a different title or details for one occurrence, and
+      quick add understanding "every Tuesday" are **Future**.
+
 ### Shared transit card (Demo)
 
 A household shares one or more physical transit cards. Declarations are
@@ -276,9 +299,11 @@ separate from events and tasks.
 - [x] Fields only this app has (approximate times, commute, gathering,
       skipped) are kept in the file, so exporting and importing again restores
       them.
-- [ ] Recurring events are skipped and listed in the preview until recurrence
-      exists. Tasks are neither imported nor exported. Subscribing to other
-      calendars by URL and publishing a calendar feed are **Future**.
+- [x] Repeating events are imported and exported with their excluded and
+      changed occurrences. Rules the app cannot repeat by (e.g. several times
+      a day) are skipped and listed in the preview.
+- [ ] Tasks are neither imported nor exported. Subscribing to other calendars
+      by URL and publishing a calendar feed are **Future**.
 
 ### Week view
 
@@ -301,7 +326,7 @@ The following product ideas are intentionally deferred from the first demo:
 - [ ] conflict detection and conflict resolution
 - [ ] task reminders, and reminder delivery while the app is closed (web push or
       a phone app)
-- [ ] recurring events, including birthdays, name days, and holidays
+- [ ] repeating tasks
 - [ ] calendar subscriptions by URL (webcal), and publishing a subscribable feed
 - [ ] automatic task scheduling and scheduled task sessions
 - [ ] task priorities, richer statuses, estimated duration, and event attachments

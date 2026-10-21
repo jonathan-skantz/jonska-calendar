@@ -93,7 +93,17 @@ The server rejects a `from` earlier than yesterday in UTC, because it does not k
 
 ### Imported reminders that already passed count as delivered
 
-`Store.ImportEvents` sets `notified_at` on imported reminders whose time has passed. Otherwise they would all show as "Missed reminder" on the next open.
+`Store.ImportEvents` records a delivery for imported reminders whose time has passed. Otherwise they would all show as "Missed reminder" on the next open.
+
+### Repeating events repeat in their own zone
+
+- A series stores the time zone it was saved in (`recurrence_time_zone`, the browser's) and repeats its wall-clock times there. Viewed from another zone, its occurrences keep the saved zone's local times.
+- `events.starts_at` is a series' **first** occurrence. Code that reads events directly must expand series through `timeline.ExpandTimeline` (or `recurrence.Series`); filtering on `starts_at` alone misses later occurrences.
+- An occurrence is identified by its event's `id` and its `occurrence_start`, which stays the same when it is moved. The frontend keys entries with `entryKey` (`lib/timeline.ts`).
+
+### Exported series have no VTIMEZONE
+
+`.ics` exports write a series' times with a `TZID` that is an IANA name, without a `VTIMEZONE` component. Google, Apple, and this app read that; a strict RFC 5545 reader may not.
 
 ## Setup and tooling
 
@@ -128,21 +138,21 @@ Files are `1_` to `23_`, not zero-padded. Sorting by name puts `10_` before `2_`
 These are not bugs. [PRODUCT.md](../PRODUCT.md) lists the full set of **Future** items.
 
 - **No resizing by drag.** Dragging moves an item; change its length in the form.
-- **No recurrence.** Each occurrence is its own event.
+- **No repeating tasks.** Events repeat; tasks do not.
 - **No month or agenda view.** The grid shows 7 days, or 3 on phones.
 - **Reminders need an open tab.** No push, no background worker. A reminder whose time passed while no tab was open shows as an in-page toast on the next load, not a system notification.
 - **No task reminders.** Event reminders exist.
 - **No task scheduling.** Tasks get no time slots.
-- **Import and export cover events only.** Recurring events in a file are skipped, and tasks and shares are not exported. There are no calendar subscriptions.
+- **Import and export cover events only.** Tasks and shares are not exported, and repeat rules outside the supported ones are skipped. There are no calendar subscriptions.
 - **No password reset, email verification, password change, or account deletion.**
 - **No login throttling, CSRF token, or `Secure` cookie flag.** The cookie is `HttpOnly` and `SameSite=Lax`.
 - **No shared tags or tag adoption.**
-- **No pagination.** `GET /api/timeline` returns everything.
+- **No pagination of tasks.** `GET /api/timeline` returns every task; events are loaded by range.
 - **No graceful shutdown.** The server ignores signals.
 - **No rate limit on login or register.** Only quick add is limited: 30 per user per hour, in memory, reset on restart.
 - **Expired sessions are never deleted.** They are rejected on lookup, but the rows remain.
 - **Tag filters are not saved.** The sidebar's tag filter resets on reload.
 
-### The whole timeline loads every time
+### Tasks load every time
 
-`GET /api/timeline` returns all items and their tags, and the grid filters in memory. That suits a family calendar. It will not scale to thousands of items without change.
+`GET /api/timeline` returns the events in the range it is asked for, but every task with them. The frontend asks for the visible days and a week on each side. That suits a family calendar; many tasks would need a range too.
