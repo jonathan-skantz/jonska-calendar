@@ -123,7 +123,6 @@ These are not bugs. [PRODUCT.md](../PRODUCT.md) lists the full set of **Future**
 - **Reminders need an open tab.** No push, no background worker. A reminder whose time passed while no tab was open shows as an in-page toast on the next load, not a system notification.
 - **No task reminders.** Event reminders exist.
 - **No task scheduling.** Tasks get no time slots.
-- **No overlap columns.** Overlaps stack with an indent.
 - **No calendar import, export, or backup.**
 - **No password reset, email verification, password change, or account deletion.**
 - **No login throttling, CSRF token, or `Secure` cookie flag.** The cookie is `HttpOnly` and `SameSite=Lax`.

@@ -1,11 +1,8 @@
-import {
-  EVENT_OVERLAP_INSET_PIXELS,
-  EVENT_SEPARATOR_PIXELS,
-} from "../../lib/calendar";
+import { EVENT_SEPARATOR_PIXELS } from "../../lib/calendar";
 import type { Tag } from "../../types";
+import type { HorizontalPlacement } from "./timelineView";
 
-// Space kept free at the column's left edge, and the extra step for each
-// earlier overlapping block.
+// Space kept free at each edge of a block, so side-by-side blocks have a gap.
 const BASE_INSET_PIXELS = 3;
 // A busy block over a not-busy ghost leaves this much of the ghost showing.
 const GHOST_EDGE_PIXELS = 8;
@@ -67,25 +64,23 @@ export const getEntryBackground = (
   };
 };
 
-// Later overlapping blocks step in from the left and right so earlier ones
-// stay visible; a block over a ghost steps in on the left only.
+const edgeOffset = (fraction: number) =>
+  `calc(${+(fraction * 100).toFixed(3)}% + ${BASE_INSET_PIXELS}px)`;
+
+// A block placed beside or over others gets its own share of the column; a
+// full-width block over a ghost steps in on the left so the ghost shows.
 export const getHorizontalInsets = (
-  overlapDepth: number,
+  { left, right }: HorizontalPlacement,
   overlapsGhost: boolean,
-) => {
-  const overlap =
-    overlapDepth > 0
-      ? `${BASE_INSET_PIXELS + overlapDepth * EVENT_OVERLAP_INSET_PIXELS}px`
-      : undefined;
-  return {
-    left:
-      overlap ??
-      (overlapsGhost
+) => ({
+  left:
+    left > 0
+      ? edgeOffset(left)
+      : overlapsGhost
         ? `${BASE_INSET_PIXELS + GHOST_EDGE_PIXELS}px`
-        : undefined),
-    right: overlap,
-  };
-};
+        : undefined,
+  right: right < 1 ? edgeOffset(1 - right) : undefined,
+});
 
 type VerticalInsetOptions = {
   trimTop: boolean;

@@ -28,7 +28,7 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 - **Chosen:** a hand-written grid. Items are placed by minutes after local midnight. Hour height is a CSS variable.
 - **Why:** it shows things a calendar component does not: approximate edges, commute and gathering bands, heads-up and skipped states, elapsed overlays, sun lines, and night shading.
 - **Trade-off:** dragging is intentionally absent, so a calendar library's main benefit does not apply.
-- **Reconsider if:** you need drag-and-drop, month or agenda views, or side-by-side overlap columns. See [frontend](frontend.md#the-week-grid).
+- **Reconsider if:** you need drag-and-drop, or month or agenda views. See [frontend](frontend.md#the-week-grid).
 
 ## pgx, not sqlc
 

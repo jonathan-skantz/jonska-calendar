@@ -52,19 +52,23 @@ describe("entry background", () => {
 });
 
 describe("insets", () => {
-  it("steps later overlapping blocks in on both sides", () => {
-    expect(getHorizontalInsets(2, true)).toEqual({
-      left: "15px",
-      right: "15px",
-    });
+  const fullWidth = { left: 0, right: 1, raised: false };
+
+  it("gives a placed block its share of the column", () => {
+    expect(
+      getHorizontalInsets({ left: 0.4, right: 0.7, raised: true }, true),
+    ).toEqual({ left: "calc(40% + 3px)", right: "calc(30% + 3px)" });
+    expect(
+      getHorizontalInsets({ left: 0, right: 1 / 3, raised: false }, false),
+    ).toEqual({ left: undefined, right: "calc(66.667% + 3px)" });
   });
 
-  it("insets a block over a ghost on the left only", () => {
-    expect(getHorizontalInsets(0, true)).toEqual({
+  it("insets a full-width block over a ghost on the left only", () => {
+    expect(getHorizontalInsets(fullWidth, true)).toEqual({
       left: "11px",
       right: undefined,
     });
-    expect(getHorizontalInsets(0, false)).toEqual({
+    expect(getHorizontalInsets(fullWidth, false)).toEqual({
       left: undefined,
       right: undefined,
     });

@@ -114,7 +114,7 @@ const layoutStartTime = (entry: TimelineEntry) =>
     : new Date(getTimelineEntryDate(entry) ?? 0).getTime();
 
 // Ordered by where each entry visually starts, commute included, because
-// overlap depth and adjacency compare each entry with its neighbours.
+// horizontal placement and adjacency compare each entry with its neighbours.
 export const getEntriesForDate = (entries: TimelineEntry[], date: Date) => {
   const rangeStart = startOfDay(date);
   const rangeEnd = addDays(rangeStart, 1);
@@ -266,19 +266,110 @@ export const entriesOverlap = (left: TimelineEntry, right: TimelineEntry) => {
   return leftRange.start < rightRange.end && rightRange.start < leftRange.end;
 };
 
-export const getEventOverlapDepth = (
-  entry: TimelineEntry,
-  earlierEntries: TimelineEntry[],
-) => {
-  if (entry.type !== "event" || !entry.starts_at) return 0;
+// Overlapping events that start within this many minutes of each other sit
+// side by side. A later one cascades over the earlier block instead, indented
+// so the earlier event's text stays visible beside it. An hour fits the title
+// and time lines even at the smallest hour height.
+const SIDE_BY_SIDE_START_MINUTES = 60;
+// Share of an overlapped block's width, from its left edge, that a later block
+// leaves uncovered, so the earlier block's text and end stay visible.
+const CASCADE_INDENT_FRACTION = 0.4;
+const FRACTION_EPSILON = 1e-9;
 
-  const startsAt = getOccupiedRange(entry).start;
-  return earlierEntries.filter(
-    (earlierEntry) =>
-      earlierEntry.type === "event" &&
-      earlierEntry.ends_at &&
-      getOccupiedRange(earlierEntry).end > startsAt,
-  ).length;
+export type HorizontalPlacement = {
+  // Edges as fractions of the day column's width.
+  left: number;
+  right: number;
+  // Drawn over an earlier block, or in a column beside an earlier one.
+  raised: boolean;
+};
+
+type Span = [left: number, right: number];
+
+const FULL_WIDTH: HorizontalPlacement = { left: 0, right: 1, raised: false };
+
+// The widest stretch of the day column that leaves every strip uncovered. Of
+// equally wide stretches the rightmost wins, so cascades step in from the left.
+const widestFreeSpan = (strips: Span[]): Span => {
+  let best: Span = [0, 0];
+  let cursor = 0;
+  for (const [left, right] of [
+    ...[...strips].sort((a, b) => a[0] - b[0]),
+    [1, 1],
+  ]) {
+    const width = left - cursor;
+    if (
+      width > FRACTION_EPSILON &&
+      width >= best[1] - best[0] - FRACTION_EPSILON
+    )
+      best = [cursor, left];
+    cursor = Math.max(cursor, right);
+  }
+  return best;
+};
+
+// One placement per entry of a start-ordered layer. Overlapping events that
+// start close together form a group that shares a span in equal columns; an
+// event reuses the first column that is free by the time it starts. A group
+// that starts later takes the widest span that keeps the left part of every
+// block it overlaps visible: over one full-width block that is a cascade, and
+// over several columns it fits beside or inside them without hiding any.
+export const getHorizontalPlacements = (
+  layer: TimelineEntry[],
+): HorizontalPlacement[] => {
+  type Group = { start: Date; span: Span; columns: number[][] };
+  const groups: Group[] = [];
+  const columnByIndex = new Map<number, { group: Group; column: number }>();
+
+  const placementOf = (index: number): HorizontalPlacement => {
+    const placed = columnByIndex.get(index);
+    if (!placed) return FULL_WIDTH;
+    const { group, column } = placed;
+    const [spanLeft, spanRight] = group.span;
+    const width = (spanRight - spanLeft) / group.columns.length;
+    return {
+      left: spanLeft + column * width,
+      right: spanLeft + (column + 1) * width,
+      raised: spanLeft > 0 || column > 0,
+    };
+  };
+
+  layer.forEach((entry, index) => {
+    if (entry.type !== "event" || !entry.starts_at || !entry.ends_at) return;
+    const start = getOccupiedRange(entry).start;
+    const overlappingMembers = [...columnByIndex.keys()].filter((member) =>
+      entriesOverlap(layer[member], entry),
+    );
+    const target = groups.findLast((group) =>
+      overlappingMembers.some(
+        (member) => columnByIndex.get(member)?.group === group,
+      ),
+    );
+    const joinsTarget =
+      target && start < addMinutes(target.start, SIDE_BY_SIDE_START_MINUTES);
+    const group: Group = joinsTarget
+      ? target
+      : {
+          start,
+          span: widestFreeSpan(
+            overlappingMembers.map((member) => {
+              const { left, right } = placementOf(member);
+              return [left, left + (right - left) * CASCADE_INDENT_FRACTION];
+            }),
+          ),
+          columns: [],
+        };
+    if (!joinsTarget) groups.push(group);
+    // Members of a column never overlap, so its last member ends latest.
+    let column = group.columns.findIndex(
+      (members) => !entriesOverlap(layer[members[members.length - 1]], entry),
+    );
+    if (column < 0) column = group.columns.push([]) - 1;
+    group.columns[column].push(index);
+    columnByIndex.set(index, { group, column });
+  });
+
+  return layer.map((_, index) => placementOf(index));
 };
 
 const clipToDay = (start: Date, end: Date, date: Date) => {
@@ -413,7 +504,7 @@ export type DayEntryLayout = ReturnType<typeof getCalendarEntryLayout> & {
   entry: TimelineEntry;
   trimTop: boolean;
   trimBottom: boolean;
-  overlapDepth: number;
+  placement: HorizontalPlacement;
   commuteSegments: CommuteSegment[];
   gatheringSegment: GatheringSegment | null;
   showBody: boolean;
@@ -433,18 +524,20 @@ export const layoutDayEntries = (
   );
   const ghosts = timed.filter((entry) => !isBusy(entry));
   const busy = timed.filter(isBusy);
-  const layoutLayer = (layer: TimelineEntry[]): DayEntryLayout[] =>
-    layer.map((entry, index) => ({
+  const layoutLayer = (layer: TimelineEntry[]): DayEntryLayout[] => {
+    const placements = getHorizontalPlacements(layer);
+    return layer.map((entry, index) => ({
       ...getCalendarEntryLayout(entry, now, date),
       ...getEventAdjacency(entry, layer[index - 1], layer[index + 1]),
       entry,
-      overlapDepth: getEventOverlapDepth(entry, layer.slice(0, index)),
+      placement: placements[index],
       commuteSegments: getCommuteSegments(entry, date),
       gatheringSegment: getGatheringSegment(entry, date),
       showBody: eventBodyOverlapsDate(entry, date),
       overlapsGhost:
         isBusy(entry) && ghosts.some((ghost) => entriesOverlap(entry, ghost)),
     }));
+  };
   return { ghosts: layoutLayer(ghosts), busy: layoutLayer(busy) };
 };
 

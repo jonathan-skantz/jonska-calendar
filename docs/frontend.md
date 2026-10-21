@@ -73,7 +73,7 @@ flowchart TD
 
 - **Busy vs ghost:** busy entries take up time. Ghosts are faint and do not count as busy. Busy blocks paint over ghosts.
 - **Occupied range:** includes commute before and after, and mandatory gathering. `getOccupiedRange` (`lib/timeline.ts`) computes it. It is cached in a `WeakMap` by object identity, so refetched data gets fresh results.
-- **Overlaps** are indented by 6px per earlier overlapping entry. They do not sit side by side. Columns are not implemented.
+- **Overlaps** (`getHorizontalPlacements`): events whose occupied ranges overlap and that start within an hour of each other sit side by side in equal columns, and an event reuses a column that is free by its start. An event that starts later never covers the left 40% of a block it overlaps, so that block's title, time and end stay visible. It takes the widest free stretch, preferring the right: over one full-width block that is a cascade, and over several columns it fits inside the rightmost one. Tasks stay full width. Busy and ghost layers are placed separately.
 - **Multi-day timed events** are split into one segment per day.
 - **Tasks** are fixed 90-minute blocks at their deadline, on the deadline's day.
 - **Elapsed:** the occupied range has ended. An event is not elapsed until its commute home is done.

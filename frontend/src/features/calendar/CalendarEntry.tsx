@@ -13,7 +13,11 @@ import {
   isBusy,
   getOrderedStripTags,
 } from "../../lib/timeline";
-import type { CommuteSegment, GatheringSegment } from "./timelineView";
+import type {
+  CommuteSegment,
+  GatheringSegment,
+  HorizontalPlacement,
+} from "./timelineView";
 import type { Reminder, TimelineEntry } from "../../types";
 import { describeReminders } from "../reminders/reminders";
 import { cx } from "../../lib/classNames";
@@ -34,7 +38,7 @@ type CalendarEntryProps = {
   durationMinutes: number;
   trimTop: boolean;
   trimBottom: boolean;
-  overlapDepth: number;
+  placement: HorizontalPlacement;
   continuesFromPreviousDay: boolean;
   continuesToNextDay: boolean;
   commuteSegments: CommuteSegment[];
@@ -76,7 +80,7 @@ export const CalendarEntry = ({
   durationMinutes,
   trimTop,
   trimBottom,
-  overlapDepth,
+  placement,
   continuesFromPreviousDay,
   continuesToNextDay,
   commuteSegments,
@@ -92,8 +96,8 @@ export const CalendarEntry = ({
   const [continuationMarkerCount, setContinuationMarkerCount] = useState(1);
   const mainTag = getMainTag(entry);
   const accentColor = mainTag?.color ?? "var(--yellow)";
-  const hasEarlierOverlap = overlapDepth > 0;
-  const insets = getHorizontalInsets(overlapDepth, overlapsGhost);
+  const hasEarlierOverlap = placement.raised;
+  const insets = getHorizontalInsets(placement, overlapsGhost);
   // Heads-up and skipped events don't take up time: an outlined ghost that
   // busy blocks draw over, marked with why it is not busy.
   const isGhost = entry.type === "event" && !isBusy(entry);
