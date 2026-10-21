@@ -104,28 +104,13 @@ func carryOut(ctx context.Context, store Store, userID uuid.UUID, action Action,
 	case decision == decisionUndo, action.Kind == kindDelete:
 		return store.DeleteTimelineItem(ctx, userID, action.EventID)
 	}
-	entries, err := store.ListTimeline(ctx, userID)
+	entry, err := ownEvent(ctx, store, userID, action.EventID)
 	if err != nil {
 		return err
-	}
-	entry, ok := ownedEvent(entries, action.EventID)
-	if !ok {
-		return db.ErrEventNotFound
 	}
 	event, err := change(entry.Event(), action, now)
 	if err != nil {
 		return err
 	}
 	return store.UpdateEvent(ctx, userID, action.EventID, event)
-}
-
-// ownedEvent finds one of the user's own events. Events shared with the user
-// are read-only.
-func ownedEvent(entries []db.TimelineEntry, id uuid.UUID) (db.TimelineEntry, bool) {
-	for _, entry := range entries {
-		if entry.ID == id && entry.Type == "event" && !entry.IsShared {
-			return entry, true
-		}
-	}
-	return db.TimelineEntry{}, false
 }

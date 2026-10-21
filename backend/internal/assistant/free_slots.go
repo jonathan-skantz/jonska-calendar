@@ -39,7 +39,8 @@ func (t *turn) findFreeSlots(ctx context.Context, input findFreeSlotsInput) (any
 	if err != nil {
 		return nil, "", err
 	}
-	entries, err := t.timeline(ctx)
+	// Commute and gathering can block up to a day each around an event.
+	entries, err := t.timeline(ctx, window.start.Add(-48*time.Hour), window.end.Add(48*time.Hour))
 	if err != nil {
 		return nil, "", err
 	}

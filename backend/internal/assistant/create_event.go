@@ -52,7 +52,6 @@ func (t *turn) createEvent(ctx context.Context, input createEventInput) (any, st
 	if err != nil {
 		return nil, "", fmt.Errorf("saving the event failed: %w", err)
 	}
-	t.loaded = false
 	// The event exists now; the extras are best effort and reported.
 	warnings = append(warnings, t.addExtras(ctx, id, tagIDs, reminders)...)
 

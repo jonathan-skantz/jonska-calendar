@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/ratelimit"
+	"github.com/jonathan-skantz/calendar/backend/internal/recurrence"
 	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
@@ -185,11 +186,14 @@ func seedEvent(t *testing.T, store *db.Store, userID uuid.UUID, event db.Event) 
 // storedEvent returns the user's own event id, and false once it is gone.
 func storedEvent(t *testing.T, store *db.Store, userID, id uuid.UUID) (db.TimelineEntry, bool) {
 	t.Helper()
-	entries, err := store.ListTimeline(context.Background(), userID)
+	entry, err := store.GetOwnEvent(context.Background(), userID, id)
+	if errors.Is(err, db.ErrEventNotFound) {
+		return db.TimelineEntry{}, false
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
-	return ownedEvent(entries, id)
+	return entry, true
 }
 
 func send(handler *Handler, body string) *httptest.ResponseRecorder {
@@ -531,5 +535,37 @@ func TestMovesCannotBeAppliedOnceTheirTimeHasPassed(t *testing.T) {
 	}
 	if entry, _ := storedEvent(t, store, userID, dentist); !entry.StartsAt.Equal(at(22, 10, 0)) {
 		t.Fatalf("expected the dentist to stay, got %+v", entry)
+	}
+}
+
+func TestRepeatingEventsAreSeenButNotChanged(t *testing.T) {
+	store, userID, upstream, handler := setup(t)
+	start := at(13, 10, 0)
+	rule := recurrence.Rule{Frequency: recurrence.Weekly, Interval: 1, Weekdays: []string{"TU", "TH"}}.RRULE(start, false)
+	lecture := seedEvent(t, store, userID, db.Event{
+		Title: "Lecture", StartsAt: start, EndsAt: start.Add(2 * time.Hour),
+		RecurrenceRule: &rule, RecurrenceTimeZone: new("Europe/Stockholm"),
+	})
+	upstream.script(
+		toolUse("toolu_1", "list_events", map[string]any{"from_date": "2026-10-19", "to_date": "2026-10-25"}),
+		toolUse("toolu_2", "find_free_slots", map[string]any{"date": "2026-10-22", "earliest": "08:00", "latest": "13:00", "duration_minutes": 60}),
+		toolUse("toolu_3", "move_event", map[string]any{"event_id": lecture, "date": "2026-10-23"}),
+		answer("The lecture repeats; move it in the app."),
+	)
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "move Thursday's lecture to Friday")))
+
+	listed := upstream.request(1).toolResults()["toolu_1"]
+	if strings.Count(listed, `"title":"Lecture"`) != 2 || !strings.Contains(listed, `"repeats":true`) ||
+		!strings.Contains(listed, `"start":"Tue 2026-10-20 10:00"`) || !strings.Contains(listed, `"start":"Thu 2026-10-22 10:00"`) {
+		t.Fatalf("expected both occurrences of the week, got %s", listed)
+	}
+	if free := upstream.request(2).toolResults()["toolu_2"]; !strings.Contains(free, `"title":"Lecture"`) {
+		t.Fatalf("expected the occurrence to block the morning, got %s", free)
+	}
+	if moved := upstream.request(3).toolResults()["toolu_3"]; !strings.Contains(moved, errRepeating.Error()) {
+		t.Fatalf("expected the move to be refused, got %s", moved)
+	}
+	if len(result.Actions) != 0 {
+		t.Fatalf("expected no actions, got %+v", result.Actions)
 	}
 }

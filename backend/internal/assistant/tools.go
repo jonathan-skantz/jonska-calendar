@@ -12,6 +12,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/toolrunner"
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
 )
 
 const (
@@ -30,7 +31,8 @@ var errToolLimit = errors.New("tool call limit reached for this message; answer 
 // signed-in user, like the rest of the API, so it only reaches the user's own
 // data.
 type Store interface {
-	ListTimeline(ctx context.Context, userID uuid.UUID) ([]db.TimelineEntry, error)
+	ListTimelineRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]db.TimelineEntry, error)
+	GetOwnEvent(ctx context.Context, userID, eventID uuid.UUID) (db.TimelineEntry, error)
 	ListTags(ctx context.Context, userID uuid.UUID) ([]db.Tag, error)
 	CreateEvent(ctx context.Context, userID uuid.UUID, event db.Event) (uuid.UUID, error)
 	UpdateEvent(ctx context.Context, userID, eventID uuid.UUID, event db.Event) error
@@ -56,8 +58,6 @@ type turn struct {
 
 	mu      sync.Mutex
 	calls   int
-	entries []db.TimelineEntry
-	loaded  bool
 	actions []Action
 	steps   []Step
 }
@@ -116,17 +116,50 @@ func newTool[T any](t *turn, name, description string, run toolRun[T]) anthropic
 	return tool
 }
 
-// timeline reads the user's timeline once per message, and again after the
-// agent created an event, so later tools see it. The caller holds mu.
-func (t *turn) timeline(ctx context.Context) ([]db.TimelineEntry, error) {
-	if !t.loaded {
-		entries, err := t.store.ListTimeline(ctx, t.userID)
-		if err != nil {
-			return nil, fmt.Errorf("loading the calendar failed: %w", err)
-		}
-		t.entries, t.loaded = entries, true
+// timeline reads the user's items that may happen in [from, to), with each
+// occurrence of a repeating event as its own entry. Tasks are all returned.
+func (t *turn) timeline(ctx context.Context, from, to time.Time) ([]db.TimelineEntry, error) {
+	entries, err := t.store.ListTimelineRange(ctx, t.userID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("loading the calendar failed: %w", err)
 	}
-	return t.entries, nil
+	items, err := timeline.ExpandTimeline(entries, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("loading the calendar failed: %w", err)
+	}
+	expanded := make([]db.TimelineEntry, len(items))
+	for index, item := range items {
+		expanded[index] = item.TimelineEntry
+	}
+	return expanded, nil
+}
+
+var (
+	// errRepeating refuses changes to repeating events, which the app
+	// changes one occurrence, the following ones or all of them at a time.
+	errRepeating = fmt.Errorf("%w: repeating events can only be changed in the app", errInvalidChange)
+	// errNotOwnEvent is an event that is gone or belongs to someone else.
+	errNotOwnEvent = fmt.Errorf("no such event of the user's own; events shared with them cannot be changed: %w", db.ErrEventNotFound)
+)
+
+// ownEvent finds one of the user's own events that the assistant may change.
+// Events shared with the user are read-only.
+func (t *turn) ownEvent(ctx context.Context, id uuid.UUID) (db.TimelineEntry, error) {
+	return ownEvent(ctx, t.store, t.userID, id)
+}
+
+func ownEvent(ctx context.Context, store Store, userID, id uuid.UUID) (db.TimelineEntry, error) {
+	entry, err := store.GetOwnEvent(ctx, userID, id)
+	if errors.Is(err, db.ErrEventNotFound) {
+		return db.TimelineEntry{}, errNotOwnEvent
+	}
+	if err != nil {
+		return db.TimelineEntry{}, err
+	}
+	if entry.RecurrenceRule != nil {
+		return db.TimelineEntry{}, errRepeating
+	}
+	return entry, nil
 }
 
 // canAct refuses another change once the message has made its share. Tools

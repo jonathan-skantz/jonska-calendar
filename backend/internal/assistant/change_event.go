@@ -13,7 +13,7 @@ import (
 const confirmNote = "Waiting for the user to apply or decline it; nothing has changed yet."
 
 const moveEventDescription = "Ask to move one of the user's own events to a new date or time. " +
-	"The user confirms it before anything changes. Events with shared_by belong to someone else and cannot be changed."
+	"The user confirms it before anything changes. Events with shared_by belong to someone else, and repeating events are changed in the app, so neither can be moved here."
 
 type moveEventInput struct {
 	EventID   string `json:"event_id" jsonschema:"required" jsonschema_description:"id from list_events"`
@@ -65,13 +65,9 @@ func (t *turn) queue(ctx context.Context, rawID, kind string, times func(db.Even
 	if err != nil {
 		return nil, "", err
 	}
-	entries, err := t.timeline(ctx)
+	entry, err := t.ownEvent(ctx, id)
 	if err != nil {
 		return nil, "", err
-	}
-	entry, ok := ownedEvent(entries, id)
-	if !ok {
-		return nil, "", errors.New("no such event of the user's own; events shared with them cannot be changed")
 	}
 
 	event := entry.Event()
