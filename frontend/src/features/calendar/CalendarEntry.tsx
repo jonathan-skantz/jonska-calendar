@@ -22,6 +22,7 @@ import type {
 import type { Reminder, TimelineEntry } from "../../types";
 import { describeReminders } from "../reminders/reminders";
 import { cx } from "../../lib/classNames";
+import { describeEntryRecurrence } from "../../lib/recurrence";
 import { CommuteBand, OptionalGatheringBand } from "./EntryBands";
 import {
   LABEL_MIN_MINUTES,
@@ -164,6 +165,7 @@ export const CalendarEntry = ({
     entry.title,
     `${entry.is_skipped ? "Skipping · " : ""}${timeRange}`,
     entry.location,
+    describeEntryRecurrence(entry),
     entry.shared_by && `from ${entry.shared_by}`,
   ]
     .filter(Boolean)
@@ -354,6 +356,16 @@ export const CalendarEntry = ({
                 title={describeReminders(reminders)}
               >
                 🔔{" "}
+              </i>
+            )}
+            {entry.recurrence && (
+              <i
+                className="repeat-marker"
+                role="img"
+                aria-label={`Repeats: ${describeEntryRecurrence(entry)}`}
+                title={describeEntryRecurrence(entry)}
+              >
+                🔁{" "}
               </i>
             )}
             {entry.share_count ? (

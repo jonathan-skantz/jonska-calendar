@@ -1,4 +1,5 @@
 import { api } from "../../lib/api";
+import { browserTimeZone } from "../../lib/calendar";
 import type { WeekStartsOn } from "../../lib/calendar";
 import type {
   AssistantAction,
@@ -19,7 +20,7 @@ export const sendAssistantMessage = (
     body: JSON.stringify({
       conversation_id: conversationId ?? undefined,
       text,
-      time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      time_zone: browserTimeZone(),
       week_start: weekStartsOn,
     }),
   });

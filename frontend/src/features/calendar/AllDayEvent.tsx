@@ -4,6 +4,7 @@ import { getMainTag, isBusy } from "../../lib/timeline";
 import type { Reminder, TimelineEntry } from "../../types";
 import { describeReminders } from "../reminders/reminders";
 import { cx } from "../../lib/classNames";
+import { describeEntryRecurrence } from "../../lib/recurrence";
 
 export function AllDayEvent({
   entry,
@@ -78,6 +79,16 @@ export function AllDayEvent({
               title={describeReminders(reminders)}
             >
               🔔{" "}
+            </i>
+          )}
+          {entry.recurrence && (
+            <i
+              className="repeat-marker"
+              role="img"
+              aria-label={`Repeats: ${describeEntryRecurrence(entry)}`}
+              title={describeEntryRecurrence(entry)}
+            >
+              🔁{" "}
             </i>
           )}
           {entry.title}

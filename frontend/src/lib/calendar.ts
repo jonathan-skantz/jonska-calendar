@@ -107,6 +107,11 @@ export const formatHour = (hour: number, options?: TimeFormatOptions) =>
   formatTimeValue(new Date(2020, 0, 1, hour), options);
 export const formatDate = (value: Date) => format(value, "EEE, MMM d");
 export const formatShortDate = (value: Date) => format(value, "MMM d");
+// The browser's IANA time zone, which the server needs for anything that
+// depends on local dates.
+export const browserTimeZone = () =>
+  Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 export const dateKey = (value: Date) => format(value, "yyyy-MM-dd");
 export const inputDateTime = (value?: string) =>
   value ? format(new Date(value), "yyyy-MM-dd'T'HH:mm") : "";

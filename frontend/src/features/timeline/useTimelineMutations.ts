@@ -59,12 +59,7 @@ const saveItem = async ({
   if (editedEvent && tagChanges) {
     await addEventTags(editedEvent.id, tagChanges);
   }
-  const request = buildTimelineItemRequest(
-    type,
-    editingItem?.id ?? null,
-    form,
-    mainTagId,
-  );
+  const request = buildTimelineItemRequest(type, editingItem, form, mainTagId);
   const response = await api<{ id: string } | undefined>(request.path, {
     method: request.method,
     body: JSON.stringify(request.body),

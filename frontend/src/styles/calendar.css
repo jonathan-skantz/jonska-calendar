@@ -832,7 +832,8 @@
   pointer-events: none;
 }
 
-.reminder-marker {
+.reminder-marker,
+.repeat-marker {
   font-style: normal;
   font-size: 0.9em;
 }

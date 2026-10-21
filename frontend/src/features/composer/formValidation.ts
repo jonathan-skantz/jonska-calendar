@@ -13,6 +13,9 @@ export type ComposerField =
   | "commute_before_minutes"
   | "commute_after_minutes"
   | "deadline_at"
+  | "repeat_interval"
+  | "repeat_until"
+  | "repeat_count"
   | "event-tags"
   | "main-tag";
 
@@ -32,6 +35,9 @@ const isComposerField = (name: string): name is ComposerField =>
     "commute_before_minutes",
     "commute_after_minutes",
     "deadline_at",
+    "repeat_interval",
+    "repeat_until",
+    "repeat_count",
     "event-tags",
     "main-tag",
   ].includes(name);

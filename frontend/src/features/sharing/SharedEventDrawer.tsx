@@ -1,5 +1,6 @@
 import { subDays } from "date-fns";
 import { formatDate, formatEventTime, localDateKey } from "../../lib/calendar";
+import { describeEntryRecurrence } from "../../lib/recurrence";
 import { getGathering, getGatheringStart } from "../../lib/timeline";
 import type { TimeFormatPreference } from "../../lib/calendar";
 import type { TimelineEntry } from "../../types";
@@ -66,6 +67,12 @@ export const SharedEventDrawer = ({
       <dl>
         <dt>When</dt>
         <dd>{formatRange(entry, timeFormat)}</dd>
+        {entry.recurrence && (
+          <>
+            <dt>Repeats</dt>
+            <dd>{describeEntryRecurrence(entry)}</dd>
+          </>
+        )}
         <dt>Kind</dt>
         <dd>{entry.kind === "attendable" ? "Attend" : "Heads-up"}</dd>
         {entry.location && (

@@ -1,3 +1,4 @@
+import type { TimelineEntry } from "../../types";
 import { describe, expect, it } from "vitest";
 import {
   buildEventPayload,
@@ -23,6 +24,12 @@ describe("timeline requests", () => {
   });
 
   it("builds event and task create and update requests", () => {
+    const savedEvent: TimelineEntry = {
+      id: "event-1",
+      type: "event",
+      title: "Planning",
+      is_completed: false,
+    };
     const eventForm = new FormData();
     eventForm.set("title", "Planning");
     eventForm.set("kind", "attendable");
@@ -44,7 +51,7 @@ describe("timeline requests", () => {
       main_tag_id: "work",
     });
     expect(
-      buildTimelineItemRequest("event", "event-1", eventForm, "work"),
+      buildTimelineItemRequest("event", savedEvent, eventForm, "work"),
     ).toMatchObject({ path: "/api/events/event-1", method: "PUT" });
 
     const taskForm = new FormData();
@@ -58,7 +65,12 @@ describe("timeline requests", () => {
       body: { title: "Follow up", deadline_at: expect.any(String) },
     });
     expect(
-      buildTimelineItemRequest("task", "task-1", taskForm, null),
+      buildTimelineItemRequest(
+        "task",
+        { id: "task-1", type: "task", title: "Follow up", is_completed: false },
+        taskForm,
+        null,
+      ),
     ).toMatchObject({ path: "/api/tasks/task-1", method: "PUT" });
   });
 
@@ -181,6 +193,8 @@ describe("timeline requests", () => {
         gathering_label: "Warm-up",
         commute_before_seconds: 1200,
         commute_after_seconds: 0,
+        recurrence: null,
+        time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
     });
   });
@@ -202,6 +216,55 @@ describe("timeline requests", () => {
         url: null,
         deadline_at: "2026-10-16T09:30:00.000Z",
       },
+    });
+  });
+
+  it("sends the repeat and scopes changes to occurrences", () => {
+    const form = new FormData();
+    form.set("title", "Lecture");
+    form.set("kind", "attendable");
+    form.set("starts_at", "2026-10-20T10:00");
+    form.set("ends_at", "2026-10-20T12:00");
+    form.set("repeat_frequency", "weekly");
+    form.set("repeat_interval", "1");
+    form.append("repeat_weekday", "TU");
+    form.set("repeat_ends", "never");
+    const occurrence: TimelineEntry = {
+      id: "series-1",
+      type: "event",
+      title: "Lecture",
+      is_completed: false,
+      kind: "attendable",
+      starts_at: "2026-10-20T08:00:00Z",
+      ends_at: "2026-10-20T10:00:00Z",
+      occurrence_start: "2026-10-20T08:00:00Z",
+      recurrence: { frequency: "weekly", interval: 1, weekdays: ["TU"] },
+    };
+
+    const saved = buildTimelineItemRequest("event", occurrence, form, null);
+    expect(saved.path).toBe(
+      "/api/events/series-1?scope=all&occurrence=2026-10-20T08%3A00%3A00Z",
+    );
+    expect(saved.body).toMatchObject({
+      recurrence: { frequency: "weekly", interval: 1, weekdays: ["TU"] },
+      time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+    expect(
+      buildTimelineItemRequest("event", occurrence, form, null, "following")
+        .path,
+    ).toContain("scope=following");
+
+    const moved = buildMoveRequest({
+      ...occurrence,
+      starts_at: "2026-10-21T08:00:00Z",
+      ends_at: "2026-10-21T10:00:00Z",
+    });
+    expect(moved.path).toBe(
+      "/api/events/series-1?scope=this&occurrence=2026-10-20T08%3A00%3A00Z",
+    );
+    expect(moved.body).toMatchObject({
+      starts_at: "2026-10-21T08:00:00Z",
+      recurrence: occurrence.recurrence,
     });
   });
 });

@@ -13,6 +13,8 @@ type DateTimeFieldProps = {
   describedBy?: string;
   required?: boolean;
   dateOnly?: boolean;
+  // Called with the new YYYY-MM-DD date when the user picks one.
+  onDateChange?: (date: string) => void;
 };
 
 const splitValue = (value: string) => {
@@ -30,6 +32,7 @@ export function DateTimeField({
   describedBy,
   required,
   dateOnly = false,
+  onDateChange,
 }: DateTimeFieldProps) {
   const initial = splitValue(defaultValue);
   const [date, setDate] = useState(initial.date);
@@ -119,7 +122,10 @@ export function DateTimeField({
         data-field={name}
         value={date}
         required={required}
-        onChange={(event) => setDate(event.target.value)}
+        onChange={(event) => {
+          setDate(event.target.value);
+          onDateChange?.(event.target.value);
+        }}
       />
       {timeControls}
       <input

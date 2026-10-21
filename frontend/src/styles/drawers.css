@@ -667,3 +667,43 @@
   margin: 0;
   padding: 10px 14px;
 }
+
+.repeat-fields {
+  display: grid;
+  gap: inherit;
+}
+
+.repeat-interval {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.repeat-interval input {
+  width: 5rem;
+}
+
+.weekday-chips {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.weekday-chips button {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 7px 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+}
+
+.weekday-chips button.selected {
+  border-color: var(--moss-dark);
+  color: var(--paper);
+  background: var(--moss-dark);
+}
+
+.weekday-chips button:disabled {
+  cursor: default;
+}

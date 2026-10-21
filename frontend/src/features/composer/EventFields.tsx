@@ -18,6 +18,7 @@ import { requestNotificationPermission } from "../reminders/useReminders";
 import { EventTagPicker } from "../tags/EventTagPicker";
 import type { FieldState } from "./fieldState";
 import { MoreDetails } from "./MoreDetails";
+import { RepeatFields } from "./RepeatFields";
 
 export type TagSelection = {
   tags: Tag[];
@@ -115,6 +116,8 @@ export const EventFields = ({
     inputDateTime(initial?.starts_at) ||
     inputDateTime(draftEventStart ?? undefined) ||
     `${selectedDate}T09:00`;
+  // The repeat options follow the start date as the user changes it.
+  const [startDate, setStartDate] = useState(defaultStart.slice(0, 10));
   // All-day ends are exclusive, so the form shows the day before.
   const defaultEnd =
     (initial?.is_all_day && initial.ends_at
@@ -181,6 +184,7 @@ export const EventFields = ({
           preference={timeFormat}
           dateOnly={isAllDay}
           required
+          onDateChange={setStartDate}
         />
       </label>
       <label className={fields.labelClass("ends_at")}>
@@ -196,6 +200,11 @@ export const EventFields = ({
           required
         />
       </label>
+      <RepeatFields
+        initial={initial?.recurrence}
+        start={new Date(`${startDate}T00:00`)}
+        fields={fields}
+      />
       <label className={fields.labelClass("location")}>
         Location
         <input

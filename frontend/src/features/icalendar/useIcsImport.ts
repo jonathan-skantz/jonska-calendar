@@ -1,12 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { browserTimeZone } from "../../lib/calendar";
 import { invalidateWorkspace } from "../../lib/queryInvalidation";
 import type { IcsImportResult } from "../../types";
 
-// The server reads floating times and all-day dates in the browser's zone,
-// because it cannot know it.
-const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
-
+// The server reads and writes all-day dates (and floating times) in the
+// browser's zone, because it cannot know it.
 export const icsExportUrl = () =>
   `/api/export.ics?time_zone=${encodeURIComponent(browserTimeZone())}`;
 

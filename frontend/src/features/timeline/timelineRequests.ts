@@ -1,5 +1,10 @@
-import { SECONDS_PER_MINUTE, localDateTime } from "../../lib/calendar";
-import type { Tag, TimelineEntry } from "../../types";
+import {
+  SECONDS_PER_MINUTE,
+  browserTimeZone,
+  localDateTime,
+} from "../../lib/calendar";
+import { readRecurrence } from "../../lib/recurrence";
+import type { Recurrence, Tag, TimelineEntry } from "../../types";
 
 type EventPayload = {
   title: string;
@@ -18,7 +23,22 @@ type EventPayload = {
   gathering_label: string | null;
   commute_before_seconds: number;
   commute_after_seconds: number;
+  // The times repeat in the browser's time zone.
+  recurrence: Recurrence | null;
+  time_zone: string;
 };
+
+// Which occurrences of a repeating event a change applies to.
+export type OccurrenceScope = "this" | "following" | "all";
+
+// The path of a change to an event, or to some occurrences of it.
+const eventPath = (entry: TimelineEntry, scope: OccurrenceScope) =>
+  entry.occurrence_start
+    ? `/api/events/${entry.id}?${new URLSearchParams({
+        scope,
+        occurrence: entry.occurrence_start,
+      })}`
+    : `/api/events/${entry.id}`;
 
 type TaskPayload = {
   title: string;
@@ -98,6 +118,8 @@ export const buildEventPayload = (form: FormData): EventPayload => {
     commute_after_seconds: allowsAttendance
       ? minuteSeconds(form.get("commute_after_minutes"))
       : 0,
+    recurrence: readRecurrence(form),
+    time_zone: browserTimeZone(),
   };
 };
 
@@ -108,29 +130,35 @@ const buildTaskPayload = (form: FormData): TaskPayload => ({
   deadline_at: localDateTime(form.get("deadline_at")),
 });
 
+// A saved occurrence of a repeating event changes the occurrences scope
+// names; scope is ignored otherwise.
 export const buildTimelineItemRequest = (
   type: "event" | "task",
-  editingItemId: string | null,
+  editingItem: TimelineEntry | null,
   form: FormData,
   mainTagId: string | null,
+  scope: OccurrenceScope = "all",
 ): TimelineItemRequest => {
-  const resource = type === "event" ? "events" : "tasks";
-  const body =
-    type === "event"
-      ? { ...buildEventPayload(form), main_tag_id: mainTagId }
-      : buildTaskPayload(form);
-
+  if (type === "task") {
+    return {
+      path: editingItem ? `/api/tasks/${editingItem.id}` : "/api/tasks",
+      method: editingItem ? "PUT" : "POST",
+      body: buildTaskPayload(form),
+    };
+  }
   return {
-    path: `/api/${resource}${editingItemId ? `/${editingItemId}` : ""}`,
-    method: editingItemId ? "PUT" : "POST",
-    body,
+    path: editingItem ? eventPath(editingItem, scope) : "/api/events",
+    method: editingItem ? "PUT" : "POST",
+    body: { ...buildEventPayload(form), main_tag_id: mainTagId },
   };
 };
 
 // Saves an item moved in the week view: its own fields with the new times.
-// Leaving out main_tag_id keeps the event's main tag.
+// Leaving out main_tag_id keeps the event's main tag. A moved occurrence
+// moves alone unless scope says otherwise.
 export const buildMoveRequest = (
   moved: TimelineEntry,
+  scope: OccurrenceScope = "this",
 ): { path: string; body: EventPayload | TaskPayload } =>
   moved.type === "task"
     ? {
@@ -143,7 +171,7 @@ export const buildMoveRequest = (
         },
       }
     : {
-        path: `/api/events/${moved.id}`,
+        path: eventPath(moved, scope),
         body: {
           title: moved.title,
           description: moved.description ?? null,
@@ -161,5 +189,7 @@ export const buildMoveRequest = (
           gathering_label: moved.gathering_label ?? null,
           commute_before_seconds: moved.commute_before_seconds ?? 0,
           commute_after_seconds: moved.commute_after_seconds ?? 0,
+          recurrence: moved.recurrence ?? null,
+          time_zone: browserTimeZone(),
         },
       };
