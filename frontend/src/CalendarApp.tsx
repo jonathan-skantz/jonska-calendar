@@ -55,6 +55,7 @@ import { useTagMutations } from "./features/tags/useTagMutations";
 import { useTagVisibility } from "./features/tags/useTagVisibility";
 import { useTimelineMutations } from "./features/timeline/useTimelineMutations";
 import { timelineRangeFor, useTimeline } from "./features/timeline/useTimeline";
+import { useRecurrenceScope } from "./features/calendar/useRecurrenceScope";
 import { useTags } from "./features/tags/useTags";
 import { entryKey } from "./lib/timeline";
 import { TransitCardDayPills } from "./features/transitCard/TransitCardPill";
@@ -107,9 +108,16 @@ export function CalendarApp({ user }: { user: User }) {
   const tags = tagsQuery.data ?? [];
   const { createTag } = useTagMutations(removeHiddenTag);
   const { toggleTask, moveItem } = useTimelineMutations();
-  const { drag, startDrag } = useEntryDrag((moved) =>
-    moveItem.mutateAsync(moved),
-  );
+  const scopePrompt = useRecurrenceScope();
+  // A dragged occurrence of a repeating event asks which occurrences move;
+  // cancelling puts it back.
+  const { drag, startDrag } = useEntryDrag(async (moved) => {
+    const scope = moved.occurrence_start
+      ? await scopePrompt.ask({ action: "move", allowThis: true })
+      : undefined;
+    if (scope === null) return;
+    return moveItem.mutateAsync({ entry: moved, scope });
+  });
   const transitCardViews = useTransitCardViews(dates, today, user.id);
   const weatherByDay = useWeather();
   const { reminders, remindersByEvent } = useReminderActions();
@@ -358,6 +366,7 @@ export function CalendarApp({ user }: { user: User }) {
           onClose={closeDrawer}
         />
       )}
+      {scopePrompt.dialog}
       <ReminderToasts
         toasts={reminderDelivery.toasts}
         onOpenEvent={openEvent}

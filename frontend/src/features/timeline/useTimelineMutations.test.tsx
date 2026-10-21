@@ -223,7 +223,7 @@ describe("useTimelineMutations", () => {
     const startsAt = () =>
       queryClient.getQueryData<TimelineEntry[]>(timelineKey)?.[0].starts_at;
 
-    act(() => result.current.moveItem.mutate(moved));
+    act(() => result.current.moveItem.mutate({ entry: moved }));
     await waitFor(() => expect(startsAt()).toBe("2026-10-16T14:00:00.000Z"));
 
     await act(async () => rejectMove(new Error("Event update failed")));
@@ -263,9 +263,12 @@ describe("useTimelineMutations", () => {
 
     act(() =>
       result.current.moveItem.mutate({
-        ...occurrence(22),
-        starts_at: "2026-10-23T08:00:00.000Z",
-        ends_at: "2026-10-23T09:00:00.000Z",
+        entry: {
+          ...occurrence(22),
+          starts_at: "2026-10-23T08:00:00.000Z",
+          ends_at: "2026-10-23T09:00:00.000Z",
+        },
+        scope: "this",
       }),
     );
     await waitFor(() =>

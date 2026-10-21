@@ -31,10 +31,10 @@ const FREQUENCIES: [Frequency, string][] = [
 ];
 
 const UNITS: Record<Recurrence["frequency"], string> = {
-  daily: "days",
-  weekly: "weeks",
-  monthly: "months",
-  yearly: "years",
+  daily: "day",
+  weekly: "week",
+  monthly: "month",
+  yearly: "year",
 };
 
 type Ends = "never" | "on" | "after";
@@ -94,7 +94,7 @@ export const RepeatFields = ({ initial, start, fields }: RepeatFieldsProps) => {
             <span className="repeat-interval">
               <input
                 name="repeat_interval"
-                aria-label={`Repeat every how many ${UNITS[frequency]}`}
+                aria-label={`Repeat every how many ${UNITS[frequency]}s`}
                 type="number"
                 inputMode="numeric"
                 min={1}
@@ -105,7 +105,7 @@ export const RepeatFields = ({ initial, start, fields }: RepeatFieldsProps) => {
                 value={interval}
                 onChange={(event) => setInterval(event.target.value)}
               />
-              {UNITS[frequency]}
+              {interval === "1" ? UNITS[frequency] : `${UNITS[frequency]}s`}
             </span>
           </label>
           {frequency === "weekly" && (

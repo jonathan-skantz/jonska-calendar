@@ -8,6 +8,9 @@ import {
   useEventShares,
 } from "../sharing/useEventShares";
 import { useTags } from "../tags/useTags";
+import { useRecurrenceScope } from "../calendar/useRecurrenceScope";
+import { changesOnlyOccurrence } from "../timeline/timelineRequests";
+import type { OccurrenceScope } from "../timeline/timelineRequests";
 import { useTimelineMutations } from "../timeline/useTimelineMutations";
 import { ComposerDrawer } from "./ComposerDrawer";
 import type { Composer } from "./useComposer";
@@ -40,7 +43,22 @@ export const ComposerPanel = ({
     setSharingEvent(null);
     composer.close();
   };
-  const save = (form: FormData) =>
+  const scopePrompt = useRecurrenceScope();
+  // Saving or deleting an occurrence of a repeating event asks which
+  // occurrences it applies to; cancelling keeps the form open.
+  const save = async (form: FormData) => {
+    const scope = editingItem?.occurrence_start
+      ? await scopePrompt.ask({
+          action: "save",
+          allowThis: changesOnlyOccurrence(
+            editingItem,
+            form,
+            composer.selectedTagIds,
+            composer.mainTagId,
+          ),
+        })
+      : undefined;
+    if (scope === null) return;
     saveItem.mutate(
       {
         type: composer.type,
@@ -49,13 +67,24 @@ export const ComposerPanel = ({
         mainTagId: composer.mainTagId,
         selectedTagIds: composer.selectedTagIds,
         tags,
+        scope,
       },
       { onSuccess: close },
     );
-  const remove = (entry: TimelineEntry) => {
-    if (window.confirm(`Delete “${entry.title}”?`)) {
-      deleteItem.mutate(entry, { onSuccess: close });
+  };
+  const remove = async (entry: TimelineEntry) => {
+    let scope: OccurrenceScope | undefined;
+    if (entry.occurrence_start) {
+      const answer = await scopePrompt.ask({
+        action: "delete",
+        allowThis: true,
+      });
+      if (!answer) return;
+      scope = answer;
+    } else if (!window.confirm(`Delete “${entry.title}”?`)) {
+      return;
     }
+    deleteItem.mutate({ entry, scope }, { onSuccess: close });
   };
 
   return (
@@ -125,6 +154,7 @@ export const ComposerPanel = ({
           onClose={() => setSharingEvent(null)}
         />
       )}
+      {scopePrompt.dialog}
     </>
   );
 };

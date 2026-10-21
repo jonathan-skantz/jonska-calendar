@@ -130,6 +130,50 @@ const buildTaskPayload = (form: FormData): TaskPayload => ({
   deadline_at: localDateTime(form.get("deadline_at")),
 });
 
+const sameText = (a?: string | null, b?: string | null) =>
+  (a?.trim() || null) === (b?.trim() || null);
+
+const sameRecurrence = (a?: Recurrence | null, b?: Recurrence | null) =>
+  a?.frequency === b?.frequency &&
+  (a?.interval ?? 1) === (b?.interval ?? 1) &&
+  (a?.weekdays ?? []).join() === (b?.weekdays ?? []).join() &&
+  (a?.monthly_by ?? "") === (b?.monthly_by ?? "") &&
+  (a?.until ?? "") === (b?.until ?? "") &&
+  (a?.count ?? 0) === (b?.count ?? 0);
+
+// Whether the form changes an occurrence only in ways one occurrence can
+// differ from its series: its time and whether it is skipped.
+export const changesOnlyOccurrence = (
+  occurrence: TimelineEntry,
+  form: FormData,
+  selectedTagIds: string[],
+  mainTagId: string | null,
+) => {
+  const payload = buildEventPayload(form);
+  const tagIds = (occurrence.tags ?? []).map((tag) => tag.id);
+  return (
+    payload.title.trim() === occurrence.title &&
+    sameText(payload.description, occurrence.description) &&
+    sameText(payload.url, occurrence.url) &&
+    sameText(payload.location as string | null, occurrence.location) &&
+    payload.kind === occurrence.kind &&
+    payload.is_all_day === Boolean(occurrence.is_all_day) &&
+    payload.start_is_approximate === Boolean(occurrence.start_is_approximate) &&
+    payload.end_is_approximate === Boolean(occurrence.end_is_approximate) &&
+    payload.gathering_seconds === (occurrence.gathering_seconds ?? 0) &&
+    payload.gathering_is_optional ===
+      Boolean(occurrence.gathering_is_optional) &&
+    sameText(payload.gathering_label, occurrence.gathering_label) &&
+    payload.commute_before_seconds ===
+      (occurrence.commute_before_seconds ?? 0) &&
+    payload.commute_after_seconds === (occurrence.commute_after_seconds ?? 0) &&
+    sameRecurrence(payload.recurrence, occurrence.recurrence) &&
+    mainTagId === (occurrence.main_tag_id ?? null) &&
+    selectedTagIds.length === tagIds.length &&
+    selectedTagIds.every((id) => tagIds.includes(id))
+  );
+};
+
 // A saved occurrence of a repeating event changes the occurrences scope
 // names; scope is ignored otherwise.
 export const buildTimelineItemRequest = (

@@ -707,3 +707,34 @@
 .weekday-chips button:disabled {
   cursor: default;
 }
+
+/* Above any drawer, since it asks about a change made in one. */
+.scope-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(39, 52, 47, 0.24);
+}
+
+.scope-dialog {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 22rem);
+  padding: 24px;
+  background: var(--paper);
+  box-shadow: 0 12px 35px rgba(39, 52, 47, 0.2);
+}
+
+.scope-dialog h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.scope-dialog .primary-button,
+.scope-dialog .danger-button {
+  justify-content: center;
+  margin: 0;
+}

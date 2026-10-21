@@ -4,6 +4,7 @@ import {
   buildEventPayload,
   buildMoveRequest,
   buildTimelineItemRequest,
+  changesOnlyOccurrence,
   getEventTagChanges,
 } from "./timelineRequests";
 
@@ -266,5 +267,63 @@ describe("timeline requests", () => {
       starts_at: "2026-10-21T08:00:00Z",
       recurrence: occurrence.recurrence,
     });
+  });
+
+  it("tells changes one occurrence can have from changes to the series", () => {
+    const occurrence: TimelineEntry = {
+      id: "series-1",
+      type: "event",
+      title: "Lecture",
+      is_completed: false,
+      kind: "attendable",
+      location: "Hall B",
+      starts_at: "2026-10-20T08:00:00Z",
+      ends_at: "2026-10-20T10:00:00Z",
+      occurrence_start: "2026-10-20T08:00:00Z",
+      recurrence: { frequency: "weekly", interval: 1, weekdays: ["TU"] },
+      tags: [tag("work")],
+      main_tag_id: "work",
+    };
+    const form = (changes: Record<string, string> = {}) => {
+      const data = new FormData();
+      const values: Record<string, string> = {
+        title: "Lecture",
+        kind: "attendable",
+        location: "Hall B",
+        starts_at: "2026-10-21T15:00",
+        ends_at: "2026-10-21T16:00",
+        is_skipped: "true",
+        repeat_frequency: "weekly",
+        repeat_interval: "1",
+        repeat_weekday: "TU",
+        repeat_ends: "never",
+        ...changes,
+      };
+      for (const [name, value] of Object.entries(values)) data.set(name, value);
+      return data;
+    };
+    // A new time and a skip are one occurrence's own.
+    expect(changesOnlyOccurrence(occurrence, form(), ["work"], "work")).toBe(
+      true,
+    );
+    expect(
+      changesOnlyOccurrence(
+        occurrence,
+        form({ title: "Guest" }),
+        ["work"],
+        "work",
+      ),
+    ).toBe(false);
+    expect(
+      changesOnlyOccurrence(
+        occurrence,
+        form({ repeat_interval: "2" }),
+        ["work"],
+        "work",
+      ),
+    ).toBe(false);
+    expect(
+      changesOnlyOccurrence(occurrence, form(), ["work", "home"], "work"),
+    ).toBe(false);
   });
 });

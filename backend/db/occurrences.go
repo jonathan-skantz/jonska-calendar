@@ -108,15 +108,18 @@ func (s *Store) SplitSeries(ctx context.Context, userID, eventID uuid.UUID, from
 		if err := endSeriesTx(ctx, tx, userID, eventID, from, oldRule, oldEndsAt); err != nil {
 			return err
 		}
-		// The new series keeps the old main tag unless another of the old
-		// series' tags was chosen.
-		if err := tx.QueryRow(ctx, `
-			SELECT CASE WHEN EXISTS (
-				SELECT 1 FROM timeline_item_tags WHERE timeline_item_id = $1 AND tag_id = $2
-			) THEN $2 ELSE main_tag_id END
-			FROM events WHERE timeline_item_id = $1
-		`, eventID, event.MainTagID).Scan(&event.MainTagID); err != nil {
+		// The new series keeps the old main tag unless another of the user's
+		// tags was chosen.
+		if event.MainTagID == uuid.Nil {
+			if err := tx.QueryRow(ctx, `
+				SELECT main_tag_id FROM events WHERE timeline_item_id = $1
+			`, eventID).Scan(&event.MainTagID); err != nil {
+				return err
+			}
+		} else if owned, err := tagOwnedBy(ctx, tx, event.MainTagID, userID); err != nil {
 			return err
+		} else if !owned {
+			return ErrTagNotFound
 		}
 		var err error
 		newID, err = insertTimelineItem(ctx, tx, userID, event.Title, event.Description, event.URL)

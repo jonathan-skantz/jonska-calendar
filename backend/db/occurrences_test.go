@@ -276,3 +276,49 @@ func TestSeriesRuleNeedsATimeZone(t *testing.T) {
 		t.Fatal("expected the database to reject a rule without a time zone")
 	}
 }
+
+func TestSplitSeriesCanChooseAnotherOwnMainTag(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.NewStore(t)
+	ownerID := registerUser(t, store, "owner@example.com")
+	strangerID := registerUser(t, store, "stranger@example.com")
+	school, err := store.CreateTag(ctx, ownerID, "school")
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign, err := store.CreateTag(ctx, strangerID, "foreign")
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventID, err := store.CreateEvent(ctx, ownerID, weeklySeries("Lecture"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	withForeign := weeklySeries("Lecture")
+	withForeign.StartsAt, withForeign.EndsAt, withForeign.MainTagID = week(2), week(2).Add(time.Hour), foreign.ID
+	if _, err := store.SplitSeries(ctx, ownerID, eventID, week(2), "FREQ=WEEKLY;COUNT=2", nil, withForeign, nil); !errors.Is(err, db.ErrTagNotFound) {
+		t.Fatalf("foreign main tag: expected ErrTagNotFound, got %v", err)
+	}
+
+	withSchool := withForeign
+	withSchool.MainTagID = school.ID
+	newID, err := store.SplitSeries(ctx, ownerID, eventID, week(2), "FREQ=WEEKLY;COUNT=2", nil, withSchool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := store.GetOwnEvent(ctx, ownerID, newID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *created.MainTagID != school.ID || len(created.Tags) != 2 {
+		t.Fatalf("expected school as main tag next to the old tag, got %+v", created)
+	}
+	old, err := store.GetOwnEvent(ctx, ownerID, eventID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(old.Tags) != 1 || old.Tags[0].Name != "general" {
+		t.Fatalf("the old series keeps its tags, got %+v", old.Tags)
+	}
+}

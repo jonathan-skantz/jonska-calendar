@@ -8,6 +8,7 @@ import {
   buildTimelineItemRequest,
   getEventTagChanges,
 } from "./timelineRequests";
+import type { OccurrenceScope } from "./timelineRequests";
 import type { Tag, TimelineEntry } from "../../types";
 
 type TimelineSnapshot = [readonly unknown[], TimelineEntry[] | undefined][];
@@ -19,7 +20,12 @@ export type SaveItemInput = {
   mainTagId: string | null;
   selectedTagIds: string[];
   tags: Tag[];
+  // For an occurrence of a repeating event: which occurrences change.
+  scope?: OccurrenceScope;
 };
+
+// A change to an item, or to some occurrences of a repeating event.
+export type ScopedEntry = { entry: TimelineEntry; scope?: OccurrenceScope };
 
 type EventTagChanges = ReturnType<typeof getEventTagChanges>;
 
@@ -47,6 +53,7 @@ const saveItem = async ({
   mainTagId,
   selectedTagIds,
   tags,
+  scope,
 }: SaveItemInput) => {
   // Add new tags before the save so the new main tag is attached when it is
   // saved. Remove old tags only after it, because the server refuses to
@@ -56,16 +63,29 @@ const saveItem = async ({
   const tagChanges = editedEvent
     ? getEventTagChanges(editedEvent.tags ?? [], selectedTagIds)
     : null;
-  if (editedEvent && tagChanges) {
+  // Changing the following occurrences starts a new series with the old
+  // one's tags; the tag changes are its own, and the earlier occurrences
+  // keep theirs.
+  const splits =
+    Boolean(editedEvent?.occurrence_start) && scope === "following";
+  if (editedEvent && tagChanges && !splits) {
     await addEventTags(editedEvent.id, tagChanges);
   }
-  const request = buildTimelineItemRequest(type, editingItem, form, mainTagId);
+  const request = buildTimelineItemRequest(
+    type,
+    editingItem,
+    form,
+    mainTagId,
+    scope,
+  );
   const response = await api<{ id: string } | undefined>(request.path, {
     method: request.method,
     body: JSON.stringify(request.body),
   });
   if (editedEvent && tagChanges) {
-    await removeEventTags(editedEvent.id, tagChanges);
+    const savedId = splits ? (response?.id ?? "") : editedEvent.id;
+    if (splits) await addEventTags(savedId, tagChanges);
+    await removeEventTags(savedId, tagChanges);
   }
   if (type === "event" && editingItem?.type !== "event") {
     // The new event starts with only its main tag (or the default tag).
@@ -93,10 +113,10 @@ export const useTimelineMutations = () => {
   // Shows a change to one entry at once, in every loaded range. A failed
   // request puts the old entries back, and either way the calendar is
   // refetched afterwards.
-  const optimisticEntryUpdate = (
-    toUpdated: (input: TimelineEntry) => TimelineEntry,
+  const optimisticEntryUpdate = <Input>(
+    toUpdated: (input: Input) => TimelineEntry,
   ) => ({
-    onMutate: async (input: TimelineEntry) => {
+    onMutate: async (input: Input) => {
       const updated = toUpdated(input);
       await queryClient.cancelQueries({ queryKey: queryKeys.timelines });
       const previous: TimelineSnapshot = queryClient.getQueriesData<
@@ -113,7 +133,7 @@ export const useTimelineMutations = () => {
     },
     onError: (
       _error: Error,
-      _input: TimelineEntry,
+      _input: Input,
       context?: { previous: TimelineSnapshot },
     ) => {
       for (const [queryKey, entries] of context?.previous ?? []) {
@@ -129,8 +149,16 @@ export const useTimelineMutations = () => {
       onSuccess: refreshWorkspace,
     }),
     deleteItem: useMutation({
-      mutationFn: (entry: TimelineEntry) =>
-        api(`/api/timeline/${entry.id}`, { method: "DELETE" }),
+      mutationFn: ({ entry, scope }: ScopedEntry) =>
+        api(
+          entry.occurrence_start && scope
+            ? `/api/timeline/${entry.id}?${new URLSearchParams({
+                scope,
+                occurrence: entry.occurrence_start,
+              })}`
+            : `/api/timeline/${entry.id}`,
+          { method: "DELETE" },
+        ),
       onSuccess: refreshWorkspace,
     }),
     toggleTask: useMutation({
@@ -144,13 +172,14 @@ export const useTimelineMutations = () => {
         is_completed: !entry.is_completed,
       })),
     }),
-    // Takes the item at its new time, as dragged in the week view.
+    // Takes the item at its new time, as dragged in the week view. Only the
+    // dragged occurrence moves at once; the rest arrive with the refetch.
     moveItem: useMutation({
-      mutationFn: (moved: TimelineEntry) => {
-        const { path, body } = buildMoveRequest(moved);
+      mutationFn: ({ entry, scope }: ScopedEntry) => {
+        const { path, body } = buildMoveRequest(entry, scope);
         return api(path, { method: "PUT", body: JSON.stringify(body) });
       },
-      ...optimisticEntryUpdate((moved) => moved),
+      ...optimisticEntryUpdate(({ entry }: ScopedEntry) => entry),
     }),
   };
 };
