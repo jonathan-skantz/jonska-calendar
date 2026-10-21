@@ -93,11 +93,18 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	var imports []db.ImportedEvent
 	for _, event := range parsed.Events {
 		validated, err := timeline.ValidateEvent(event.Event)
+		var exceptions []db.OccurrenceException
+		if err == nil && event.Recurrence != nil {
+			// Exceptions that are not occurrences of the rule are dropped.
+			validated, exceptions, err = timeline.WithSeries(validated, event.Recurrence, event.TimeZone, event.Exceptions)
+		}
 		if err != nil {
 			response.Skipped = append(response.Skipped, Skipped{Title: event.Title, Reason: err.Error()})
 			continue
 		}
-		imported := db.ImportedEvent{Event: validated, ICalUID: event.UID, ReminderOffsets: event.ReminderOffsets}
+		imported := db.ImportedEvent{
+			Event: validated, ICalUID: event.UID, ReminderOffsets: event.ReminderOffsets, Exceptions: exceptions,
+		}
 		// Tags are matched by name and never created.
 		for _, name := range event.Categories {
 			if tagID, ok := tagIDs[strings.ToLower(name)]; ok {

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/recurrence"
 )
 
 func exportEvents() []db.ExportEvent {
@@ -102,5 +103,92 @@ func TestEncodeThenParseKeepsEvents(t *testing.T) {
 			!slices.Equal(parsed.ReminderOffsets, want.ReminderOffsets) {
 			t.Fatalf("event %d: expected %+v, got %+v", index, want, parsed)
 		}
+	}
+}
+
+func TestEncodeThenParseKeepsRepeatingEvents(t *testing.T) {
+	start := time.Date(2026, 10, 20, 10, 0, 0, 0, stockholm)
+	rule := recurrence.Rule{Frequency: recurrence.Weekly, Interval: 1, Weekdays: []string{"TU", "TH"}, Count: 10}
+	value := rule.RRULE(start, false)
+	movedStart, movedEnd := time.Date(2026, 10, 29, 14, 0, 0, 0, stockholm), time.Date(2026, 10, 29, 16, 0, 0, 0, stockholm)
+	skipped, attended := true, false
+	series := db.ExportEvent{
+		Event: db.Event{
+			Title: "Lecture", StartsAt: start, EndsAt: start.Add(2 * time.Hour), Kind: db.EventKindAttendable,
+			IsSkipped: true, RecurrenceRule: &value, RecurrenceTimeZone: new("Europe/Stockholm"),
+		},
+		UID: "lecture@jonska-calendar",
+		Exceptions: []db.OccurrenceException{
+			{OriginalStart: time.Date(2026, 10, 22, 10, 0, 0, 0, stockholm), IsCancelled: true},
+			{OriginalStart: time.Date(2026, 10, 27, 10, 0, 0, 0, stockholm), IsSkipped: &attended},
+			{OriginalStart: time.Date(2026, 10, 29, 10, 0, 0, 0, stockholm), StartsAt: &movedStart, EndsAt: &movedEnd, IsSkipped: &skipped},
+		},
+	}
+	allDayStart := time.Date(2026, 10, 30, 0, 0, 0, 0, stockholm)
+	yearly := recurrence.Rule{Frequency: recurrence.Yearly, Interval: 1, Until: new("2030-10-30")}.RRULE(allDayStart, true)
+	birthday := db.ExportEvent{
+		Event: db.Event{
+			Title: "Birthday", StartsAt: allDayStart, EndsAt: allDayStart.AddDate(0, 0, 1), IsAllDay: true,
+			Kind: db.EventKindInformational, RecurrenceRule: &yearly, RecurrenceTimeZone: new("Europe/Stockholm"),
+		},
+		UID:        "birthday@jonska-calendar",
+		Exceptions: []db.OccurrenceException{{OriginalStart: allDayStart.AddDate(1, 0, 0), IsCancelled: true}},
+	}
+
+	var file strings.Builder
+	if err := Encode(&file, []db.ExportEvent{series, birthday}, time.UTC, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	text := file.String()
+	for _, want := range []string{
+		"DTSTART;TZID=Europe/Stockholm:20261020T100000\r\n",
+		"RRULE:" + value + "\r\n",
+		"EXDATE;TZID=Europe/Stockholm:20261022T100000\r\n",
+		"RECURRENCE-ID;TZID=Europe/Stockholm:20261029T100000\r\n",
+		"DTSTART;VALUE=DATE:20261030\r\n",
+		"EXDATE;VALUE=DATE:20271030\r\n",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("expected %q in:\n%s", want, text)
+		}
+	}
+
+	// The user's zone differs from the series', which must not matter.
+	result, err := Parse(strings.NewReader(text), time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Events) != 2 || len(result.Skipped) != 0 || len(result.Warnings) != 0 {
+		t.Fatalf("unexpected result %+v", result)
+	}
+	// Times with a TZID keep their zone, whatever the user's.
+	got, want := result.Events[0], series
+	wantRule, err := recurrence.FromRRULE(*want.RecurrenceRule, want.StartsAt.In(stockholm))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Recurrence == nil || !reflect.DeepEqual(*got.Recurrence, wantRule) || got.TimeZone != "Europe/Stockholm" ||
+		!got.StartsAt.Equal(want.StartsAt) || !got.EndsAt.Equal(want.EndsAt) {
+		t.Fatalf("expected %+v, got %+v", want, got)
+	}
+	if len(got.Exceptions) != len(want.Exceptions) {
+		t.Fatalf("expected exceptions %+v, got %+v", want.Exceptions, got.Exceptions)
+	}
+	for i, exception := range want.Exceptions {
+		parsed := got.Exceptions[i]
+		if !parsed.OriginalStart.Equal(exception.OriginalStart) || parsed.IsCancelled != exception.IsCancelled ||
+			(exception.StartsAt == nil) != (parsed.StartsAt == nil) ||
+			(exception.StartsAt != nil && !parsed.StartsAt.Equal(*exception.StartsAt)) ||
+			!reflect.DeepEqual(parsed.IsSkipped, exception.IsSkipped) {
+			t.Fatalf("exception %d: expected %+v, got %+v", i, exception, parsed)
+		}
+	}
+
+	// Dates have no zone: an all-day series keeps its dates in the user's.
+	day := result.Events[1]
+	if day.Recurrence == nil || day.Recurrence.Frequency != recurrence.Yearly || *day.Recurrence.Until != "2030-10-30" ||
+		day.TimeZone != "UTC" || !day.StartsAt.Equal(time.Date(2026, 10, 30, 0, 0, 0, 0, time.UTC)) ||
+		len(day.Exceptions) != 1 || !day.Exceptions[0].OriginalStart.Equal(time.Date(2027, 10, 30, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("unexpected all-day series %+v", day)
 	}
 }

@@ -116,7 +116,7 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		err = h.Store.UpdateEvent(r.Context(), userID, eventID, event)
 	} else {
 		var kept []db.OccurrenceException
-		event, kept, err = withSeries(event, request.Recurrence, request.TimeZone, existing.Exceptions)
+		event, kept, err = WithSeries(event, request.Recurrence, request.TimeZone, existing.Exceptions)
 		if err == nil {
 			err = h.Store.UpdateSeries(r.Context(), userID, eventID, event, kept)
 		}

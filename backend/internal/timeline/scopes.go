@@ -69,9 +69,9 @@ func scopedSeries(existing db.TimelineEntry, scope occurrenceScope) (recurrence.
 	return series, nil
 }
 
-// withSeries gives the event its rule, keeps the candidate exceptions that
+// WithSeries gives the event its rule, keeps the candidate exceptions that
 // are occurrences of it, and sets the series' end with them.
-func withSeries(event db.Event, rule *recurrence.Rule, timeZone string, candidates []db.OccurrenceException) (db.Event, []db.OccurrenceException, error) {
+func WithSeries(event db.Event, rule *recurrence.Rule, timeZone string, candidates []db.OccurrenceException) (db.Event, []db.OccurrenceException, error) {
 	withRule, err := applyRecurrence(event, rule, timeZone, nil)
 	if err != nil {
 		return event, nil, err
@@ -152,7 +152,7 @@ func (h *Handler) updateAllOccurrences(r *http.Request, userID uuid.UUID, existi
 		exception.OriginalStart = recurrence.Shift(exception.OriginalStart, occurrence, movedTo, series.Zone)
 		moved[index] = exception
 	}
-	updated, kept, err := withSeries(event, rule, request.TimeZone, moved)
+	updated, kept, err := WithSeries(event, rule, request.TimeZone, moved)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (h *Handler) updateFollowingOccurrences(r *http.Request, userID uuid.UUID, 
 		left.Count -= done
 		rule = &left
 	}
-	after, kept, err := withSeries(event, rule, request.TimeZone, later)
+	after, kept, err := WithSeries(event, rule, request.TimeZone, later)
 	if err != nil {
 		return uuid.Nil, err
 	}

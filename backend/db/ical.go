@@ -23,6 +23,8 @@ type ImportedEvent struct {
 	ICalUID         string
 	TagIDs          []uuid.UUID
 	ReminderOffsets []int
+	// The occurrences of a repeating event that differ from it.
+	Exceptions []OccurrenceException
 }
 
 // ExportEvent is one of the user's own events with what an iCalendar file
@@ -32,6 +34,7 @@ type ExportEvent struct {
 	UID             string
 	TagNames        []string
 	ReminderOffsets []int
+	Exceptions      []OccurrenceException
 }
 
 var errDryRun = errors.New("dry run")
@@ -86,6 +89,9 @@ func (s *Store) ImportEvents(ctx context.Context, userID, mainTagID uuid.UUID, e
 				SELECT id, $3, now() FROM reminder
 				WHERE $3::timestamptz - make_interval(secs => offset_seconds) <= now()
 			`, itemID, userID, event.StartsAt, imported.ReminderOffsets); err != nil {
+				return err
+			}
+			if err := insertExceptions(ctx, tx, itemID, imported.Exceptions); err != nil {
 				return err
 			}
 			created[index] = true
@@ -153,7 +159,7 @@ func (s *Store) ListEventsForExport(ctx context.Context, userID uuid.UUID) ([]Ex
 			event.start_is_approximate, event.end_is_approximate, event.gathering_seconds,
 			event.gathering_is_optional, event.gathering_label,
 			event.commute_before_seconds, event.commute_after_seconds, event.main_tag_id,
-			event.is_skipped,
+			event.is_skipped, event.recurrence_rule, event.recurrence_time_zone, event.recurrence_ends_at,
 			ARRAY(
 				SELECT tag.name
 				FROM timeline_item_tags AS item_tag
@@ -175,7 +181,7 @@ func (s *Store) ListEventsForExport(ctx context.Context, userID uuid.UUID) ([]Ex
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (ExportEvent, error) {
+	events, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (ExportEvent, error) {
 		var event ExportEvent
 		err := row.Scan(
 			&event.ID, &event.UID, &event.Title, &event.Description, &event.URL,
@@ -183,8 +189,29 @@ func (s *Store) ListEventsForExport(ctx context.Context, userID uuid.UUID) ([]Ex
 			&event.StartIsApproximate, &event.EndIsApproximate, &event.GatheringSeconds,
 			&event.GatheringIsOptional, &event.GatheringLabel,
 			&event.CommuteBeforeSeconds, &event.CommuteAfterSeconds, &event.MainTagID,
-			&event.IsSkipped, &event.TagNames, &event.ReminderOffsets,
+			&event.IsSkipped, &event.RecurrenceRule, &event.RecurrenceTimeZone, &event.RecurrenceEndsAt,
+			&event.TagNames, &event.ReminderOffsets,
 		)
 		return event, err
 	})
+	if err != nil {
+		return nil, err
+	}
+	var seriesIDs []uuid.UUID
+	for _, event := range events {
+		if event.RecurrenceRule != nil {
+			seriesIDs = append(seriesIDs, event.ID)
+		}
+	}
+	if len(seriesIDs) == 0 {
+		return events, nil
+	}
+	exceptions, err := s.exceptionsByEvent(ctx, userID, seriesIDs)
+	if err != nil {
+		return nil, err
+	}
+	for index := range events {
+		events[index].Exceptions = exceptions[events[index].ID]
+	}
+	return events, nil
 }

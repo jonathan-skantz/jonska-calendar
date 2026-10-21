@@ -2,12 +2,14 @@ package ical
 
 import (
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/recurrence"
 )
 
 var stockholm = mustLoad("Europe/Stockholm")
@@ -220,8 +222,9 @@ END:VALARM`)
 
 func TestParseSkipsAndWarns(t *testing.T) {
 	result, err := Parse(strings.NewReader(calendar(
-		"SUMMARY:Weekly\nDTSTART:20261024T100000Z\nRRULE:FREQ=WEEKLY",
-		"SUMMARY:Moved occurrence\nDTSTART:20261031T110000Z\nRECURRENCE-ID:20261031T100000Z",
+		"SUMMARY:Hourly\nDTSTART:20261024T100000Z\nRRULE:FREQ=HOURLY",
+		"SUMMARY:Extra dates\nDTSTART:20261024T100000Z\nRDATE:20261025T100000Z",
+		"UID:elsewhere\nSUMMARY:Moved occurrence\nDTSTART:20261031T110000Z\nRECURRENCE-ID:20261031T100000Z",
 		"SUMMARY:Called off\nDTSTART:20261024T100000Z\nSTATUS:CANCELLED",
 		"SUMMARY:No start",
 		"SUMMARY:Mixed\nDTSTART;VALUE=DATE:20261024\nDTEND:20261024T100000Z",
@@ -231,11 +234,12 @@ func TestParseSkipsAndWarns(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantSkipped := []Skipped{
-		{Title: "Weekly", Reason: ReasonRecurring},
-		{Title: "Moved occurrence", Reason: ReasonRecurring},
+		{Title: "Hourly", Reason: ReasonUnsupportedRule},
+		{Title: "Extra dates", Reason: ReasonUnsupportedRule},
 		{Title: "Called off", Reason: ReasonCancelled},
 		{Title: "No start", Reason: ReasonNoStart},
 		{Title: "Mixed", Reason: ReasonBadTime},
+		{Title: "Moved occurrence", Reason: ReasonOrphanOccurrence},
 	}
 	if !slices.Equal(result.Skipped, wantSkipped) {
 		t.Fatalf("expected skipped %+v, got %+v", wantSkipped, result.Skipped)
@@ -313,5 +317,78 @@ func TestParseDuration(t *testing.T) {
 		if _, err := parseDuration(value); err == nil {
 			t.Fatalf("%q: expected an error", value)
 		}
+	}
+}
+
+func TestParseRecurringEvents(t *testing.T) {
+	result, err := Parse(strings.NewReader(calendar(
+		`UID:lecture@example.com
+SUMMARY:Lecture
+DTSTART;TZID=Europe/Stockholm:20261020T100000
+DTEND;TZID=Europe/Stockholm:20261020T120000
+RRULE:FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20261231T225959Z
+EXDATE;TZID=Europe/Stockholm:20261022T100000,20261027T100000`,
+		`UID:lecture@example.com
+SUMMARY:Lecture
+RECURRENCE-ID;TZID=Europe/Stockholm:20261029T100000
+DTSTART;TZID=Europe/Stockholm:20261029T140000
+DTEND;TZID=Europe/Stockholm:20261029T160000`,
+		`UID:lecture@example.com
+SUMMARY:Lecture
+RECURRENCE-ID;TZID=Europe/Stockholm:20261103T100000
+STATUS:CANCELLED`,
+		`UID:lecture@example.com
+SUMMARY:Guest lecture
+RECURRENCE-ID;TZID=Europe/Stockholm:20261105T100000
+DTSTART;TZID=Europe/Stockholm:20261105T100000
+DTEND;TZID=Europe/Stockholm:20261105T120000
+X-JONSKA-SKIPPED:TRUE`,
+		`UID:birthday@example.com
+SUMMARY:Birthday
+DTSTART;VALUE=DATE:20261030
+RRULE:FREQ=YEARLY
+EXDATE;VALUE=DATE:20271030`,
+	)), stockholm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Events) != 2 || len(result.Skipped) != 0 {
+		t.Fatalf("expected two series, got %+v", result)
+	}
+	if len(result.Warnings) != 1 || !strings.HasPrefix(result.Warnings[0], "Guest lecture: changes to one occurrence") {
+		t.Fatalf("unexpected warnings %q", result.Warnings)
+	}
+
+	lecture := result.Events[0]
+	until := "2026-12-31"
+	wantRule := recurrence.Rule{Frequency: recurrence.Weekly, Interval: 1, Weekdays: []string{"TU", "TH"}, Until: &until}
+	if lecture.Recurrence == nil || !reflect.DeepEqual(*lecture.Recurrence, wantRule) || lecture.TimeZone != "Europe/Stockholm" {
+		t.Fatalf("unexpected rule %+v in %q", lecture.Recurrence, lecture.TimeZone)
+	}
+	at := func(day, hour int) time.Time { return time.Date(2026, 10, day, hour, 0, 0, 0, stockholm) }
+	november := func(day, hour int) time.Time { return time.Date(2026, 11, day, hour, 0, 0, 0, stockholm) }
+	exceptions := lecture.Exceptions
+	if len(exceptions) != 5 {
+		t.Fatalf("expected five exceptions, got %+v", exceptions)
+	}
+	for index, want := range []time.Time{at(22, 10), at(27, 10), at(29, 10), november(3, 10), november(5, 10)} {
+		if !exceptions[index].OriginalStart.Equal(want) {
+			t.Fatalf("exception %d: expected %v, got %+v", index, want, exceptions[index])
+		}
+	}
+	if !exceptions[0].IsCancelled || !exceptions[1].IsCancelled || !exceptions[3].IsCancelled {
+		t.Fatalf("expected excluded and cancelled occurrences, got %+v", exceptions)
+	}
+	if moved := exceptions[2]; moved.StartsAt == nil || !moved.StartsAt.Equal(at(29, 14)) || !moved.EndsAt.Equal(at(29, 16)) {
+		t.Fatalf("expected the 29th moved to 14:00, got %+v", moved)
+	}
+	if retitled := exceptions[4]; retitled.StartsAt != nil || retitled.IsSkipped == nil || !*retitled.IsSkipped {
+		t.Fatalf("expected the 5th only skipped, got %+v", retitled)
+	}
+
+	birthday := result.Events[1]
+	if birthday.Recurrence == nil || birthday.Recurrence.Frequency != recurrence.Yearly || birthday.TimeZone != "Europe/Stockholm" ||
+		len(birthday.Exceptions) != 1 || !birthday.Exceptions[0].OriginalStart.Equal(time.Date(2027, 10, 30, 0, 0, 0, 0, stockholm)) {
+		t.Fatalf("unexpected birthday %+v", birthday)
 	}
 }

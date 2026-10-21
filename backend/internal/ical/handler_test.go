@@ -90,13 +90,13 @@ func TestImportPreviewsThenImports(t *testing.T) {
 	file := calendar(
 		"UID:dinner\nSUMMARY:Dinner\nDTSTART:20261024T160000Z\nDTEND:20261024T190000Z\nCATEGORIES:family,Unknown",
 		"UID:trip\nSUMMARY:Trip\nDTSTART;VALUE=DATE:20261024\nX-JONSKA-COMMUTE-BEFORE:PT30M",
-		"UID:weekly\nSUMMARY:Weekly\nDTSTART:20261024T100000Z\nRRULE:FREQ=WEEKLY",
+		"UID:hourly\nSUMMARY:Hourly\nDTSTART:20261024T100000Z\nRRULE:FREQ=HOURLY",
 	)
 	request := map[string]any{"ics": file, "time_zone": "Europe/Stockholm", "dry_run": true}
 
 	preview := decodeImport(t, postImport(t, handler, request))
 	wantSkipped := []Skipped{
-		{Title: "Weekly", Reason: ReasonRecurring},
+		{Title: "Hourly", Reason: ReasonUnsupportedRule},
 		{Title: "Trip", Reason: timeline.ErrInvalidCommute.Error()},
 	}
 	if preview.Imported != 1 || !slices.Equal(preview.Skipped, wantSkipped) || len(preview.Warnings) != 0 {
@@ -193,5 +193,48 @@ func TestExportDownloadsOwnEvents(t *testing.T) {
 	}
 	if len(shared.Events) != 0 {
 		t.Fatalf("events shared with the user must not be exported, got %+v", shared.Events)
+	}
+}
+
+func TestImportStoresRepeatingEvents(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.NewStore(t)
+	userID, err := store.Register(ctx, "owner@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(store, testutil.SignedInAs(userID))
+	// The 21st is a Wednesday, so excluding it means nothing and is dropped.
+	file := calendar(
+		`UID:lecture
+SUMMARY:Lecture
+DTSTART;TZID=Europe/Stockholm:20261020T100000
+DTEND;TZID=Europe/Stockholm:20261020T120000
+RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=4
+EXDATE;TZID=Europe/Stockholm:20261027T100000,20261021T100000`,
+		`UID:lecture
+SUMMARY:Lecture
+RECURRENCE-ID;TZID=Europe/Stockholm:20261103T100000
+DTSTART;TZID=Europe/Stockholm:20261103T150000
+DTEND;TZID=Europe/Stockholm:20261103T170000`,
+	)
+	result := decodeImport(t, postImport(t, handler, map[string]any{"ics": file, "time_zone": "UTC"}))
+	if result.Imported != 1 || len(result.Skipped) != 0 {
+		t.Fatalf("unexpected import %+v", result)
+	}
+	events, err := store.ListEventsForExport(ctx, userID)
+	if err != nil || len(events) != 1 {
+		t.Fatalf("expected one series, got %+v %v", events, err)
+	}
+	series := events[0]
+	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	lastEnd := time.Date(2026, 11, 10, 12, 0, 0, 0, stockholm)
+	if series.RecurrenceRule == nil || *series.RecurrenceTimeZone != "Europe/Stockholm" ||
+		series.RecurrenceEndsAt == nil || !series.RecurrenceEndsAt.Equal(lastEnd) {
+		t.Fatalf("unexpected series %+v", series)
+	}
+	if len(series.Exceptions) != 2 || !series.Exceptions[0].IsCancelled ||
+		series.Exceptions[1].StartsAt == nil || !series.Exceptions[1].StartsAt.Equal(time.Date(2026, 11, 3, 15, 0, 0, 0, stockholm)) {
+		t.Fatalf("expected the 27th cancelled and 3 November moved, got %+v", series.Exceptions)
 	}
 }

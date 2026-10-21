@@ -13,6 +13,7 @@ import (
 	ics "github.com/arran4/golang-ical"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/recurrence"
 )
 
 // MaxEvents bounds the VEVENTs one file may hold, so one import cannot hold
@@ -26,10 +27,11 @@ var (
 
 // Reasons an event in a file is not imported.
 const (
-	ReasonRecurring = "recurring events are not supported yet"
-	ReasonCancelled = "cancelled"
-	ReasonNoStart   = "no start time"
-	ReasonBadTime   = "unreadable start or end time"
+	ReasonUnsupportedRule  = "unsupported repeat rule"
+	ReasonOrphanOccurrence = "a changed occurrence of a repeating event that is not in the file"
+	ReasonCancelled        = "cancelled"
+	ReasonNoStart          = "no start time"
+	ReasonBadTime          = "unreadable start or end time"
 )
 
 // Properties for the fields only this app has, so an exported file imports
@@ -55,6 +57,12 @@ type Event struct {
 	UID             string
 	Categories      []string
 	ReminderOffsets []int
+	// A repeating event's rule, the IANA time zone it repeats in, and the
+	// occurrences that differ from it: excluded dates and changed
+	// occurrences.
+	Recurrence *recurrence.Rule
+	TimeZone   string
+	Exceptions []db.OccurrenceException
 }
 
 // Skipped is an event the file holds that is not imported, and why.
@@ -90,30 +98,77 @@ func Parse(r io.Reader, loc *time.Location) (Result, error) {
 		return Result{}, ErrTooManyEvents
 	}
 	var result Result
-	for _, vevent := range vevents {
-		event, warnings, reason := parseEvent(vevent, loc)
+	warn := func(title string, warnings []string) {
 		for _, warning := range warnings {
-			result.Warnings = append(result.Warnings, event.Title+": "+warning)
+			result.Warnings = append(result.Warnings, title+": "+warning)
 		}
+	}
+	// Changed occurrences of a repeating event share its UID and carry a
+	// RECURRENCE-ID; they become exceptions of the series once it is read.
+	var overrides []*ics.VEvent
+	series := make(map[string]int)
+	for _, vevent := range vevents {
+		if vevent.HasProperty(ics.ComponentPropertyRecurrenceId) {
+			overrides = append(overrides, vevent)
+			continue
+		}
+		event, warnings, reason := parseEvent(vevent, loc)
+		warn(event.Title, warnings)
 		if reason != "" {
 			result.Skipped = append(result.Skipped, Skipped{Title: event.Title, Reason: reason})
 			continue
 		}
+		if event.Recurrence != nil && event.UID != "" {
+			series[event.UID] = len(result.Events)
+		}
 		result.Events = append(result.Events, event)
 	}
+	for _, override := range overrides {
+		title := titleOf(override)
+		index, ok := -1, false
+		if uid := textValue(override, ics.ComponentPropertyUniqueId); uid != nil {
+			index, ok = series[*uid]
+		}
+		if !ok {
+			result.Skipped = append(result.Skipped, Skipped{Title: title, Reason: ReasonOrphanOccurrence})
+			continue
+		}
+		master := &result.Events[index]
+		exception, warnings, err := parseOverride(override, *master, loc)
+		warn(title, warnings)
+		if err != nil {
+			result.Skipped = append(result.Skipped, Skipped{Title: title, Reason: ReasonBadTime})
+			continue
+		}
+		master.Exceptions = setException(master.Exceptions, exception)
+	}
 	return result, nil
+}
+
+func titleOf(vevent *ics.VEvent) string {
+	if title := textValue(vevent, ics.ComponentPropertySummary); title != nil {
+		return *title
+	}
+	return "Untitled"
+}
+
+// setException adds an exception, replacing one for the same occurrence.
+func setException(exceptions []db.OccurrenceException, exception db.OccurrenceException) []db.OccurrenceException {
+	for index, other := range exceptions {
+		if other.OriginalStart.Equal(exception.OriginalStart) {
+			exceptions[index] = exception
+			return exceptions
+		}
+	}
+	return append(exceptions, exception)
 }
 
 // parseEvent maps one VEVENT. A non-empty reason means it is skipped; the
 // event's title is set either way.
 func parseEvent(vevent *ics.VEvent, loc *time.Location) (event Event, warnings []string, reason string) {
-	event.Title = "Untitled"
-	if title := textValue(vevent, ics.ComponentPropertySummary); title != nil {
-		event.Title = *title
-	}
-	if hasAny(vevent, ics.ComponentPropertyRrule, ics.ComponentPropertyRdate,
-		ics.ComponentPropertyExrule, ics.ComponentPropertyRecurrenceId) {
-		return event, nil, ReasonRecurring
+	event.Title = titleOf(vevent)
+	if hasAny(vevent, ics.ComponentPropertyRdate, ics.ComponentPropertyExrule) {
+		return event, nil, ReasonUnsupportedRule
 	}
 	if status := textValue(vevent, ics.ComponentPropertyStatus); status != nil &&
 		strings.EqualFold(*status, string(ics.ObjectStatusCancelled)) {
@@ -151,6 +206,24 @@ func parseEvent(vevent *ics.VEvent, loc *time.Location) (event Event, warnings [
 	}
 	if !event.IsAllDay && (event.EndsAt.IsZero() || event.EndsAt.Equal(event.StartsAt)) {
 		event.EndsAt = event.StartsAt.Add(defaultDuration)
+	}
+	if property := vevent.GetProperty(ics.ComponentPropertyRrule); property != nil {
+		// A series repeats in its start's zone; times given in UTC repeat
+		// in the user's.
+		zone := start.zone
+		if zone == nil {
+			zone = loc
+		}
+		rule, err := recurrence.FromRRULE(property.Value, event.StartsAt.In(zone))
+		if err != nil {
+			return event, warnings, ReasonUnsupportedRule
+		}
+		event.Recurrence, event.TimeZone = &rule, zone.String()
+		excluded, err := excludedDates(vevent, loc)
+		if err != nil {
+			warnings = append(warnings, "excluded dates that could not be read were left out")
+		}
+		event.Exceptions = excluded
 	}
 
 	event.Description = textValue(vevent, ics.ComponentPropertyDescription)
@@ -246,8 +319,11 @@ func reminderOffset(alarm *ics.VAlarm, event db.Event, loc *time.Location) (int,
 }
 
 type icalTime struct {
-	at      time.Time
-	isDate  bool
+	at     time.Time
+	isDate bool
+	// zone is the zone the value was read in: its TZID's, or loc for dates
+	// and floating times. It is nil for UTC times.
+	zone    *time.Location
 	warning string
 }
 
@@ -266,7 +342,7 @@ func readTime(property *ics.IANAProperty, loc *time.Location) (icalTime, error) 
 		if err != nil {
 			return icalTime{}, err
 		}
-		return icalTime{at: time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, loc), isDate: true}, nil
+		return icalTime{at: time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, loc), isDate: true, zone: loc}, nil
 	}
 	if utc, ok := strings.CutSuffix(value, "Z"); ok {
 		at, err := time.Parse(dateTimeLayout, utc)
@@ -281,7 +357,87 @@ func readTime(property *ics.IANAProperty, loc *time.Location) (icalTime, error) 
 		}
 	}
 	at, err := time.ParseInLocation(dateTimeLayout, value, zone)
-	return icalTime{at: at, warning: warning}, err
+	return icalTime{at: at, zone: zone, warning: warning}, err
+}
+
+// excludedDates reads a series' EXDATE values as cancelled occurrences.
+func excludedDates(vevent *ics.VEvent, loc *time.Location) ([]db.OccurrenceException, error) {
+	var exceptions []db.OccurrenceException
+	for _, property := range vevent.GetProperties(ics.ComponentPropertyExdate) {
+		for value := range strings.SplitSeq(property.Value, ",") {
+			single := *property
+			single.Value = value
+			excluded, err := readTime(&single, loc)
+			if err != nil {
+				return exceptions, err
+			}
+			exceptions = setException(exceptions, db.OccurrenceException{OriginalStart: excluded.at, IsCancelled: true})
+		}
+	}
+	return exceptions, nil
+}
+
+// parseOverride reads a changed occurrence of master. Only its time, whether
+// it happens, and the app's own skip carry over; other changes are reported.
+func parseOverride(vevent *ics.VEvent, master Event, loc *time.Location) (db.OccurrenceException, []string, error) {
+	original, err := readTime(vevent.GetProperty(ics.ComponentPropertyRecurrenceId), loc)
+	if err != nil {
+		return db.OccurrenceException{}, nil, err
+	}
+	exception := db.OccurrenceException{OriginalStart: original.at}
+	if status := textValue(vevent, ics.ComponentPropertyStatus); status != nil &&
+		strings.EqualFold(*status, string(ics.ObjectStatusCancelled)) {
+		exception.IsCancelled = true
+		return exception, nil, nil
+	}
+	var warnings []string
+	if titleOf(vevent) != master.Title ||
+		!sameText(textValue(vevent, ics.ComponentPropertyLocation), master.Location) ||
+		!sameText(textValue(vevent, ics.ComponentPropertyDescription), master.Description) {
+		warnings = append(warnings, "changes to one occurrence other than its time were left out")
+	}
+	if value := textValue(vevent, ics.ComponentProperty(propSkipped)); value != nil {
+		skipped := strings.EqualFold(*value, "TRUE")
+		exception.IsSkipped = &skipped
+	}
+
+	startsAt, endsAt := original.at, original.at.Add(master.EndsAt.Sub(master.StartsAt))
+	if master.IsAllDay {
+		endsAt = original.at.AddDate(0, 0, recurrence.DaysBetween(master.StartsAt.In(loc), master.EndsAt.In(loc)))
+	}
+	if property := vevent.GetProperty(ics.ComponentPropertyDtStart); property != nil {
+		start, err := readTime(property, loc)
+		if err != nil {
+			return exception, warnings, err
+		}
+		length := endsAt.Sub(startsAt)
+		startsAt, endsAt = start.at, start.at.Add(length)
+		switch {
+		case vevent.HasProperty(ics.ComponentPropertyDtEnd):
+			end, err := readTime(vevent.GetProperty(ics.ComponentPropertyDtEnd), loc)
+			if err != nil {
+				return exception, warnings, err
+			}
+			endsAt = end.at
+		case vevent.HasProperty(ics.ComponentPropertyDuration):
+			length, err := parseDuration(vevent.GetProperty(ics.ComponentPropertyDuration).Value)
+			if err != nil {
+				return exception, warnings, err
+			}
+			endsAt = length.addTo(startsAt)
+		}
+	}
+	if !endsAt.After(startsAt) {
+		return exception, warnings, errInvalidDuration
+	}
+	if !startsAt.Equal(original.at) || !endsAt.Equal(original.at.Add(master.EndsAt.Sub(master.StartsAt))) {
+		exception.StartsAt, exception.EndsAt = &startsAt, &endsAt
+	}
+	return exception, warnings, nil
+}
+
+func sameText(a, b *string) bool {
+	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
 
 func lookupZone(tzid string) (*time.Location, bool) {

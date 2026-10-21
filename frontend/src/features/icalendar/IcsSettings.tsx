@@ -51,8 +51,8 @@ export function IcsSettings({ tags, exportUrl, onImport }: IcsSettingsProps) {
     <section className="settings-section" aria-labelledby="ics-heading">
       <h2 id="ics-heading">Import and export</h2>
       <p>
-        Move events to and from other calendars with .ics files. Recurring
-        events and tasks are not included yet.
+        Move events to and from other calendars with .ics files, including
+        repeating ones. Tasks are not included yet.
       </p>
       <a className="primary-button compact ics-export" href={exportUrl}>
         Download my events (.ics)
