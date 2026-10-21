@@ -30,7 +30,7 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	event, err = applyRecurrence(event, request.Recurrence, request.TimeZone, nil)
 	if err != nil {
-		writeRecurrenceError(w, err)
+		writeEventError(w, err, "failed to create event")
 		return
 	}
 
@@ -45,32 +45,29 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	writeCreated(w, id)
 }
 
-// updateSeries saves an event that is or becomes a series, or stops being
-// one. Exceptions that are no longer occurrences of the new rule are dropped.
-func (h *Handler) updateSeries(r *http.Request, userID, eventID uuid.UUID, event db.Event,
-	request eventRequest, exceptions []db.OccurrenceException) error {
-	withRule, err := applyRecurrence(event, request.Recurrence, request.TimeZone, nil)
-	if err != nil {
-		return err
-	}
-	kept, err := matchingExceptions(withRule, exceptions)
-	if err != nil {
-		return err
-	}
-	// The series' end depends on the exceptions it keeps.
-	withRule, err = applyRecurrence(event, request.Recurrence, request.TimeZone, kept)
-	if err != nil {
-		return err
-	}
-	return h.Store.UpdateSeries(r.Context(), userID, eventID, withRule, kept)
-}
-
-func writeRecurrenceError(w http.ResponseWriter, err error) {
-	if isRecurrenceError(err) {
+// writeEventError answers an error from saving or deleting an event or some
+// of its occurrences.
+func writeEventError(w http.ResponseWriter, err error, message string) {
+	switch {
+	case isRecurrenceError(err), errors.Is(err, ErrInvalidScope), errors.Is(err, ErrNotRepeating),
+		errors.Is(err, ErrOccurrenceFields):
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	case errors.Is(err, ErrOccurrenceNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	default:
+		writeMappedError(w, err,
+			httpErrorResponse{status: http.StatusInternalServerError, message: message},
+			mainTagNotFound,
+			mappedErrorResponse{
+				cause:    db.ErrEventNotFound,
+				response: httpErrorResponse{status: http.StatusNotFound, message: "event not found"},
+			},
+			mappedErrorResponse{
+				cause:    db.ErrTimelineItemNotFound,
+				response: httpErrorResponse{status: http.StatusNotFound, message: "timeline item not found"},
+			},
+		)
 	}
-	writeServerError(w, "failed to save the repeat", err)
 }
 
 func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
@@ -91,33 +88,41 @@ func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	existing, err := h.Store.GetOwnEvent(r.Context(), userID, eventID)
-	if errors.Is(err, db.ErrEventNotFound) {
-		http.Error(w, "event not found", http.StatusNotFound)
+	scope, err := parseScope(r.URL.Query())
+	if err != nil {
+		writeEventError(w, err, "failed to update event")
 		return
 	}
+	existing, err := h.Store.GetOwnEvent(r.Context(), userID, eventID)
 	if err != nil {
-		writeServerError(w, "failed to update event", err)
+		writeEventError(w, err, "failed to update event")
+		return
+	}
+	if scope.scope != "" {
+		newID, err := h.updateOccurrences(r, userID, existing, event, request, scope)
+		if err != nil {
+			writeEventError(w, err, "failed to update event")
+			return
+		}
+		if newID != uuid.Nil {
+			// Changing the following occurrences starts a new series.
+			writeJSON(w, http.StatusOK, createResponse{ID: newID})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	if existing.RecurrenceRule == nil && request.Recurrence == nil {
 		err = h.Store.UpdateEvent(r.Context(), userID, eventID, event)
 	} else {
-		err = h.updateSeries(r, userID, eventID, event, request, existing.Exceptions)
-		if isRecurrenceError(err) {
-			writeRecurrenceError(w, err)
-			return
+		var kept []db.OccurrenceException
+		event, kept, err = withSeries(event, request.Recurrence, request.TimeZone, existing.Exceptions)
+		if err == nil {
+			err = h.Store.UpdateSeries(r.Context(), userID, eventID, event, kept)
 		}
 	}
 	if err != nil {
-		writeMappedError(w, err,
-			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update event"},
-			mainTagNotFound,
-			mappedErrorResponse{
-				cause:    db.ErrEventNotFound,
-				response: httpErrorResponse{status: http.StatusNotFound, message: "event not found"},
-			},
-		)
+		writeEventError(w, err, "failed to update event")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

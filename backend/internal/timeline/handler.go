@@ -53,14 +53,19 @@ func (h *Handler) DeleteTimelineItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.Store.DeleteTimelineItem(r.Context(), userID, itemID); err != nil {
-		writeMappedError(w, err,
-			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to delete timeline item"},
-			mappedErrorResponse{
-				cause:    db.ErrTimelineItemNotFound,
-				response: httpErrorResponse{status: http.StatusNotFound, message: "timeline item not found"},
-			},
-		)
+	scope, err := parseScope(r.URL.Query())
+	if err != nil {
+		writeEventError(w, err, "failed to delete timeline item")
+		return
+	}
+	// Deleting all occurrences deletes the series.
+	if scope.scope == "" || scope.scope == scopeAll {
+		err = h.Store.DeleteTimelineItem(r.Context(), userID, itemID)
+	} else {
+		err = h.deleteOccurrences(r, userID, itemID, scope)
+	}
+	if err != nil {
+		writeEventError(w, err, "failed to delete timeline item")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
