@@ -88,7 +88,7 @@ export function CalendarApp({ user }: { user: User }) {
   const isPhone = useMediaQuery(PHONE_MEDIA_QUERY);
   const dayCount = isPhone ? PHONE_DAY_COUNT : WEEK_DAY_COUNT;
   const sidebar = useSidebarState(isPhone);
-  const { rangeStart, selectedDate, setSelectedDate, moveRange } =
+  const { rangeStart, selectedDate, setSelectedDate, moveRange, goToToday } =
     useCalendarState(today, weekStartsOn, dayCount);
   const dates = getCalendarDates(rangeStart, dayCount);
   const { createTag } = useTagMutations(removeHiddenTag);
@@ -201,8 +201,8 @@ export function CalendarApp({ user }: { user: User }) {
           <div className="timeline-column">
             <WeekHeader
               title={`${formatRangeDate(dates[0])} – ${formatRangeDate(dates[dates.length - 1])}`}
-              itemCount={weekEntries.length}
               onPrevious={() => moveRange(-1)}
+              onToday={goToToday}
               onNext={() => moveRange(1)}
               onAddItem={() => composer.openNew()}
               quickAdd={<QuickAddBar onSubmit={quickAddEvent} />}
@@ -211,6 +211,7 @@ export function CalendarApp({ user }: { user: User }) {
             </WeekHeader>
             <WeekCalendar
               dates={dates}
+              today={today}
               hasAllDayEvents={allDayEventSpans.length > 0}
               weatherByDay={weatherByDay}
               transitCardPills={

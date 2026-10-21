@@ -17,6 +17,7 @@ import { usePreferences } from "./preferencesContext";
 
 type WeekCalendarProps = {
   dates: Date[];
+  today: Date;
   onDayClick: (event: MouseEvent<HTMLDivElement>, date: Date) => void;
   renderDay: (date: Date) => ReactNode;
   renderAllDay: () => ReactNode;
@@ -34,6 +35,7 @@ const isWeekend = (date: Date) => date.getDay() === 0 || date.getDay() === 6;
 
 export const WeekCalendar = ({
   dates,
+  today,
   onDayClick,
   renderDay,
   renderAllDay,
@@ -44,7 +46,7 @@ export const WeekCalendar = ({
   scrollToHour,
   onSwipe,
 }: WeekCalendarProps) => {
-  const { timeFormat } = usePreferences().preferences;
+  const { timeFormat, visibleHours } = usePreferences().preferences;
   const scrollerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -84,6 +86,25 @@ export const WeekCalendar = ({
     scroller.scrollTop = (scrollToHour / HOURS_PER_DAY) * grid.offsetHeight;
   }, [rangeKey, scrollToHour]);
 
+  // Zooming changes the grid height; keep the same hour at the top. The
+  // fraction is recorded on scroll because the grid has already resized by
+  // the time the effect runs.
+  const topFraction = useRef(0);
+  const zoomedHours = useRef(visibleHours);
+  const recordScroll = () => {
+    const scroller = scrollerRef.current;
+    const grid = gridRef.current;
+    if (scroller && grid?.offsetHeight)
+      topFraction.current = scroller.scrollTop / grid.offsetHeight;
+  };
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    const grid = gridRef.current;
+    if (!scroller || !grid || zoomedHours.current === visibleHours) return;
+    zoomedHours.current = visibleHours;
+    scroller.scrollTop = topFraction.current * grid.offsetHeight;
+  }, [visibleHours]);
+
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     swipeStart.current =
       onSwipe && event.pointerType === "touch"
@@ -110,7 +131,13 @@ export const WeekCalendar = ({
       ref={scrollerRef}
       className={cx("week-calendar", onSwipe && "swipeable")}
       aria-label="Week calendar"
-      style={{ "--day-count": dates.length } as CSSProperties}
+      style={
+        {
+          "--day-count": dates.length,
+          "--visible-hours": visibleHours,
+        } as CSSProperties
+      }
+      onScroll={recordScroll}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={() => (swipeStart.current = null)}
@@ -120,7 +147,14 @@ export const WeekCalendar = ({
           <span />
           {dates.map((date) => (
             <div
-              className={cx("day-heading", isWeekend(date) && "weekend")}
+              className={cx(
+                "day-heading",
+                isWeekend(date) && "weekend",
+                dateKey(date) === dateKey(today) && "today",
+              )}
+              aria-current={
+                dateKey(date) === dateKey(today) ? "date" : undefined
+              }
               key={dateKey(date)}
             >
               <strong>{date.getDate()}</strong>

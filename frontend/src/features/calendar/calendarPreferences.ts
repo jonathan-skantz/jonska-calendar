@@ -9,9 +9,14 @@ export type SunDisplayPreferences = {
   showNight: boolean;
 };
 
+// How many hours of the day fill the week grid's height; the rest scrolls.
+export const VISIBLE_HOUR_OPTIONS = [24, 16, 12] as const;
+export type VisibleHours = (typeof VISIBLE_HOUR_OPTIONS)[number];
+
 export type CalendarPreferences = SunDisplayPreferences & {
   timeFormat: TimeFormatPreference;
   weekStartsOn: WeekStartPreference;
+  visibleHours: VisibleHours;
 };
 
 export const DEFAULT_CALENDAR_PREFERENCES: CalendarPreferences = {
@@ -20,6 +25,7 @@ export const DEFAULT_CALENDAR_PREFERENCES: CalendarPreferences = {
   showSunrise: true,
   showSunset: true,
   showNight: true,
+  visibleHours: 24,
 };
 
 const booleanOr = (value: unknown, fallback: boolean) =>
@@ -36,6 +42,9 @@ const isWeekStartPreference = (value: unknown): value is WeekStartPreference =>
     Number.isInteger(value) &&
     value >= 0 &&
     value <= 6);
+
+const isVisibleHours = (value: unknown): value is VisibleHours =>
+  VISIBLE_HOUR_OPTIONS.includes(value as VisibleHours);
 
 export const parseCalendarPreferences = (
   value: string | null,
@@ -56,6 +65,9 @@ export const parseCalendarPreferences = (
       showSunrise: booleanOr(preferences.showSunrise, true),
       showSunset: booleanOr(preferences.showSunset, true),
       showNight: booleanOr(preferences.showNight, true),
+      visibleHours: isVisibleHours(preferences.visibleHours)
+        ? preferences.visibleHours
+        : 24,
     };
   } catch {
     return DEFAULT_CALENDAR_PREFERENCES;

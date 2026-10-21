@@ -54,7 +54,7 @@ flowchart LR
 ```
 
 - `gridOffset` (`lib/calendar.ts`) returns a CSS `calc()` string, not pixels.
-- `WeekCalendar` sets `--hour-height` from the space under the header, divided by 24 hours. It is clamped between `2rem` and `5rem`.
+- `WeekCalendar` sets `--hour-height` from the space under the header, divided by the zoom level's visible hours (24, 16 or 12, the `visibleHours` preference set from the week header). It is clamped between `2rem` and `5rem`. Changing zoom keeps the same hour at the top.
 - The grid always has 24 rows.
 - Three days show on phones. Seven show on larger screens.
 

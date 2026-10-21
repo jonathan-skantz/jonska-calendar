@@ -50,6 +50,16 @@ describe("calendar preferences", () => {
     });
   });
 
+  it("keeps a saved zoom level and falls back to the full day", () => {
+    expect(
+      parseCalendarPreferences(JSON.stringify({ visibleHours: 12 })),
+    ).toEqual({ ...DEFAULT_CALENDAR_PREFERENCES, visibleHours: 12 });
+    expect(
+      parseCalendarPreferences(JSON.stringify({ visibleHours: 7 }))
+        .visibleHours,
+    ).toBe(24);
+  });
+
   it("resolves browser week settings and localizes weekday names", () => {
     expect(getEffectiveWeekStart(2)).toBe(2);
     expect(weekdayName(0, "en-US")).toBe("Sunday");

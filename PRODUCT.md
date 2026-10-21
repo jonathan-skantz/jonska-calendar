@@ -145,7 +145,7 @@ Events have a start date/time and end date/time.
 
 #### Quick add (Demo)
 
-- [x] A field next to "Add item" takes one sentence in Swedish or English, e.g.
+- [x] A field next to "New" takes one sentence in Swedish or English, e.g.
       "middag hos mormor på lördag ca 18–21 #familj, påminn en timme innan".
       Pressing Enter opens the new-event form with the stated fields filled in:
       title, date and time, all-day, approximate edges, location, attend or

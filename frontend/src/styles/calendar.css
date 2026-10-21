@@ -18,11 +18,66 @@
 }
 
 .week-title h2 {
-  font-size: 24px;
+  font-size: 22px;
+}
+
+.week-nav-group {
+  display: flex;
+}
+
+.week-nav-group .week-nav + .week-nav {
+  margin-left: -1px;
+}
+
+.week-nav.today-button {
+  width: auto;
+  flex: none;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.zoom-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: #e8eee3;
+}
+
+.zoom-toggle button {
+  border: 0;
+  padding: 3px 7px;
+  background: transparent;
+  color: var(--muted);
+  font:
+    11px "DM Mono",
+    monospace;
+}
+
+.zoom-toggle button.selected {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(39, 52, 47, 0.08);
 }
 
 .week-actions .primary-button {
   margin: 0;
+}
+
+/* Quick add and New share one height so they read as one control. */
+.week-actions .quick-add input {
+  height: 38px;
+  padding: 0 12px;
+}
+
+.week-actions .new-item-button {
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.week-actions .new-item-button span {
+  font-size: 15px;
 }
 
 .quick-add {
@@ -105,6 +160,22 @@
   color: var(--ink);
   font-size: 16px;
   font-weight: 500;
+}
+
+/* Today's date sits in a filled circle, like a page marker. */
+.day-heading.today strong {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px 0 -2px -6px;
+  border-radius: 50%;
+  background: var(--moss-dark);
+  color: #fff;
+}
+
+.day-heading.today span {
+  color: var(--moss-dark);
 }
 
 .day-heading span {
@@ -801,18 +872,24 @@
 
 /* Keep in sync with PHONE_MEDIA_QUERY in lib/layout.ts. */
 @media (max-width: 640px) {
-  .week-heading .section-kicker,
-  .week-heading .item-count,
-  .add-item-label {
-    display: none;
-  }
-
   .week-title {
+    flex: 1 1 100%;
     gap: 8px;
   }
 
   .week-title h2 {
-    font-size: 18px;
+    flex: 1;
+    min-width: 0;
+    font-size: 16px;
+    white-space: nowrap;
+  }
+
+  .week-nav.today-button {
+    padding: 0 8px;
+  }
+
+  .zoom-toggle button {
+    padding: 3px 4px;
   }
 
   .week-actions {
@@ -827,11 +904,6 @@
   .quick-add input {
     width: 100%;
     min-width: 0;
-  }
-
-  .week-actions .primary-button.compact {
-    min-width: 0;
-    padding: 10px 14px;
   }
 
   .day-heading {

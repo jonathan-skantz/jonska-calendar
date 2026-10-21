@@ -59,4 +59,15 @@ describe("useCalendarState", () => {
     rerender({ dayCount: WEEK_DAY_COUNT });
     expect(dateKey(result.current.rangeStart)).toBe("2026-10-19");
   });
+
+  it("jumps back to the range containing today", () => {
+    const { result } = renderHook(() =>
+      useCalendarState(today, 1, WEEK_DAY_COUNT),
+    );
+    act(() => result.current.moveRange(1));
+    act(() => result.current.moveRange(1));
+    act(() => result.current.goToToday());
+    expect(dateKey(result.current.rangeStart)).toBe("2026-10-12");
+    expect(result.current.selectedDate).toBe("2026-10-16");
+  });
 });

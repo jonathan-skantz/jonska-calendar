@@ -59,5 +59,14 @@ export const useCalendarState = (
     setSelectedDate(dateKey(next));
   };
 
-  return { rangeStart, selectedDate, setSelectedDate, moveRange };
+  const goToToday = () => {
+    setRange({
+      weekStartsOn,
+      dayCount,
+      rangeStart: getRangeStart(today, weekStartsOn, dayCount),
+    });
+    setSelectedDate(dateKey(today));
+  };
+
+  return { rangeStart, selectedDate, setSelectedDate, moveRange, goToToday };
 };
