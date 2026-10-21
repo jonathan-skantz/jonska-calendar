@@ -63,12 +63,6 @@
   display: none;
 }
 
-.tag-help {
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-
 .side-panel {
   display: grid;
   align-content: start;
@@ -137,19 +131,9 @@
   margin-top: 15px;
 }
 
-.family-note {
-  display: flex;
-  gap: 12px;
+.info-hint {
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.family-note p {
-  margin: 0;
-}
-
-.note-symbol {
-  color: var(--coral);
-  font-size: 19px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: help;
 }

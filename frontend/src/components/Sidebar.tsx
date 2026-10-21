@@ -44,6 +44,10 @@ export const Sidebar = ({
 
   if (!open) return null;
 
+  const filterHelp = `Click a tag to hide or show its events. Default tag: ${
+    tags.find((tag) => tag.is_default)?.name ?? "none"
+  }. Events shared with you are read-only; only the owner can change them.`;
+
   return (
     <>
       {isOpenDrawer && (
@@ -64,7 +68,17 @@ export const Sidebar = ({
         </div>
         <div className="side-section">
           <div className="section-heading small">
-            <h2>Event filters</h2>
+            <h2>
+              Event filters{" "}
+              <span
+                className="info-hint"
+                role="img"
+                aria-label={filterHelp}
+                title={filterHelp}
+              >
+                ⓘ
+              </span>
+            </h2>
             <button
               className="icon-button"
               aria-label="Add tag"
@@ -101,22 +115,11 @@ export const Sidebar = ({
               <span className="muted">No tags yet</span>
             )}
           </div>
-          <p className="tag-help">
-            Click a tag to hide or show its events. Default:{" "}
-            {tags.find((tag) => tag.is_default)?.name ?? "none"}
-          </p>
         </div>
         <div className="tag-editor-trigger">
           <button className="text-button" onClick={onEditTags}>
             Edit
           </button>
-        </div>
-        <div className="side-section family-note">
-          <span className="note-symbol">✳</span>
-          <p>
-            Events shared with you are read-only; only the owner can change
-            them.
-          </p>
         </div>
         {variant === "drawer" && drawerFooter}
       </aside>
