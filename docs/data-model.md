@@ -57,6 +57,14 @@ Schema constraints:
 - Optional gathering is a dotted band. It counts as busy only when there is a commute before it.
 - Shared events never include the owner's commute. Gathering is shared, because it describes the event.
 
+### iCalendar UIDs
+
+- `timeline_items.ical_uid` (migration 24) holds the UID an event was imported with. It is NULL for events made in the app.
+- It is unique per user, so importing the same file again skips the events it already created. Imported events are never updated from a file.
+- Exported events use `ical_uid`, or `<id>@jonska-calendar` for events made in the app. Importing your own export skips those events too; another user importing it gets new events.
+- An event in a file without a UID cannot be recognized, so it is imported again each time.
+- `Store.ImportEvents` (`backend/db/ical.go`) writes all events, tags, and reminders in one transaction. A preview runs the same transaction and rolls it back.
+
 ## Tasks
 
 - Stores a title, optional description and URL, `deadline_at`, and `is_completed`.

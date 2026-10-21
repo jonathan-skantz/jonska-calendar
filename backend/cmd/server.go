@@ -16,6 +16,7 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/assistant"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
+	"github.com/jonathan-skantz/calendar/backend/internal/ical"
 	"github.com/jonathan-skantz/calendar/backend/internal/quickadd"
 	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
 	"github.com/jonathan-skantz/calendar/backend/internal/weather"
@@ -49,6 +50,7 @@ func main() {
 	authHandler := auth.New(store)
 	timelineHandler := timeline.New(store, authHandler.CurrentUserID)
 	weatherHandler := weather.New(store, authHandler.CurrentUserID, weather.NewClient())
+	icalHandler := ical.New(store, authHandler.CurrentUserID)
 
 	// Quick add and the assistant stay off (503) without a key, so the rest
 	// of the app runs without one.
@@ -97,6 +99,8 @@ func main() {
 	mux.HandleFunc("PATCH /api/household", timelineHandler.UpdateHousehold)
 	mux.HandleFunc("POST /api/household/members", timelineHandler.AddHouseholdMember)
 	mux.HandleFunc("DELETE /api/household/members/me", timelineHandler.LeaveHousehold)
+	mux.HandleFunc("POST /api/import/ics", icalHandler.Import)
+	mux.HandleFunc("GET /api/export.ics", icalHandler.Export)
 	mux.HandleFunc("GET /api/weather", weatherHandler.Forecast)
 	mux.HandleFunc("POST /api/assistant/messages", assistantHandler.Message)
 	mux.HandleFunc("POST /api/assistant/conversations/{conversationID}/actions/{actionID}", assistantHandler.Decide)

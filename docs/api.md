@@ -12,6 +12,7 @@
 | `401` | No valid session.                                                                          |
 | `404` | Not found **or** not yours. The server does not say which, on purpose.                     |
 | `409` | Conflict: duplicate name, already shared, already a member, last or main tag removal.      |
+| `413` | The `.ics` import body is over 6 MB.                                                       |
 | `429` | Quick add rate limit reached (30 per user per hour).                                       |
 | `502` | Quick add: Anthropic failed.                                                               |
 | `503` | Not configured or unavailable: quick add without a key, weather with no cache or upstream. |
@@ -53,6 +54,8 @@
 | `POST /api/assistant/messages`                                          | `text`, `time_zone`, `week_start`, `conversation_id?` | `{conversation_id, reply, actions, steps, ended}`; `404`, `409`, `429`, `502`, `503` |
 | `POST /api/assistant/conversations/{conversationID}/actions/{actionID}` | `decision` (`apply`, `decline`, `undo`)               | The action with its new `status`; `400`, `404`, `409`                                |
 | `GET /api/weather?lat=&lon=`                                            | None                                                  | `{date, conditions, sunrise?, sunset?}[]`; `503`                                     |
+| `POST /api/import/ics`                                                  | `ics`, `time_zone`, `tag_id?`, `dry_run`              | `{imported, skipped, warnings}`; `400`, `404` tag not yours, `413`                   |
+| `GET /api/export.ics?time_zone=`                                        | None                                                  | Your own events as a `text/calendar` file download                                   |
 | `GET /api/household`                                                    | None                                                  | Household, or `null`                                                                 |
 | `POST /api/household`                                                   | `name`, `transit_card_count`                          | `201`; `409` if already in a household                                               |
 | `PATCH /api/household`                                                  | `name`, `transit_card_count`                          | `204`; `404` without a household                                                     |
@@ -120,6 +123,18 @@ Required: `title`, `starts_at`, `ends_at`, `kind`.
 - `GET /api/weather?lat=&lon=` returns one item per day.
 - Each item has `date`, `conditions`, and optional `sunrise` and `sunset` (`HH:MM`, local time at that place).
 - Results are cached per 0.1-degree cell. See [weather cache](data-model.md#weather-cache).
+
+## Import and export
+
+- The code is in `backend/internal/ical`. Only `VEVENT`s are read and written; tasks, recurrence, and attendees are not.
+- `POST /api/import/ics` takes the file's text in `ics` and the browser's IANA `time_zone`, used for floating times and all-day dates.
+  - `tag_id` is the main tag of every imported event. Leave it out for your default tag. `CATEGORIES` that match your tag names, ignoring case, are attached too. Tags are never created.
+  - `dry_run: true` answers what an import would do and writes nothing. The real import runs in one transaction.
+  - `skipped` lists `{title, reason}` for events not imported: recurring, cancelled, no start time, an unreadable time, failed event validation (the reason is the validation message), or `already imported`.
+  - `warnings` lists details that were dropped, such as a reminder after the start or an unknown time zone.
+  - A file holds at most 5000 events. A file that is not iCalendar answers `400`.
+- `GET /api/export.ics` returns your own events, not events shared with you, with your tags as `CATEGORIES` and your reminders as `VALARM`s. Fields only this app has are written as `X-JONSKA-*` properties, so importing the file again restores them.
+- See [data model: iCalendar UIDs](data-model.md#icalendar-uids) for how repeated imports are detected.
 
 ## Quick add
 
