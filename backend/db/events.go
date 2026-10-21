@@ -125,18 +125,6 @@ func updateEventTx(ctx context.Context, tx pgx.Tx, userID, eventID uuid.UUID, ev
 		return err
 	}
 
-	// A moved event's reminders fire again at their new time, for every user.
-	if _, err := tx.Exec(ctx, `
-		UPDATE event_reminders AS reminder
-		SET notified_at = NULL
-		FROM events AS e
-		WHERE reminder.event_id = $1
-		  AND e.timeline_item_id = $1
-		  AND e.starts_at <> $2
-	`, eventID, event.StartsAt); err != nil {
-		return err
-	}
-
 	result, err = tx.Exec(ctx, `
 		UPDATE events
 		SET starts_at = $2, ends_at = $3, is_all_day = $4, kind = $5, location = $6,

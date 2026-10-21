@@ -76,11 +76,15 @@ func (s *Store) ImportEvents(ctx context.Context, userID, mainTagID uuid.UUID, e
 			// A reminder whose time has passed counts as delivered, so it is
 			// not shown as missed on the next open.
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO event_reminders (event_id, user_id, offset_seconds, notified_at)
-				SELECT $1, $2, reminder_offset,
-					CASE WHEN $3::timestamptz - make_interval(secs => reminder_offset) <= now() THEN now() END
-				FROM unnest($4::int[]) AS reminder_offset
-				ON CONFLICT DO NOTHING
+				WITH reminder AS (
+					INSERT INTO event_reminders (event_id, user_id, offset_seconds)
+					SELECT $1, $2, reminder_offset FROM unnest($4::int[]) AS reminder_offset
+					ON CONFLICT DO NOTHING
+					RETURNING id, offset_seconds
+				)
+				INSERT INTO reminder_deliveries (reminder_id, occurrence_start, notified_at)
+				SELECT id, $3, now() FROM reminder
+				WHERE $3::timestamptz - make_interval(secs => offset_seconds) <= now()
 			`, itemID, userID, event.StartsAt, imported.ReminderOffsets); err != nil {
 				return err
 			}

@@ -202,3 +202,97 @@ func TestReminderNotifiedResetsWhenEventMoves(t *testing.T) {
 		t.Fatalf("expected reminders to be deleted with the event, got %+v, %v", reminders, err)
 	}
 }
+
+func TestRemindersRepeatForEachOccurrence(t *testing.T) {
+	ctx := context.Background()
+	store, ownerID := setupTestStore(t)
+	recipientID, err := store.Register(ctx, "recipient@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := New(store, testutil.SignedInAs(ownerID))
+	tomorrow := time.Now().In(stockholm).AddDate(0, 0, 1)
+	first := time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 10, 0, 0, 0, stockholm)
+	body := lecture(map[string]any{"frequency": "daily", "interval": 1, "count": 4})
+	body["starts_at"], body["ends_at"] = first, first.Add(time.Hour)
+	eventID := createdID(t, sendEvent(t, owner, http.MethodPost, "", body))
+	if _, err := store.CreateReminder(ctx, ownerID, eventID, 900); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ShareEvent(ctx, ownerID, eventID, recipientID, db.ShareFields{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateReminder(ctx, recipientID, eventID, 3600); err != nil {
+		t.Fatal(err)
+	}
+
+	list := func(handler *Handler) []db.Reminder {
+		t.Helper()
+		response := httptest.NewRecorder()
+		handler.ListReminders(response, httptest.NewRequest(http.MethodGet, "/api/reminders", nil))
+		var reminders []db.Reminder
+		if err := json.NewDecoder(response.Body).Decode(&reminders); err != nil {
+			t.Fatal(err)
+		}
+		return reminders
+	}
+	markNotified := func(reminder db.Reminder) {
+		t.Helper()
+		request := httptest.NewRequest(http.MethodPost, "/api/reminders/"+reminder.ID.String()+"/notified",
+			bytes.NewBufferString(fmt.Sprintf(`{"occurrence_start":%q}`, reminder.OccurrenceStart.Format(time.RFC3339))))
+		request.SetPathValue("reminderID", reminder.ID.String())
+		response := httptest.NewRecorder()
+		owner.MarkReminderNotified(response, request)
+		if response.Code != http.StatusNoContent {
+			t.Fatalf("mark notified: expected %d, got %d", http.StatusNoContent, response.Code)
+		}
+	}
+
+	reminders := list(owner)
+	if len(reminders) != 4 {
+		t.Fatalf("expected a reminder for each of the four occurrences, got %+v", reminders)
+	}
+	for index, reminder := range reminders {
+		start := first.AddDate(0, 0, index)
+		if !reminder.OccurrenceStart.Equal(start) || !reminder.EventStartsAt.Equal(start) ||
+			!reminder.RemindAt.Equal(start.Add(-15*time.Minute)) || reminder.NotifiedAt != nil {
+			t.Fatalf("reminder %d: unexpected %+v", index, reminder)
+		}
+	}
+
+	// Delivering the second occurrence's reminder leaves the others due.
+	markNotified(reminders[1])
+	reminders = list(owner)
+	if reminders[0].NotifiedAt != nil || reminders[1].NotifiedAt == nil || reminders[2].NotifiedAt != nil {
+		t.Fatalf("expected only the second delivered, got %+v", reminders)
+	}
+
+	// Moving the second occurrence re-arms its reminder; skipping the third
+	// shows to the owner only.
+	moved := occurrenceBody(first.AddDate(0, 0, 1).Add(2*time.Hour), first.AddDate(0, 0, 1).Add(3*time.Hour), nil)
+	if code := updateScoped(t, owner, eventID, scopeQuery("this", first.AddDate(0, 0, 1)), moved).Code; code != http.StatusNoContent {
+		t.Fatalf("move: expected %d, got %d", http.StatusNoContent, code)
+	}
+	skipped := occurrenceBody(first.AddDate(0, 0, 2), first.AddDate(0, 0, 2).Add(time.Hour), nil)
+	skipped["is_skipped"] = true
+	if code := updateScoped(t, owner, eventID, scopeQuery("this", first.AddDate(0, 0, 2)), skipped).Code; code != http.StatusNoContent {
+		t.Fatalf("skip: expected %d, got %d", http.StatusNoContent, code)
+	}
+	reminders = list(owner)
+	if !reminders[1].EventStartsAt.Equal(first.AddDate(0, 0, 1).Add(2*time.Hour)) || reminders[1].NotifiedAt != nil {
+		t.Fatalf("expected the moved occurrence's reminder due again, got %+v", reminders[1])
+	}
+	if !reminders[2].EventIsSkipped || reminders[3].EventIsSkipped {
+		t.Fatalf("expected only the third occurrence skipped, got %+v", reminders)
+	}
+
+	shared := list(New(store, testutil.SignedInAs(recipientID)))
+	if len(shared) != 4 || !shared[0].IsShared || shared[0].OffsetSeconds != 3600 {
+		t.Fatalf("expected the recipient's own reminders, got %+v", shared)
+	}
+	for _, reminder := range shared {
+		if reminder.EventIsSkipped {
+			t.Fatalf("recipients never see the owner's skip, got %+v", reminder)
+		}
+	}
+}

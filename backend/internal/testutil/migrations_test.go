@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/jonathan-skantz/calendar/backend/db"
 )
 
 func TestMainTagMigrationBackfillsExistingEventTag(t *testing.T) {
@@ -72,5 +74,57 @@ func TestMainTagMigrationBackfillsExistingEventTag(t *testing.T) {
 	}
 	if !mainTagAttached {
 		t.Fatalf("expected migrated main tag %s to remain attached", mainTagID)
+	}
+}
+
+func TestReminderDeliveriesMigrationKeepsDeliveries(t *testing.T) {
+	ctx := context.Background()
+	pool := newTestPool(t, migrationNames[:25])
+
+	store := db.NewStore(pool)
+	userID, err := store.Register(ctx, "migration@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	startsAt := time.Date(2026, 10, 15, 9, 0, 0, 0, time.UTC)
+	itemID, err := store.CreateEvent(ctx, userID, db.Event{
+		Title: "Dentist", StartsAt: startsAt, EndsAt: startsAt.Add(time.Hour), Kind: db.EventKindAttendable,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	delivered, err := store.CreateReminder(ctx, userID, itemID, 3600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateReminder(ctx, userID, itemID, 900); err != nil {
+		t.Fatal(err)
+	}
+	notifiedAt := startsAt.Add(-time.Hour)
+	if _, err := pool.Exec(ctx, `UPDATE event_reminders SET notified_at = $2 WHERE id = $1`, delivered, notifiedAt); err != nil {
+		t.Fatal(err)
+	}
+
+	applyMigrations(t, ctx, pool, migrationNames[25:26])
+
+	rows, err := pool.Query(ctx, `SELECT reminder_id, occurrence_start, notified_at FROM reminder_deliveries`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var count int
+	for rows.Next() {
+		var reminderID uuid.UUID
+		var occurrenceStart, at time.Time
+		if err := rows.Scan(&reminderID, &occurrenceStart, &at); err != nil {
+			t.Fatal(err)
+		}
+		if reminderID != delivered || !occurrenceStart.Equal(startsAt) || !at.Equal(notifiedAt) {
+			t.Fatalf("unexpected delivery %s %v %v", reminderID, occurrenceStart, at)
+		}
+		count++
+	}
+	if count != 1 {
+		t.Fatalf("expected one delivery, got %d", count)
 	}
 }

@@ -83,6 +83,10 @@ type reminderRequest struct {
 	OffsetSeconds int `json:"offset_seconds"`
 }
 
+type reminderNotifiedRequest struct {
+	OccurrenceStart *time.Time `json:"occurrence_start"`
+}
+
 type taskRequest struct {
 	Title       string    `json:"title"`
 	Description *string   `json:"description"`

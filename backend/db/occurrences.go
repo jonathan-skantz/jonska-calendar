@@ -168,9 +168,7 @@ func insertExceptions(ctx context.Context, tx pgx.Tx, eventID uuid.UUID, excepti
 	return nil
 }
 
-// populateExceptions attaches their exceptions to the series among entries:
-// the user's own, or ones shared with them. The owner's skip decisions are
-// only attached to the owner's own series.
+// populateExceptions attaches their exceptions to the series among entries.
 func (s *Store) populateExceptions(ctx context.Context, userID uuid.UUID, entries []TimelineEntry) error {
 	var seriesIDs []uuid.UUID
 	for _, entry := range entries {
@@ -181,6 +179,20 @@ func (s *Store) populateExceptions(ctx context.Context, userID uuid.UUID, entrie
 	if len(seriesIDs) == 0 {
 		return nil
 	}
+	byEvent, err := s.exceptionsByEvent(ctx, userID, seriesIDs)
+	if err != nil {
+		return err
+	}
+	for index := range entries {
+		entries[index].Exceptions = byEvent[entries[index].ID]
+	}
+	return nil
+}
+
+// exceptionsByEvent returns the exceptions of the series the user can see:
+// their own, or ones shared with them. The owner's skip decisions are only
+// returned for the owner's own series.
+func (s *Store) exceptionsByEvent(ctx context.Context, userID uuid.UUID, eventIDs []uuid.UUID) (map[uuid.UUID][]OccurrenceException, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT exception.event_id, exception.original_start, exception.is_cancelled,
 			exception.starts_at, exception.ends_at,
@@ -190,9 +202,9 @@ func (s *Store) populateExceptions(ctx context.Context, userID uuid.UUID, entrie
 		WHERE exception.event_id = ANY($2)
 		  AND `+canSeeEventSQL+`
 		ORDER BY exception.original_start
-	`, userID, seriesIDs)
+	`, userID, eventIDs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 	byEvent := make(map[uuid.UUID][]OccurrenceException)
@@ -201,15 +213,9 @@ func (s *Store) populateExceptions(ctx context.Context, userID uuid.UUID, entrie
 		var exception OccurrenceException
 		if err := rows.Scan(&eventID, &exception.OriginalStart, &exception.IsCancelled,
 			&exception.StartsAt, &exception.EndsAt, &exception.IsSkipped); err != nil {
-			return err
+			return nil, err
 		}
 		byEvent[eventID] = append(byEvent[eventID], exception)
 	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	for index := range entries {
-		entries[index].Exceptions = byEvent[entries[index].ID]
-	}
-	return nil
+	return byEvent, rows.Err()
 }

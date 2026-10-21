@@ -124,20 +124,31 @@ type EventShare struct {
 }
 
 // Reminder carries the event fields a client needs to deliver it without
-// loading the timeline. RemindAt is the event start minus the offset.
+// loading the timeline. RemindAt is the event start minus the offset. A
+// reminder is delivered once per occurrence, which OccurrenceStart, the
+// occurrence's start, identifies.
 type Reminder struct {
-	ID             uuid.UUID  `json:"id"`
-	EventID        uuid.UUID  `json:"event_id"`
-	OffsetSeconds  int        `json:"offset_seconds"`
-	RemindAt       time.Time  `json:"remind_at"`
-	NotifiedAt     *time.Time `json:"notified_at,omitempty"`
-	EventTitle     string     `json:"event_title"`
-	EventLocation  *string    `json:"event_location,omitempty"`
-	EventStartsAt  time.Time  `json:"event_starts_at"`
-	EventEndsAt    time.Time  `json:"event_ends_at"`
-	EventIsAllDay  bool       `json:"event_is_all_day,omitempty"`
-	EventIsSkipped bool       `json:"event_is_skipped,omitempty"`
-	IsShared       bool       `json:"is_shared,omitempty"`
+	ID              uuid.UUID  `json:"id"`
+	EventID         uuid.UUID  `json:"event_id"`
+	OffsetSeconds   int        `json:"offset_seconds"`
+	RemindAt        time.Time  `json:"remind_at"`
+	OccurrenceStart time.Time  `json:"occurrence_start"`
+	NotifiedAt      *time.Time `json:"notified_at,omitempty"`
+	EventTitle      string     `json:"event_title"`
+	EventLocation   *string    `json:"event_location,omitempty"`
+	EventStartsAt   time.Time  `json:"event_starts_at"`
+	EventEndsAt     time.Time  `json:"event_ends_at"`
+	EventIsAllDay   bool       `json:"event_is_all_day,omitempty"`
+	EventIsSkipped  bool       `json:"event_is_skipped,omitempty"`
+	IsShared        bool       `json:"is_shared,omitempty"`
+	// A reminder of a repeating event is listed once, with the series, for
+	// the caller to expand: the event fields are the first occurrence's,
+	// and Deliveries holds when each occurrence, by its UTC start, was
+	// delivered.
+	RecurrenceRule     *string                 `json:"-"`
+	RecurrenceTimeZone *string                 `json:"-"`
+	Exceptions         []OccurrenceException   `json:"-"`
+	Deliveries         map[time.Time]time.Time `json:"-"`
 }
 
 type TimelineEntry struct {
