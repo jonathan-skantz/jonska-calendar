@@ -43,6 +43,7 @@ const (
 	propGathering         = "X-JONSKA-GATHERING"
 	propGatheringOptional = "X-JONSKA-GATHERING-OPTIONAL"
 	propGatheringLabel    = "X-JONSKA-GATHERING-LABEL"
+	propStartsAtGathering = "X-JONSKA-STARTS-AT-GATHERING"
 	propSkipped           = "X-JONSKA-SKIPPED"
 )
 
@@ -62,6 +63,10 @@ type Event struct {
 	Recurrence *recurrence.Rule
 	TimeZone   string
 	Exceptions []db.OccurrenceException
+	// lead is how much earlier than the event the file gave its start: by
+	// its gathering, in files this app wrote. Its changed occurrences are
+	// earlier by as much.
+	lead time.Duration
 }
 
 // Skipped is an event the file holds that is not imported, and why.
@@ -257,9 +262,18 @@ func parseEvent(vevent *ics.VEvent, loc *time.Location) (event Event, warnings [
 		}
 	}
 	readAppFields(vevent, &event.Event)
+	dtStart := event.StartsAt
+	if value := textValue(vevent, ics.ComponentProperty(propStartsAtGathering)); value != nil &&
+		strings.EqualFold(*value, "TRUE") && !event.IsAllDay {
+		event.lead = time.Duration(event.GatheringSeconds) * time.Second
+		event.StartsAt = event.StartsAt.Add(event.lead)
+		for index := range event.Exceptions {
+			event.Exceptions[index].OriginalStart = event.Exceptions[index].OriginalStart.Add(event.lead)
+		}
+	}
 
 	for _, alarm := range vevent.Alarms() {
-		offset, ok := reminderOffset(alarm, event.Event, loc)
+		offset, ok := reminderOffset(alarm, event.Event, dtStart, loc)
 		if !ok {
 			warnings = append(warnings, "a reminder that is not 0 to 30 days before the start was left out")
 			continue
@@ -298,9 +312,10 @@ func readAppFields(vevent *ics.VEvent, event *db.Event) {
 }
 
 // reminderOffset turns a VALARM trigger into seconds before the event
-// starts, in whole minutes. Reminders after the start, or more than 30 days
-// before it, are not supported.
-func reminderOffset(alarm *ics.VAlarm, event db.Event, loc *time.Location) (int, bool) {
+// starts, in whole minutes. A trigger is relative to dtStart, the file's
+// start, which may be the gathering's. Reminders after the start, or more
+// than 30 days before it, are not supported.
+func reminderOffset(alarm *ics.VAlarm, event db.Event, dtStart time.Time, loc *time.Location) (int, bool) {
 	trigger := alarm.GetProperty(ics.ComponentPropertyTrigger)
 	if trigger == nil {
 		return 0, false
@@ -317,7 +332,7 @@ func reminderOffset(alarm *ics.VAlarm, event db.Event, loc *time.Location) (int,
 		if err != nil {
 			return 0, false
 		}
-		base := event.StartsAt
+		base := dtStart
 		if strings.EqualFold(parameter(trigger, ics.ParameterRelated), "END") {
 			base = event.EndsAt
 		}
@@ -396,6 +411,7 @@ func parseOverride(vevent *ics.VEvent, master Event, loc *time.Location) (db.Occ
 	if err != nil {
 		return db.OccurrenceException{}, nil, err
 	}
+	original.at = original.at.Add(master.lead)
 	exception := db.OccurrenceException{OriginalStart: original.at}
 	if status := textValue(vevent, ics.ComponentPropertyStatus); status != nil &&
 		strings.EqualFold(*status, string(ics.ObjectStatusCancelled)) {
@@ -423,7 +439,7 @@ func parseOverride(vevent *ics.VEvent, master Event, loc *time.Location) (db.Occ
 			return exception, warnings, err
 		}
 		length := endsAt.Sub(startsAt)
-		startsAt, endsAt = start.at, start.at.Add(length)
+		startsAt, endsAt = start.at.Add(master.lead), start.at.Add(master.lead+length)
 		switch {
 		case vevent.HasProperty(ics.ComponentPropertyDtEnd):
 			end, err := readTime(vevent.GetProperty(ics.ComponentPropertyDtEnd), loc)

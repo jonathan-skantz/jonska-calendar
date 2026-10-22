@@ -179,6 +179,18 @@ X-JONSKA-SKIPPED:TRUE`)
 	}
 }
 
+func TestParseKeepsTheStartOfFilesWithoutTheGatheringStart(t *testing.T) {
+	// Files written before DTSTART moved to the gathering.
+	event := parseOne(t, `
+SUMMARY:Match
+DTSTART:20261024T160000Z
+DTEND:20261024T180000Z
+X-JONSKA-GATHERING:PT15M`)
+	if !event.StartsAt.Equal(time.Date(2026, 10, 24, 16, 0, 0, 0, time.UTC)) || event.GatheringSeconds != 900 {
+		t.Fatalf("expected the start as written, got %+v", event.Event)
+	}
+}
+
 func TestParseReminders(t *testing.T) {
 	event := parseOne(t, `
 SUMMARY:Meeting

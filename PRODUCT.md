@@ -309,6 +309,10 @@ separate from events and tasks.
 - [x] Fields only this app has (approximate times, commute, gathering,
       skipped) are kept in the file, so exporting and importing again restores
       them.
+- [x] An event with gathering starts at the gathering in the file, so other
+      calendar apps show the whole event; this app reads the event's own start
+      back. A repeating event whose gathering starts the day before keeps its
+      own start.
 - [x] Repeating events are imported and exported with their excluded and
       changed occurrences. Rules the app cannot repeat by (e.g. several times
       a day) are skipped and listed in the preview.

@@ -36,7 +36,7 @@ func TestSubscribingToAPublishedFeed(t *testing.T) {
 	rule := recurrence.Rule{Frequency: recurrence.Weekly, Interval: 1}.RRULE(start, false)
 	practiceID, err := store.CreateEvent(ctx, publisherID, db.Event{
 		Title: "Practice", StartsAt: start, EndsAt: start.Add(90 * time.Minute), Kind: db.EventKindAttendable,
-		CommuteBeforeSeconds: 1200, RecurrenceRule: &rule, RecurrenceTimeZone: new("Europe/Stockholm"),
+		CommuteBeforeSeconds: 1200, GatheringSeconds: 900, RecurrenceRule: &rule, RecurrenceTimeZone: new("Europe/Stockholm"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -77,8 +77,10 @@ func TestSubscribingToAPublishedFeed(t *testing.T) {
 	}
 	var starts []string
 	for _, item := range items {
-		if item.Subscription == nil || item.CommuteBeforeSeconds != 0 {
-			t.Fatalf("expected a subscribed occurrence without commute, got %+v", item)
+		// The file starts the practice at its gathering; the subscriber
+		// reads its own start and the gathering back.
+		if item.Subscription == nil || item.CommuteBeforeSeconds != 0 || item.GatheringSeconds != 900 {
+			t.Fatalf("expected a subscribed occurrence with gathering and without commute, got %+v", item)
 		}
 		starts = append(starts, item.StartsAt.In(stockholm).Format("2006-01-02 15:04"))
 	}

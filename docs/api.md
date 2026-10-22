@@ -176,7 +176,7 @@ A recipient's own changes to an event shared with them or from a calendar they s
   - `skipped` lists `{title, reason}` for events not imported: an unsupported repeat rule (RDATE, EXRULE, or a rule outside the ones above), a changed occurrence whose series is not in the file, cancelled, no start time, an unreadable time, failed event validation (the reason is the validation message), or `already imported`.
   - `warnings` lists details that were dropped, such as a reminder after the start or an unknown time zone.
   - A file holds at most 5000 events. A file that is not iCalendar answers `400`.
-- `GET /api/export.ics` returns your own events, not events shared with you, with your tags as `CATEGORIES` and your reminders as `VALARM`s. Fields only this app has are written as `X-JONSKA-*` properties, so importing the file again restores them.
+- `GET /api/export.ics` returns your own events, not events shared with you, with your tags as `CATEGORIES` and your reminders as `VALARM`s. Fields only this app has are written as `X-JONSKA-*` properties, so importing the file again restores them. An event with gathering has `DTSTART` at the gathering and `X-JONSKA-STARTS-AT-GATHERING:TRUE`, so other apps show the whole event; its alarms, `EXDATE`s, and `RECURRENCE-ID`s are as early. A series whose gathering would start the day before keeps its own start, since its rule's weekdays depend on it.
 - See [data model: iCalendar UIDs](data-model.md#icalendar-uids) for how repeated imports are detected.
 
 ## Subscriptions

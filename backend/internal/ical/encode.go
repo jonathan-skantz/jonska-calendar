@@ -76,18 +76,21 @@ func encodeCalendar(events []db.ExportEvent, loc *time.Location, stamp time.Time
 				return nil, err
 			}
 		}
+		lead := gatheringLead(event.Event, zone)
 		vevent := calendar.AddEvent(event.UID)
 		writeEvent(vevent, event, stamp)
-		writeTimes(vevent, event.StartsAt, event.EndsAt, event.IsAllDay, zone, event.RecurrenceRule != nil)
+		writeTimes(vevent, event.StartsAt.Add(-lead), event.EndsAt, event.IsAllDay, zone, event.RecurrenceRule != nil)
 		for _, name := range event.TagNames {
 			vevent.AddCategory(name)
 		}
-		writeAppFields(vevent, event.Event)
+		writeAppFields(vevent, event.Event, lead > 0)
 		for _, offset := range event.ReminderOffsets {
+			// Triggers are relative to DTSTART, which may be the gathering.
+			before := time.Duration(offset)*time.Second - lead
 			alarm := vevent.AddAlarm()
 			alarm.SetAction(ics.ActionDisplay)
 			alarm.SetProperty(ics.ComponentPropertyDescription, event.Title)
-			alarm.SetTrigger(duration{negative: offset > 0, clock: time.Duration(offset) * time.Second}.String())
+			alarm.SetTrigger(duration{negative: before > 0, clock: before.Abs()}.String())
 		}
 		if event.RecurrenceRule == nil {
 			continue
@@ -97,7 +100,7 @@ func encodeCalendar(events []db.ExportEvent, loc *time.Location, stamp time.Time
 		lengthDays := recurrence.DaysBetween(event.StartsAt.In(zone), event.EndsAt.In(zone))
 		for _, exception := range event.Exceptions {
 			if exception.IsCancelled {
-				vevent.AddExdate(zonedValue(exception.OriginalStart, event.IsAllDay, zone), zonedParameter(event.IsAllDay, zone))
+				vevent.AddExdate(zonedValue(exception.OriginalStart.Add(-lead), event.IsAllDay, zone), zonedParameter(event.IsAllDay, zone))
 				continue
 			}
 			// A moved or skipped occurrence is its own VEVENT with the
@@ -105,7 +108,7 @@ func encodeCalendar(events []db.ExportEvent, loc *time.Location, stamp time.Time
 			override := calendar.AddEvent(event.UID)
 			writeEvent(override, event, stamp)
 			override.SetProperty(ics.ComponentPropertyRecurrenceId,
-				zonedValue(exception.OriginalStart, event.IsAllDay, zone), zonedParameter(event.IsAllDay, zone))
+				zonedValue(exception.OriginalStart.Add(-lead), event.IsAllDay, zone), zonedParameter(event.IsAllDay, zone))
 			startsAt, endsAt := exception.OriginalStart, exception.OriginalStart.Add(length)
 			if event.IsAllDay {
 				endsAt = exception.OriginalStart.In(zone).AddDate(0, 0, lengthDays)
@@ -113,13 +116,27 @@ func encodeCalendar(events []db.ExportEvent, loc *time.Location, stamp time.Time
 			if exception.StartsAt != nil && exception.EndsAt != nil {
 				startsAt, endsAt = *exception.StartsAt, *exception.EndsAt
 			}
-			writeTimes(override, startsAt, endsAt, event.IsAllDay, zone, true)
+			writeTimes(override, startsAt.Add(-lead), endsAt, event.IsAllDay, zone, true)
 			if exception.IsSkipped != nil {
 				override.SetProperty(ics.ComponentProperty(propSkipped), strings.ToUpper(strconv.FormatBool(*exception.IsSkipped)))
 			}
 		}
 	}
 	return calendar, nil
+}
+
+// gatheringLead is how much earlier than the event its DTSTART is written:
+// at the gathering, so calendar apps that know nothing of gathering show the
+// whole event. propStartsAtGathering tells this app to read the event's own
+// start back. A series keeps its start when its gathering begins the day
+// before, since that would change the days its rule picks.
+func gatheringLead(event db.Event, zone *time.Location) time.Duration {
+	lead := time.Duration(event.GatheringSeconds) * time.Second
+	if lead == 0 || event.IsAllDay ||
+		(event.RecurrenceRule != nil && recurrence.DaysBetween(event.StartsAt.Add(-lead).In(zone), event.StartsAt.In(zone)) != 0) {
+		return 0
+	}
+	return lead
 }
 
 // writeEvent writes the fields an event and its changed occurrences share.
@@ -162,7 +179,7 @@ func zonedParameter(isAllDay bool, zone *time.Location) ics.PropertyParameter {
 
 // writeAppFields writes the fields only this app has, leaving out defaults,
 // so other calendar apps see a plain event.
-func writeAppFields(vevent *ics.VEvent, event db.Event) {
+func writeAppFields(vevent *ics.VEvent, event db.Event, startsAtGathering bool) {
 	flag := func(name string, set bool) {
 		if set {
 			vevent.SetProperty(ics.ComponentProperty(name), "TRUE")
@@ -180,6 +197,7 @@ func writeAppFields(vevent *ics.VEvent, event db.Event) {
 	seconds(propGathering, event.GatheringSeconds)
 	flag(propGatheringOptional, event.GatheringIsOptional)
 	setOptional(vevent, ics.ComponentProperty(propGatheringLabel), event.GatheringLabel)
+	flag(propStartsAtGathering, startsAtGathering)
 	flag(propSkipped, event.IsSkipped)
 }
 

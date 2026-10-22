@@ -55,10 +55,13 @@ func TestEncodeWritesValidICalendar(t *testing.T) {
 		"DTSTAMP:20261021T120000Z\r\n",
 		"SUMMARY:Football\\; semi-final\\, home\r\n",
 		"DESCRIPTION:Bring\\nboots\r\n",
-		"DTSTART:20261024T160000Z\r\n",
+		// The football's 15 minutes of gathering start it earlier, and its
+		// reminders are relative to that.
+		"DTSTART:20261024T154500Z\r\n", "DTEND:20261024T180000Z\r\n",
+		"X-JONSKA-GATHERING:PT15M\r\n", "X-JONSKA-STARTS-AT-GATHERING:TRUE\r\n",
 		"DTSTART;VALUE=DATE:20261024\r\n", "DTEND;VALUE=DATE:20261026\r\n",
 		"TRANSP:TRANSPARENT\r\n",
-		"TRIGGER:-PT15M\r\n", "TRIGGER:-PT24H\r\n", "TRIGGER:PT0S\r\n",
+		"TRIGGER:PT15M\r\n", "TRIGGER:PT0S\r\n", "TRIGGER:-PT23H45M\r\n",
 		"X-JONSKA-COMMUTE-BEFORE:PT30M\r\n",
 	} {
 		if !strings.Contains(text, want) {
@@ -95,13 +98,66 @@ func TestEncodeFeedLeavesOutCommuteAndSkips(t *testing.T) {
 			t.Errorf("expected no %q in:\n%s", unwanted, text)
 		}
 	}
-	for _, want := range []string{"X-JONSKA-GATHERING:PT15M\r\n", "RECURRENCE-ID;TZID=UTC:20261026T160000\r\n"} {
+	for _, want := range []string{"X-JONSKA-GATHERING:PT15M\r\n", "RECURRENCE-ID;TZID=UTC:20261026T154500\r\n"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("expected %q in:\n%s", want, text)
 		}
 	}
 	if events[0].CommuteBeforeSeconds == 0 || events[0].Exceptions[0].IsSkipped == nil {
 		t.Fatal("expected the caller's events unchanged")
+	}
+}
+
+func TestGatheringStartsRepeatingEventsOnTheSameDayOnly(t *testing.T) {
+	encodeSeries := func(start time.Time, gatheringSeconds int) (string, Event) {
+		t.Helper()
+		rule := recurrence.Rule{Frequency: recurrence.Weekly, Interval: 1, Weekdays: []string{"TU"}}.RRULE(start, false)
+		moved := start.AddDate(0, 0, 7).Add(time.Hour)
+		series := db.ExportEvent{
+			Event: db.Event{
+				Title: "Practice", StartsAt: start, EndsAt: start.Add(time.Hour), Kind: db.EventKindAttendable,
+				GatheringSeconds: gatheringSeconds, RecurrenceRule: &rule, RecurrenceTimeZone: new("Europe/Stockholm"),
+			},
+			UID:             "practice@jonska-calendar",
+			ReminderOffsets: []int{600},
+			Exceptions: []db.OccurrenceException{
+				{OriginalStart: start.AddDate(0, 0, 14), IsCancelled: true},
+				{OriginalStart: start.AddDate(0, 0, 7), StartsAt: &moved, EndsAt: new(moved.Add(time.Hour))},
+			},
+		}
+		var file strings.Builder
+		if err := Encode(&file, []db.ExportEvent{series}, stockholm, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		result, err := Parse(strings.NewReader(file.String()), stockholm)
+		if err != nil || len(result.Events) != 1 || len(result.Warnings) != 0 {
+			t.Fatalf("unexpected result %+v, %v", result, err)
+		}
+		got := result.Events[0]
+		if !got.StartsAt.Equal(start) || !slices.Equal(got.ReminderOffsets, []int{600}) || len(got.Exceptions) != 2 ||
+			!got.Exceptions[0].OriginalStart.Equal(start.AddDate(0, 0, 14)) ||
+			!got.Exceptions[1].OriginalStart.Equal(start.AddDate(0, 0, 7)) || !got.Exceptions[1].StartsAt.Equal(moved) {
+			t.Fatalf("expected the series read back as written, got %+v", got)
+		}
+		return file.String(), got
+	}
+
+	text, _ := encodeSeries(time.Date(2026, 10, 20, 18, 0, 0, 0, stockholm), 1800)
+	for _, want := range []string{
+		"DTSTART;TZID=Europe/Stockholm:20261020T173000\r\n",
+		"EXDATE;TZID=Europe/Stockholm:20261103T173000\r\n",
+		"RECURRENCE-ID;TZID=Europe/Stockholm:20261027T173000\r\n",
+		"DTSTART;TZID=Europe/Stockholm:20261027T183000\r\n",
+		"TRIGGER:PT20M\r\n",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("expected %q in:\n%s", want, text)
+		}
+	}
+	// Gathering from 23:30 on Monday would make the rule's Tuesday a Monday.
+	text, _ = encodeSeries(time.Date(2026, 10, 20, 0, 15, 0, 0, stockholm), 2700)
+	if !strings.Contains(text, "DTSTART;TZID=Europe/Stockholm:20261020T001500\r\n") || strings.Contains(text, "STARTS-AT-GATHERING") {
+		t.Errorf("expected the series' own start, got:\n%s", text)
 	}
 }
 
