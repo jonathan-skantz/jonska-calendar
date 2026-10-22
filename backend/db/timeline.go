@@ -9,9 +9,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ListTimeline returns the user's events and the events shared with them
-// that may happen in [from, to): plain events that overlap it, and series
-// that may have an occurrence in it, as series. Tasks are all returned.
+// ListTimeline returns the user's events, the events shared with them, and
+// the events of their subscriptions that may happen in [from, to): plain
+// events that overlap it, and series that may have an occurrence in it, as
+// series. Tasks are all returned.
 func (s *Store) ListTimeline(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]TimelineEntry, error) {
 	return s.listTimeline(ctx, userID, &timeWindow{from: from, to: to})
 }
@@ -28,18 +29,27 @@ func (window *timeWindow) bounds() (from, to *time.Time) {
 	return &window.from, &window.to
 }
 
-// inWindowSQL keeps the events that may happen in the window given as $2
-// and $3, or every event when they are NULL. A series lasts until its last
+// windowSQL keeps the events that may happen in the window given as $2 and
+// $3, or every event when they are NULL. A series lasts until its last
 // occurrence ends, or forever, and a moved occurrence may start before the
-// series does.
-const inWindowSQL = `($2::timestamptz IS NULL OR (
-	LEAST(event.starts_at, (
-		SELECT min(exception.starts_at) FROM event_occurrence_exceptions AS exception
-		WHERE exception.event_id = event.timeline_item_id
-	)) < $3
+// series does. earliestException selects the earliest moved start of the
+// event's exceptions.
+func windowSQL(earliestException string) string {
+	return `($2::timestamptz IS NULL OR (
+	LEAST(event.starts_at, (` + earliestException + `)) < $3
 	AND CASE WHEN event.recurrence_rule IS NULL THEN event.ends_at
 		ELSE COALESCE(event.recurrence_ends_at, 'infinity') END > $2
 ))`
+}
+
+var (
+	inWindowSQL = windowSQL(`
+		SELECT min(exception.starts_at) FROM event_occurrence_exceptions AS exception
+		WHERE exception.event_id = event.timeline_item_id`)
+	subscribedInWindowSQL = windowSQL(`
+		SELECT min(exception.starts_at) FROM subscription_event_exceptions AS exception
+		WHERE exception.subscription_event_id = event.id`)
+)
 
 func (s *Store) listTimeline(ctx context.Context, userID uuid.UUID, window *timeWindow) ([]TimelineEntry, error) {
 	// Shared events are projected into the recipient's timeline; they are not
@@ -60,6 +70,12 @@ func (s *Store) listTimeline(ctx context.Context, userID uuid.UUID, window *time
 	if err := s.populateExceptions(ctx, userID, entries); err != nil {
 		return nil, err
 	}
+	// Subscribed events have no tags and their own exceptions.
+	subscribedEntries, err := s.listSubscribedTimeline(ctx, userID, window)
+	if err != nil {
+		return nil, err
+	}
+	entries = append(entries, subscribedEntries...)
 
 	sort.SliceStable(entries, func(i, j int) bool {
 		return timelineEntryTime(entries[i]).Before(timelineEntryTime(entries[j]))

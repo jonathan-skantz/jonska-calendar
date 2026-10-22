@@ -569,3 +569,36 @@ func TestRepeatingEventsAreSeenButNotChanged(t *testing.T) {
 		t.Fatalf("expected no actions, got %+v", result.Actions)
 	}
 }
+
+func TestSubscribedEventsAreSeenButNotChanged(t *testing.T) {
+	store, userID, upstream, handler := setup(t)
+	start := at(22, 10, 0)
+	subscription, err := store.CreateSubscription(context.Background(), db.Subscription{
+		UserID: userID, Name: "School", URL: "https://example.com/school.ics", Color: "#336699", TimeZone: "Europe/Stockholm",
+	}, []db.SubscribedEvent{{Event: db.Event{
+		Title: "Exam", StartsAt: start, EndsAt: start.Add(2 * time.Hour), Kind: db.EventKindAttendable,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := store.ListTimeline(context.Background(), userID, at(22, 0, 0), at(23, 0, 0))
+	if err != nil || len(entries) != 1 || entries[0].Subscription == nil || entries[0].Subscription.ID != subscription.ID {
+		t.Fatalf("expected the subscribed exam, got %+v, %v", entries, err)
+	}
+	upstream.script(
+		toolUse("toolu_1", "list_events", map[string]any{"from_date": "2026-10-22", "to_date": "2026-10-22"}),
+		toolUse("toolu_2", "delete_event", map[string]any{"event_id": entries[0].ID}),
+		answer("The exam comes from a subscribed calendar."),
+	)
+	result := decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "delete the exam")))
+
+	if listed := upstream.request(1).toolResults()["toolu_1"]; !strings.Contains(listed, `"calendar":"School"`) {
+		t.Fatalf("expected the exam marked with its calendar, got %s", listed)
+	}
+	if deleted := upstream.request(2).toolResults()["toolu_2"]; !strings.Contains(deleted, errNotOwnEvent.Error()) {
+		t.Fatalf("expected the delete to be refused, got %s", deleted)
+	}
+	if len(result.Actions) != 0 {
+		t.Fatalf("expected no actions, got %+v", result.Actions)
+	}
+}

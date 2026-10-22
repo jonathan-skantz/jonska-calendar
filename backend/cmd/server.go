@@ -18,6 +18,7 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 	"github.com/jonathan-skantz/calendar/backend/internal/ical"
 	"github.com/jonathan-skantz/calendar/backend/internal/quickadd"
+	"github.com/jonathan-skantz/calendar/backend/internal/subscription"
 	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
 	"github.com/jonathan-skantz/calendar/backend/internal/weather"
 )
@@ -51,6 +52,11 @@ func main() {
 	timelineHandler := timeline.New(store, authHandler.CurrentUserID)
 	weatherHandler := weather.New(store, authHandler.CurrentUserID, weather.NewClient())
 	icalHandler := ical.New(store, authHandler.CurrentUserID)
+	// Subscriptions may not reach private addresses unless allowed, for a
+	// calendar server on the same network as this one.
+	subscriptionClient := subscription.NewClient(os.Getenv("SUBSCRIPTIONS_ALLOW_PRIVATE") == "true")
+	subscriptionHandler := subscription.New(store, authHandler.CurrentUserID, subscriptionClient)
+	go subscriptionHandler.Refresher.Run(ctx)
 
 	// Quick add and the assistant stay off (503) without a key, so the rest
 	// of the app runs without one.
@@ -108,6 +114,11 @@ func main() {
 	mux.HandleFunc("DELETE /api/feeds/{feedID}", icalHandler.DeleteFeed)
 	// Calendar apps fetch feeds without a session; the token is the secret.
 	mux.HandleFunc("GET /api/feeds/{token}/calendar.ics", icalHandler.ServeFeed)
+	mux.HandleFunc("GET /api/subscriptions", subscriptionHandler.List)
+	mux.HandleFunc("POST /api/subscriptions", subscriptionHandler.Create)
+	mux.HandleFunc("PATCH /api/subscriptions/{subscriptionID}", subscriptionHandler.Update)
+	mux.HandleFunc("POST /api/subscriptions/{subscriptionID}/refresh", subscriptionHandler.Refresh)
+	mux.HandleFunc("DELETE /api/subscriptions/{subscriptionID}", subscriptionHandler.Delete)
 	mux.HandleFunc("GET /api/weather", weatherHandler.Forecast)
 	mux.HandleFunc("POST /api/assistant/messages", assistantHandler.Message)
 	mux.HandleFunc("POST /api/assistant/conversations/{conversationID}/actions/{actionID}", assistantHandler.Decide)

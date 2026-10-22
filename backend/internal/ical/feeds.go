@@ -90,7 +90,7 @@ func (h *Handler) CreateFeed(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	loc, err := parseTimeZone(request.TimeZone)
+	loc, err := timeline.ParseTimeZone(request.TimeZone)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

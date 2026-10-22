@@ -392,3 +392,27 @@ EXDATE;VALUE=DATE:20271030`,
 		t.Fatalf("unexpected birthday %+v", birthday)
 	}
 }
+
+func TestParseReadsCalendarName(t *testing.T) {
+	for name, test := range map[string]struct {
+		properties []string
+		want       string
+	}{
+		"none":            {nil, ""},
+		"x-wr-calname":    {[]string{"X-WR-CALNAME: School "}, "School"},
+		"name wins":       {[]string{"X-WR-CALNAME:Old", "NAME:New"}, "New"},
+		"name either way": {[]string{"NAME:New", "X-WR-CALNAME:Old"}, "New"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			lines := append([]string{"BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Test//EN"}, test.properties...)
+			file := strings.Join(append(lines, "END:VCALENDAR"), "\r\n") + "\r\n"
+			result, err := Parse(strings.NewReader(file), stockholm)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Name != test.want {
+				t.Fatalf("expected %q, got %q", test.want, result.Name)
+			}
+		})
+	}
+}

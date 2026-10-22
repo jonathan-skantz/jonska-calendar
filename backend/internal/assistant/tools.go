@@ -139,7 +139,7 @@ var (
 	// changes one occurrence, the following ones or all of them at a time.
 	errRepeating = fmt.Errorf("%w: repeating events can only be changed in the app", errInvalidChange)
 	// errNotOwnEvent is an event that is gone or belongs to someone else.
-	errNotOwnEvent = fmt.Errorf("no such event of the user's own; events shared with them cannot be changed: %w", db.ErrEventNotFound)
+	errNotOwnEvent = fmt.Errorf("no such event of the user's own; events shared with them or from subscribed calendars cannot be changed: %w", db.ErrEventNotFound)
 )
 
 // ownEvent finds one of the user's own events that the assistant may change.

@@ -27,6 +27,8 @@ var (
 	ErrReminderNotFound     = errors.New("reminder not found")
 	ErrWeatherNotCached     = errors.New("weather forecast not cached")
 	ErrFeedNotFound         = errors.New("feed not found")
+	ErrSubscriptionNotFound = errors.New("subscription not found")
+	ErrSubscriptionExists   = errors.New("already subscribed to this calendar")
 )
 
 func isUniqueViolation(err error) bool {

@@ -104,7 +104,7 @@ func applyRecurrence(event db.Event, rule *recurrence.Rule, timeZone string, exc
 	if rule == nil {
 		return event, nil
 	}
-	zone, err := parseTimeZone(timeZone)
+	zone, err := ParseTimeZone(timeZone)
 	if err != nil {
 		return event, err
 	}
@@ -152,9 +152,9 @@ func matchingExceptions(event db.Event, exceptions []db.OccurrenceException) ([]
 	return kept, nil
 }
 
-// parseTimeZone reads the browser's IANA time zone. "Local" and "" are
+// ParseTimeZone reads the browser's IANA time zone. "Local" and "" are
 // valid for time.LoadLocation, but mean the server's zone and UTC.
-func parseTimeZone(name string) (*time.Location, error) {
+func ParseTimeZone(name string) (*time.Location, error) {
 	if name == "" || name == "Local" {
 		return nil, ErrInvalidTimeZone
 	}

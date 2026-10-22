@@ -123,7 +123,7 @@ func validateTagUpdateRequest(request tagUpdateRequest) (tagUpdateRequest, error
 		return request, err
 	}
 	request.Name = name
-	if !validTagColor(request.Color) {
+	if !ValidColor(request.Color) {
 		return request, ErrInvalidRequest
 	}
 	return request, nil
@@ -136,7 +136,8 @@ func validateTagSelectionRequest(request tagSelectionRequest) error {
 	return nil
 }
 
-func validTagColor(color string) bool {
+// ValidColor reports whether color is a #rrggbb hex color.
+func ValidColor(color string) bool {
 	if len(color) != 7 || color[0] != '#' {
 		return false
 	}

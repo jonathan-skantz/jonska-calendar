@@ -25,8 +25,6 @@ const maxImportBodyBytes = 6 << 20
 // imported.
 const ReasonDuplicate = "already imported"
 
-var errInvalidTimeZone = errors.New("time_zone must be an IANA time zone")
-
 type Handler struct {
 	Store       *db.Store
 	CurrentUser auth.CurrentUser
@@ -68,7 +66,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, timeline.ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	loc, err := parseTimeZone(request.TimeZone)
+	loc, err := timeline.ParseTimeZone(request.TimeZone)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -152,7 +150,7 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	loc, err := parseTimeZone(r.URL.Query().Get("time_zone"))
+	loc, err := timeline.ParseTimeZone(r.URL.Query().Get("time_zone"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -171,19 +169,6 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="calendar.ics"`)
 	_, _ = file.WriteTo(w)
-}
-
-// parseTimeZone reads the browser's IANA time zone. "Local" and "" are
-// valid for time.LoadLocation, but mean the server's zone and UTC.
-func parseTimeZone(name string) (*time.Location, error) {
-	if name == "" || name == "Local" {
-		return nil, errInvalidTimeZone
-	}
-	loc, err := time.LoadLocation(name)
-	if err != nil {
-		return nil, errInvalidTimeZone
-	}
-	return loc, nil
 }
 
 func writeServerError(w http.ResponseWriter, message string, err error) {

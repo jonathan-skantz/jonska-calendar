@@ -1,6 +1,5 @@
 // Package ical reads and writes iCalendar (RFC 5545) files. It maps VEVENTs
-// to the app's events and back. Recurrence, tasks and attendees are not
-// supported: recurring events are skipped on import.
+// to the app's events and back. Tasks and attendees are not supported.
 package ical
 
 import (
@@ -72,6 +71,8 @@ type Skipped struct {
 }
 
 type Result struct {
+	// Name is the calendar's own name (NAME or X-WR-CALNAME), if it has one.
+	Name     string
 	Events   []Event
 	Skipped  []Skipped
 	Warnings []string
@@ -98,6 +99,17 @@ func Parse(r io.Reader, loc *time.Location) (Result, error) {
 		return Result{}, ErrTooManyEvents
 	}
 	var result Result
+	for _, property := range calendar.CalendarProperties {
+		name := strings.TrimSpace(property.Value)
+		switch ics.Property(property.IANAToken) {
+		case ics.PropertyName:
+			result.Name = name
+		case ics.PropertyXWRCalName:
+			if result.Name == "" {
+				result.Name = name
+			}
+		}
+	}
 	warn := func(title string, warnings []string) {
 		for _, warning := range warnings {
 			result.Warnings = append(result.Warnings, title+": "+warning)

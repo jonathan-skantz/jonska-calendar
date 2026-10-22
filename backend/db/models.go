@@ -175,8 +175,10 @@ type TimelineEntry struct {
 	IsShared             bool       `json:"is_shared,omitempty"`
 	SharedBy             *string    `json:"shared_by,omitempty"`
 	ShareCount           int        `json:"share_count,omitempty"`
-	Tags                 []Tag      `json:"tags,omitempty"`
-	MainTagID            *uuid.UUID `json:"main_tag_id,omitempty"`
+	// Subscription is set on the read-only events of a subscribed calendar.
+	Subscription *SubscriptionRef `json:"subscription,omitempty"`
+	Tags         []Tag            `json:"tags,omitempty"`
+	MainTagID    *uuid.UUID       `json:"main_tag_id,omitempty"`
 	// The series fields of a repeating event, expanded into occurrences
 	// before they reach a client.
 	RecurrenceRule     *string               `json:"-"`
