@@ -20,6 +20,11 @@ type ReceivedValues struct {
 	Location    *string   `json:"location,omitempty"`
 	StartsAt    time.Time `json:"starts_at"`
 	EndsAt      time.Time `json:"ends_at"`
+	// Gathering is shared with recipients; commute never is, so received
+	// events have none.
+	GatheringSeconds    int     `json:"gathering_seconds,omitempty"`
+	GatheringIsOptional bool    `json:"gathering_is_optional,omitempty"`
+	GatheringLabel      *string `json:"gathering_label,omitempty"`
 }
 
 // customize applies the recipient's customization of a received event and
@@ -32,11 +37,20 @@ func customize(item *TimelineItem) {
 	received := ReceivedValues{
 		Title: item.Title, Description: item.Description, URL: item.URL, Location: item.Location,
 		StartsAt: *item.StartsAt, EndsAt: *item.EndsAt,
+		GatheringSeconds: item.GatheringSeconds, GatheringIsOptional: item.GatheringIsOptional,
+		GatheringLabel: item.GatheringLabel,
 	}
 	values := received.customized(*custom, item.IsAllDay)
 	item.Original = &received
 	item.Title, item.Description, item.URL, item.Location = values.Title, values.Description, values.URL, values.Location
 	item.StartsAt, item.EndsAt = &values.StartsAt, &values.EndsAt
+	// Commute and gathering only make sense on timed events the recipient
+	// attends, as on their own events.
+	if item.Kind != nil && *item.Kind == db.EventKindAttendable && !item.IsAllDay {
+		item.CommuteBeforeSeconds, item.CommuteAfterSeconds = custom.CommuteBeforeSeconds, custom.CommuteAfterSeconds
+		item.GatheringSeconds, item.GatheringIsOptional, item.GatheringLabel =
+			values.GatheringSeconds, values.GatheringIsOptional, values.GatheringLabel
+	}
 }
 
 // customized returns the values with the customization applied. The shifts
@@ -50,6 +64,10 @@ func (values ReceivedValues) customized(custom db.Customization, isAllDay bool) 
 	values.Description = customizedText(custom.Description, values.Description)
 	values.URL = customizedText(custom.URL, values.URL)
 	values.Location = customizedText(custom.Location, values.Location)
+	if custom.GatheringSeconds != nil {
+		values.GatheringSeconds, values.GatheringIsOptional, values.GatheringLabel =
+			*custom.GatheringSeconds, custom.GatheringIsOptional, custom.GatheringLabel
+	}
 	if isAllDay {
 		return values
 	}

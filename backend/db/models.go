@@ -117,15 +117,22 @@ type ShareFields struct {
 
 // Customization is a recipient's own change to an event they receive. A nil
 // field and a zero shift keep the received value. Note is the recipient's
-// own text, shown beside the event's.
+// own text, shown beside the event's, and commute is theirs alone: received
+// events have none. A nil GatheringSeconds keeps the received gathering;
+// otherwise the three gathering fields replace it, and 0 removes it.
 type Customization struct {
-	Title             *string `json:"title,omitempty"`
-	Description       *string `json:"description,omitempty"`
-	URL               *string `json:"url,omitempty"`
-	Location          *string `json:"location,omitempty"`
-	Note              *string `json:"note,omitempty"`
-	StartShiftSeconds int     `json:"start_shift_seconds,omitempty"`
-	EndShiftSeconds   int     `json:"end_shift_seconds,omitempty"`
+	Title                *string `json:"title,omitempty"`
+	Description          *string `json:"description,omitempty"`
+	URL                  *string `json:"url,omitempty"`
+	Location             *string `json:"location,omitempty"`
+	Note                 *string `json:"note,omitempty"`
+	StartShiftSeconds    int     `json:"start_shift_seconds,omitempty"`
+	EndShiftSeconds      int     `json:"end_shift_seconds,omitempty"`
+	CommuteBeforeSeconds int     `json:"commute_before_seconds,omitempty"`
+	CommuteAfterSeconds  int     `json:"commute_after_seconds,omitempty"`
+	GatheringSeconds     *int    `json:"gathering_seconds,omitempty"`
+	GatheringIsOptional  bool    `json:"gathering_is_optional,omitempty"`
+	GatheringLabel       *string `json:"gathering_label,omitempty"`
 }
 
 // EventShare is the owner's view of one recipient of an event.

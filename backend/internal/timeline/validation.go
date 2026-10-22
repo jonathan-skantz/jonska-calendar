@@ -94,19 +94,36 @@ func validShiftSeconds(seconds int) bool {
 }
 
 // validateCustomizationRequest returns the customization with its text
-// trimmed; blank text keeps the received value.
+// trimmed; blank text keeps the received value. Commute and gathering have
+// the limits of an event's own; whether the event can have them is decided
+// when it is shown, since the owner may change it.
 func validateCustomizationRequest(request customizationRequest) (db.Customization, error) {
 	if !validShiftSeconds(request.StartShiftSeconds) || !validShiftSeconds(request.EndShiftSeconds) {
 		return db.Customization{}, ErrInvalidShift
 	}
+	if !validCommuteSeconds(request.CommuteBeforeSeconds) || !validCommuteSeconds(request.CommuteAfterSeconds) {
+		return db.Customization{}, ErrInvalidCommute
+	}
+	label := normalizeOptionalText(request.GatheringLabel)
+	hasGathering := request.GatheringSeconds != nil && *request.GatheringSeconds > 0
+	if (request.GatheringSeconds != nil && !validCommuteSeconds(*request.GatheringSeconds)) ||
+		(!hasGathering && (request.GatheringIsOptional || label != nil)) ||
+		(label != nil && utf8.RuneCountInString(*label) > db.MaxGatheringLabelLength) {
+		return db.Customization{}, ErrInvalidGathering
+	}
 	return db.Customization{
-		Title:             normalizeOptionalText(request.Title),
-		Description:       normalizeOptionalText(request.Description),
-		URL:               normalizeOptionalText(request.URL),
-		Location:          normalizeOptionalText(request.Location),
-		Note:              normalizeOptionalText(request.Note),
-		StartShiftSeconds: request.StartShiftSeconds,
-		EndShiftSeconds:   request.EndShiftSeconds,
+		CommuteBeforeSeconds: request.CommuteBeforeSeconds,
+		CommuteAfterSeconds:  request.CommuteAfterSeconds,
+		GatheringSeconds:     request.GatheringSeconds,
+		GatheringIsOptional:  request.GatheringIsOptional,
+		GatheringLabel:       label,
+		Title:                normalizeOptionalText(request.Title),
+		Description:          normalizeOptionalText(request.Description),
+		URL:                  normalizeOptionalText(request.URL),
+		Location:             normalizeOptionalText(request.Location),
+		Note:                 normalizeOptionalText(request.Note),
+		StartShiftSeconds:    request.StartShiftSeconds,
+		EndShiftSeconds:      request.EndShiftSeconds,
 	}, nil
 }
 

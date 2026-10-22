@@ -169,13 +169,15 @@ A share is a **projection**, not a copy. Nothing is written to the recipient's `
 ```text
 event_shares ─── share_customizations (event_share_id PK)
 calendar_subscriptions ─── subscription_customizations (subscription_id, event_uid PK)
-  (title, description, url, location, note, start_shift_seconds, end_shift_seconds)
+  (title, description, url, location, note, start_shift_seconds, end_shift_seconds,
+   commute_before_seconds, commute_after_seconds, gathering_seconds, gathering_is_optional, gathering_label)
 ```
 
 A recipient's own version of an event they receive (migration 29). Like a share, it is applied on read, never copied.
 
 - **Recipient:** not stored. Found through the share's `recipient_user_id` or the subscription's `user_id`. The owner of a shared event never reads these tables.
 - **Layers:** the event's values, then the owner's per-recipient share fields, then the recipient's customization. A NULL field and a zero shift keep the received value, so later changes at the source still show.
+- **Commute** (migration 30) is the recipient's own: received events never carry the owner's. **Gathering** is shared, so `gathering_seconds` NULL keeps the received gathering, and a value replaces it with its flag and label (`0` removes it). Both apply only to timed attendable events, decided when shown, since the owner may change the event.
 - **Shifts** move the start and end by whole minutes, at most a day (`MaxShiftSeconds`). They are left out on all-day events and when the shifted event would not end after it starts.
 - **Where it applies:** `customize` in `backend/internal/timeline/customization.go`, called by `ExpandTimeline` for each event or occurrence, so the timeline and the assistant see the same thing. Reminders apply the same values in `expandReminders`; a delivery is keyed by the shifted start.
 - **Range:** a shift may move an event across the edge of a range. `ListTimeline` reads received events a day around it, series expand that much around it, and `ExpandTimeline` keeps what overlaps the range once shifted.

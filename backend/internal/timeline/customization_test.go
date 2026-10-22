@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,6 +73,45 @@ func TestExpandTimelineAppliesCustomizations(t *testing.T) {
 	}
 }
 
+func TestExpandTimelineAppliesCommuteAndGathering(t *testing.T) {
+	from := time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC)
+	attendable, informational := db.EventKindAttendable, db.EventKindInformational
+	gathering := &db.Customization{
+		CommuteBeforeSeconds: 1200, CommuteAfterSeconds: 600,
+		GatheringSeconds: new(1800), GatheringLabel: new("Warm-up"),
+	}
+	match := receivedEvent("Match", from.Add(18*time.Hour), gathering)
+	match.Kind, match.GatheringSeconds, match.GatheringIsOptional = &attendable, 900, true
+	// 0 removes the gathering the owner shares.
+	quiz := receivedEvent("Quiz", from.Add(20*time.Hour), &db.Customization{GatheringSeconds: new(0)})
+	quiz.Kind, quiz.GatheringSeconds = &attendable, 900
+	news := receivedEvent("News", from.Add(12*time.Hour), gathering)
+	news.Kind = &informational
+
+	items, err := ExpandTimeline([]db.TimelineEntry{match, quiz, news}, from, from.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	byTitle := map[string]TimelineItem{}
+	for _, item := range items {
+		byTitle[item.Title] = item
+	}
+	got := byTitle["Match"]
+	if got.CommuteBeforeSeconds != 1200 || got.CommuteAfterSeconds != 600 || got.GatheringSeconds != 1800 ||
+		got.GatheringIsOptional || *got.GatheringLabel != "Warm-up" {
+		t.Fatalf("expected the recipient's commute and gathering, got %+v", got.TimelineEntry)
+	}
+	if got.Original.GatheringSeconds != 900 || !got.Original.GatheringIsOptional {
+		t.Fatalf("expected the received gathering as the original, got %+v", got.Original)
+	}
+	if got := byTitle["Quiz"]; got.GatheringSeconds != 0 {
+		t.Fatalf("expected the gathering removed, got %+v", got.TimelineEntry)
+	}
+	if got := byTitle["News"]; got.CommuteBeforeSeconds != 0 || got.GatheringSeconds != 0 {
+		t.Fatalf("expected no commute or gathering on a heads-up, got %+v", got.TimelineEntry)
+	}
+}
+
 func TestExpandTimelineShiftsEachOccurrence(t *testing.T) {
 	from := time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC)
 	rule, zone := "FREQ=DAILY", "UTC"
@@ -133,11 +173,14 @@ func TestReceivedEventsShiftedIntoTheRangeAreListed(t *testing.T) {
 }
 
 type listedReceived struct {
-	Title         string            `json:"title"`
-	Location      *string           `json:"location"`
-	StartsAt      time.Time         `json:"starts_at"`
-	Customization *db.Customization `json:"customization"`
-	Original      *ReceivedValues   `json:"original"`
+	Title                string            `json:"title"`
+	Location             *string           `json:"location"`
+	CommuteBeforeSeconds int               `json:"commute_before_seconds"`
+	GatheringSeconds     int               `json:"gathering_seconds"`
+	GatheringLabel       *string           `json:"gathering_label"`
+	StartsAt             time.Time         `json:"starts_at"`
+	Customization        *db.Customization `json:"customization"`
+	Original             *ReceivedValues   `json:"original"`
 }
 
 func listReceived(t *testing.T, handler *Handler, from, to time.Time) []listedReceived {
@@ -185,12 +228,18 @@ func TestRecipientCustomizesASharedEvent(t *testing.T) {
 	handler := New(store, func(*http.Request) (uuid.UUID, error) { return currentUser, nil })
 	from, to := startsAt.Truncate(24*time.Hour), startsAt.Truncate(24*time.Hour).AddDate(0, 0, 1)
 
-	for _, body := range []string{`{"start_shift_seconds": 30}`, `{"end_shift_seconds": 90000}`, `not json`} {
+	for _, body := range []string{
+		`{"start_shift_seconds": 30}`, `{"end_shift_seconds": 90000}`, `not json`,
+		`{"commute_before_seconds": -60}`, `{"commute_after_seconds": 90}`,
+		`{"gathering_is_optional": true}`, `{"gathering_seconds": 0, "gathering_label": "Mingle"}`,
+		`{"gathering_seconds": 600, "gathering_label": "` + strings.Repeat("x", 41) + `"}`,
+	} {
 		if response := sendCustomization(handler.CustomizeSharedEvent, http.MethodPut, eventID, body); response.Code != http.StatusBadRequest {
 			t.Fatalf("%s: expected %d, got %d", body, http.StatusBadRequest, response.Code)
 		}
 	}
-	body := `{"title": " My lecture ", "location": "  ", "note": "Zoom link", "start_shift_seconds": 900}`
+	body := `{"title": " My lecture ", "location": "  ", "note": "Zoom link", "start_shift_seconds": 900,
+		"commute_before_seconds": 1200, "gathering_seconds": 600, "gathering_label": " Coffee "}`
 	if response := sendCustomization(handler.CustomizeSharedEvent, http.MethodPut, eventID, body); response.Code != http.StatusNoContent {
 		t.Fatalf("customize: expected %d, got %d: %s", http.StatusNoContent, response.Code, response.Body.String())
 	}
@@ -201,7 +250,8 @@ func TestRecipientCustomizesASharedEvent(t *testing.T) {
 	}
 	got := items[0]
 	if got.Title != "My lecture" || *got.Location != "Hall" || !got.StartsAt.Equal(startsAt.Add(15*time.Minute)) ||
-		got.Customization == nil || *got.Customization.Note != "Zoom link" || got.Customization.Location != nil {
+		got.Customization == nil || *got.Customization.Note != "Zoom link" || got.Customization.Location != nil ||
+		got.CommuteBeforeSeconds != 1200 || got.GatheringSeconds != 600 || *got.GatheringLabel != "Coffee" {
 		t.Fatalf("expected the trimmed customization applied, got %+v", got)
 	}
 	// The original is what the owner sent this recipient, not their own title.

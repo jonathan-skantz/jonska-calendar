@@ -119,6 +119,13 @@ type customizationRequest struct {
 	Note              *string `json:"note"`
 	StartShiftSeconds int     `json:"start_shift_seconds"`
 	EndShiftSeconds   int     `json:"end_shift_seconds"`
+	// Commute is the recipient's own. A missing gathering_seconds keeps the
+	// received gathering; 0 removes it.
+	CommuteBeforeSeconds int     `json:"commute_before_seconds"`
+	CommuteAfterSeconds  int     `json:"commute_after_seconds"`
+	GatheringSeconds     *int    `json:"gathering_seconds"`
+	GatheringIsOptional  bool    `json:"gathering_is_optional"`
+	GatheringLabel       *string `json:"gathering_label"`
 }
 
 type tagRequest struct {

@@ -118,6 +118,8 @@ A recipient's own changes to an event shared with them or from a calendar they s
 
 - `title`, `description`, `url`, `location`, and `note` (the recipient's own text) are trimmed. An empty or missing field keeps the received value, so later changes at the source still show.
 - `start_shift_seconds` and `end_shift_seconds` move the start and end. They are whole minutes, at most 24 hours either way, and `0` or missing keeps the edge. Shifts are left out on all-day events, and when the shifted event would not end after it starts.
+- `commute_before_seconds` and `commute_after_seconds` add the recipient's own commute (whole minutes, up to 24 hours). Owners never share theirs.
+- `gathering_seconds` replaces the received gathering with `gathering_is_optional` and `gathering_label` (at most 40 characters); `0` removes it and a missing value keeps it. Commute and gathering only apply to timed attend events.
 - `PUT` replaces all of them. It applies to every occurrence of a repeating event.
 - A subscribed event is customized by its `id` in the timeline. The change is kept by the feed's UID, so it survives refreshes and covers every event the feed gives that UID.
 
@@ -129,7 +131,7 @@ A recipient's own changes to an event shared with them or from a calendar they s
 - Other fields appear only when they have a value. They include `kind`, `starts_at`, `ends_at`, `tags`, `main_tag_id`, and the commute and gathering fields.
 - `is_shared` and `shared_by` (the owner's display name) appear on items shared with you. Those never include tags, `main_tag_id`, commute, or `is_skipped`.
 - `share_count` appears on your own events that you have shared.
-- `customization` (the [customization fields](#customization-fields)) appears on received events you customized. They show your customized values, and `original` holds `{title, description?, url?, location?, starts_at, ends_at}` as you received them.
+- `customization` (the [customization fields](#customization-fields)) appears on received events you customized. They show your customized values, and `original` holds `{title, description?, url?, location?, starts_at, ends_at, gathering_seconds?, gathering_is_optional?, gathering_label?}` as you received them.
 - `from` and `to` are required RFC 3339 instants, at most 92 days apart. Events that overlap the range are returned; tasks are all returned. See [gotchas](gotchas.md#tasks-load-every-time).
 - Each occurrence of a repeating event is its own entry with the event's `id`, its own `starts_at` and `ends_at`, `occurrence_start` (the start its rule gives it, which identifies it even when moved), and `recurrence` (the rule).
 

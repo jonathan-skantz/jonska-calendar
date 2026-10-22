@@ -2,6 +2,8 @@ package db
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,13 +14,43 @@ import (
 // its subscription's user_id is. The owner of a shared event never reads
 // these tables.
 
-const customizationColumns = `title, description, url, location, note, start_shift_seconds, end_shift_seconds`
+// customizationFields are the columns of both customization tables, in the
+// order of customizationArgs and scannedCustomization.targets.
+var customizationFields = []string{
+	"title", "description", "url", "location", "note", "start_shift_seconds", "end_shift_seconds",
+	"commute_before_seconds", "commute_after_seconds",
+	"gathering_seconds", "gathering_is_optional", "gathering_label",
+}
+
+var (
+	customizationColumns = strings.Join(customizationFields, ", ")
+	// customizationUpsertSQL replaces every field of an existing row.
+	customizationUpsertSQL = func() string {
+		assignments := make([]string, len(customizationFields))
+		for index, field := range customizationFields {
+			assignments[index] = field + " = EXCLUDED." + field
+		}
+		return strings.Join(assignments, ", ") + ", updated_at = now()"
+	}()
+)
+
+// customizationPlaceholders returns the query parameters for the fields,
+// numbered from first.
+func customizationPlaceholders(first int) string {
+	placeholders := make([]string, len(customizationFields))
+	for index := range customizationFields {
+		placeholders[index] = fmt.Sprintf("$%d", first+index)
+	}
+	return strings.Join(placeholders, ", ")
+}
 
 // customizationSQL selects a LEFT JOINed customization aliased as custom,
 // with whether there is one first.
 const customizationSQL = `custom.updated_at IS NOT NULL,
 	custom.title, custom.description, custom.url, custom.location, custom.note,
-	COALESCE(custom.start_shift_seconds, 0), COALESCE(custom.end_shift_seconds, 0)`
+	COALESCE(custom.start_shift_seconds, 0), COALESCE(custom.end_shift_seconds, 0),
+	COALESCE(custom.commute_before_seconds, 0), COALESCE(custom.commute_after_seconds, 0),
+	custom.gathering_seconds, COALESCE(custom.gathering_is_optional, false), custom.gathering_label`
 
 // scannedCustomization receives customizationSQL.
 type scannedCustomization struct {
@@ -30,6 +62,8 @@ func (scanned *scannedCustomization) targets() []any {
 	return []any{
 		&scanned.exists, &scanned.Title, &scanned.Description, &scanned.URL, &scanned.Location,
 		&scanned.Note, &scanned.StartShiftSeconds, &scanned.EndShiftSeconds,
+		&scanned.CommuteBeforeSeconds, &scanned.CommuteAfterSeconds,
+		&scanned.GatheringSeconds, &scanned.GatheringIsOptional, &scanned.GatheringLabel,
 	}
 }
 
@@ -45,6 +79,8 @@ func customizationArgs(customization Customization) []any {
 	return []any{
 		customization.Title, customization.Description, customization.URL, customization.Location,
 		customization.Note, customization.StartShiftSeconds, customization.EndShiftSeconds,
+		customization.CommuteBeforeSeconds, customization.CommuteAfterSeconds,
+		customization.GatheringSeconds, customization.GatheringIsOptional, customization.GatheringLabel,
 	}
 }
 
@@ -53,14 +89,10 @@ func customizationArgs(customization Customization) []any {
 func (s *Store) CustomizeSharedEvent(ctx context.Context, recipientID, eventID uuid.UUID, customization Customization) error {
 	result, err := s.db.Exec(ctx, `
 		INSERT INTO share_customizations (event_share_id, `+customizationColumns+`)
-		SELECT share.id, $3, $4, $5, $6, $7, $8, $9
+		SELECT share.id, `+customizationPlaceholders(3)+`
 		FROM event_shares AS share
 		WHERE share.event_id = $2 AND share.recipient_user_id = $1
-		ON CONFLICT (event_share_id) DO UPDATE SET
-			title = EXCLUDED.title, description = EXCLUDED.description, url = EXCLUDED.url,
-			location = EXCLUDED.location, note = EXCLUDED.note,
-			start_shift_seconds = EXCLUDED.start_shift_seconds, end_shift_seconds = EXCLUDED.end_shift_seconds,
-			updated_at = now()
+		ON CONFLICT (event_share_id) DO UPDATE SET `+customizationUpsertSQL+`
 	`, append([]any{recipientID, eventID}, customizationArgs(customization)...)...)
 	return requireRowsAffected(result, err, ErrSharedEventNotFound)
 }
@@ -118,12 +150,8 @@ func (s *Store) CustomizeSubscribedEvent(ctx context.Context, userID, eventID uu
 		}
 		_, err = tx.Exec(ctx, `
 			INSERT INTO subscription_customizations (subscription_id, event_uid, `+customizationColumns+`)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-			ON CONFLICT (subscription_id, event_uid) DO UPDATE SET
-				title = EXCLUDED.title, description = EXCLUDED.description, url = EXCLUDED.url,
-				location = EXCLUDED.location, note = EXCLUDED.note,
-				start_shift_seconds = EXCLUDED.start_shift_seconds, end_shift_seconds = EXCLUDED.end_shift_seconds,
-				updated_at = now()
+			VALUES ($1, $2, `+customizationPlaceholders(3)+`)
+			ON CONFLICT (subscription_id, event_uid) DO UPDATE SET `+customizationUpsertSQL+`
 		`, append([]any{subscriptionID, uid}, customizationArgs(customization)...)...)
 		return err
 	})

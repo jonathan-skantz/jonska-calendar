@@ -87,9 +87,11 @@ Events have a start date/time and end date/time.
       and cannot edit them.
 - [x] Recipients can make their own version of a shared event: its title,
       details, URL, and location, a private note, and its start and end moved
-      by whole minutes (up to 24 hours either way, not on all-day events). A
-      blank field keeps what they received, and moved times move with the
-      event when the owner changes it. Nobody else sees the changes. The
+      by whole minutes (up to 24 hours either way, not on all-day events). On
+      an event they attend they can add their own commute, which is never
+      shared, and add, change, or remove the gathering. A blank field keeps
+      what they received, and moved times move with the event when the owner
+      changes it. Nobody else sees the changes. The
       event shows a ✎ marker and its details can show the original;
       "Reset to original" removes the changes. Their reminders, free time, and
       the assistant use their version. A change applies to every occurrence.
