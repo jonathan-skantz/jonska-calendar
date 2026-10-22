@@ -296,3 +296,96 @@ func TestRemindersRepeatForEachOccurrence(t *testing.T) {
 		}
 	}
 }
+
+func TestRemindersFollowTheRecipientsCustomization(t *testing.T) {
+	store, ownerID := setupTestStore(t)
+	ctx := context.Background()
+	recipientID, err := store.Register(ctx, "recipient@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(store, func(*http.Request) (uuid.UUID, error) { return recipientID, nil })
+	share := func(title string, startsAt time.Time, customization db.Customization) uuid.UUID {
+		eventID, err := store.CreateEvent(ctx, ownerID, db.Event{
+			Title: title, StartsAt: startsAt, EndsAt: startsAt.Add(time.Hour), Kind: db.EventKindAttendable,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.ShareEvent(ctx, ownerID, eventID, recipientID, db.ShareFields{}); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.CustomizeSharedEvent(ctx, recipientID, eventID, customization); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.CreateReminder(ctx, recipientID, eventID, 600); err != nil {
+			t.Fatal(err)
+		}
+		return eventID
+	}
+	listReminders := func() map[uuid.UUID]db.Reminder {
+		response := httptest.NewRecorder()
+		handler.ListReminders(response, httptest.NewRequest(http.MethodGet, "/api/reminders", nil))
+		var reminders []db.Reminder
+		if err := json.NewDecoder(response.Body).Decode(&reminders); err != nil {
+			t.Fatal(err)
+		}
+		byEvent := map[uuid.UUID]db.Reminder{}
+		for _, reminder := range reminders {
+			byEvent[reminder.EventID] = reminder
+		}
+		return byEvent
+	}
+
+	startsAt := time.Now().Add(48 * time.Hour).Truncate(time.Minute).UTC()
+	shifted := db.Customization{Title: new("My lecture"), StartShiftSeconds: 1800, EndShiftSeconds: 1800}
+	lectureID := share("Lecture", startsAt, shifted)
+	// Ended half an hour ago, but the recipient moved it an hour later.
+	justEnded := time.Now().Add(-90 * time.Minute).Truncate(time.Minute).UTC()
+	lateID := share("Late", justEnded, db.Customization{StartShiftSeconds: 3600, EndShiftSeconds: 3600})
+
+	reminders := listReminders()
+	lecture := reminders[lectureID]
+	if lecture.EventTitle != "My lecture" || !lecture.EventStartsAt.Equal(startsAt.Add(30*time.Minute)) ||
+		!lecture.OccurrenceStart.Equal(startsAt.Add(30*time.Minute)) || !lecture.RemindAt.Equal(startsAt.Add(20*time.Minute)) {
+		t.Fatalf("expected the reminder to follow the customization, got %+v", lecture)
+	}
+	if late, ok := reminders[lateID]; !ok || !late.EventStartsAt.Equal(justEnded.Add(time.Hour)) {
+		t.Fatalf("expected the event shifted out of the past listed, got %+v", reminders)
+	}
+
+	if err := store.MarkReminderNotified(ctx, recipientID, lecture.ID, &lecture.OccurrenceStart, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got := listReminders()[lectureID]; got.NotifiedAt == nil {
+		t.Fatalf("expected the delivery at the shifted start found, got %+v", got)
+	}
+	shifted.StartShiftSeconds = 900
+	if err := store.CustomizeSharedEvent(ctx, recipientID, lectureID, shifted); err != nil {
+		t.Fatal(err)
+	}
+	if got := listReminders()[lectureID]; got.NotifiedAt != nil || !got.RemindAt.Equal(startsAt.Add(5*time.Minute)) {
+		t.Fatalf("expected a new shift to arm the reminder again, got %+v", got)
+	}
+}
+
+func TestExpandRemindersShiftsEachOccurrence(t *testing.T) {
+	now := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+	rule, zone := "FREQ=DAILY", "UTC"
+	// Daily 11:00 to 11:30 from the day before; the shift makes today's end
+	// at 12:30, so it has not ended yet.
+	firstStart := now.AddDate(0, 0, -1).Add(-time.Hour)
+	reminder := db.Reminder{
+		ID: uuid.New(), OffsetSeconds: 300, EventTitle: "Stand-up",
+		EventStartsAt: firstStart, EventEndsAt: firstStart.Add(30 * time.Minute),
+		RecurrenceRule: &rule, RecurrenceTimeZone: &zone, IsShared: true,
+		Customization: &db.Customization{StartShiftSeconds: 3600, EndShiftSeconds: 3600},
+	}
+	expanded, err := expandReminders([]db.Reminder{reminder}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expanded) != 31 || !expanded[0].EventStartsAt.Equal(now) || !expanded[0].RemindAt.Equal(now.Add(-5*time.Minute)) {
+		t.Fatalf("expected today's occurrence shifted to noon first, got %d: %+v", len(expanded), expanded[0])
+	}
+}

@@ -156,12 +156,14 @@ type Reminder struct {
 	EventIsSkipped  bool       `json:"event_is_skipped,omitempty"`
 	IsShared        bool       `json:"is_shared,omitempty"`
 	// A reminder of a repeating event is listed once, with the series, for
-	// the caller to expand: the event fields are the first occurrence's,
-	// and Deliveries holds when each occurrence, by its UTC start, was
-	// delivered.
+	// the caller to expand: the event fields are the first occurrence's.
+	// The event fields of a shared event are as received, for the caller
+	// to apply the recipient's Customization to. Deliveries holds when each
+	// occurrence, by its UTC start, was delivered, for both.
 	RecurrenceRule     *string                 `json:"-"`
 	RecurrenceTimeZone *string                 `json:"-"`
 	Exceptions         []OccurrenceException   `json:"-"`
+	Customization      *Customization          `json:"-"`
 	Deliveries         map[time.Time]time.Time `json:"-"`
 }
 

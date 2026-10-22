@@ -41,43 +41,85 @@ func (h *Handler) ListReminders(w http.ResponseWriter, r *http.Request) {
 
 // expandReminders lists a repeating event's reminder once for each of its
 // occurrences that has not ended and starts within reminderHorizon, in the
-// order the reminders are due.
+// order the reminders are due. A recipient's customization moves the
+// reminder with the event; the shifted start identifies its delivery, so
+// changing the shift arms it again, as moving the event does.
 func expandReminders(reminders []db.Reminder, now time.Time) ([]db.Reminder, error) {
+	// A shift may move an occurrence that has just ended back into the
+	// listing, so series are expanded that much earlier.
+	margin := db.MaxShiftSeconds * time.Second
 	expanded := make([]db.Reminder, 0, len(reminders))
 	for _, reminder := range reminders {
-		if reminder.RecurrenceRule == nil {
-			expanded = append(expanded, reminder)
-			continue
-		}
-		series, err := seriesOf(db.TimelineEntry{
-			StartsAt: &reminder.EventStartsAt, EndsAt: &reminder.EventEndsAt, IsAllDay: reminder.EventIsAllDay,
-			RecurrenceRule: reminder.RecurrenceRule, RecurrenceTimeZone: reminder.RecurrenceTimeZone,
-		})
-		if err != nil {
-			return nil, err
-		}
-		occurrences, err := series.Occurrences(exceptionsOf(reminder.Exceptions), now, now.Add(reminderHorizon))
-		if err != nil {
-			return nil, err
-		}
-		for _, occurrence := range occurrences {
-			listed := reminder
-			listed.EventStartsAt, listed.EventEndsAt = occurrence.StartsAt, occurrence.EndsAt
-			listed.OccurrenceStart = occurrence.StartsAt
-			listed.RemindAt = occurrence.StartsAt.Add(-time.Duration(reminder.OffsetSeconds) * time.Second)
-			listed.NotifiedAt = nil
-			if notifiedAt, ok := reminder.Deliveries[occurrence.StartsAt.UTC()]; ok {
-				listed.NotifiedAt = &notifiedAt
+		listed := []db.Reminder{reminder}
+		if reminder.RecurrenceRule != nil {
+			var err error
+			if listed, err = reminderOccurrences(reminder, now.Add(-margin), now.Add(reminderHorizon)); err != nil {
+				return nil, err
 			}
-			// Exceptions carry no skips for recipients.
-			if occurrence.IsSkipped != nil {
-				listed.EventIsSkipped = *occurrence.IsSkipped
+		}
+		for _, item := range listed {
+			customizeReminder(&item)
+			if !item.EventEndsAt.After(now) ||
+				(item.RecurrenceRule != nil && !item.EventStartsAt.Before(now.Add(reminderHorizon))) {
+				continue
 			}
-			expanded = append(expanded, listed)
+			expanded = append(expanded, item)
 		}
 	}
 	slices.SortStableFunc(expanded, func(a, b db.Reminder) int { return a.RemindAt.Compare(b.RemindAt) })
 	return expanded, nil
+}
+
+func reminderOccurrences(reminder db.Reminder, from, to time.Time) ([]db.Reminder, error) {
+	series, err := seriesOf(db.TimelineEntry{
+		StartsAt: &reminder.EventStartsAt, EndsAt: &reminder.EventEndsAt, IsAllDay: reminder.EventIsAllDay,
+		RecurrenceRule: reminder.RecurrenceRule, RecurrenceTimeZone: reminder.RecurrenceTimeZone,
+	})
+	if err != nil {
+		return nil, err
+	}
+	occurrences, err := series.Occurrences(exceptionsOf(reminder.Exceptions), from, to)
+	if err != nil {
+		return nil, err
+	}
+	listed := make([]db.Reminder, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		item := reminder
+		item.EventStartsAt, item.EventEndsAt = occurrence.StartsAt, occurrence.EndsAt
+		setReminderOccurrence(&item)
+		// Exceptions carry no skips for recipients.
+		if occurrence.IsSkipped != nil {
+			item.EventIsSkipped = *occurrence.IsSkipped
+		}
+		listed = append(listed, item)
+	}
+	return listed, nil
+}
+
+// customizeReminder applies the recipient's customization to the event of
+// a reminder.
+func customizeReminder(reminder *db.Reminder) {
+	if reminder.Customization == nil {
+		return
+	}
+	values := ReceivedValues{
+		Title: reminder.EventTitle, Location: reminder.EventLocation,
+		StartsAt: reminder.EventStartsAt, EndsAt: reminder.EventEndsAt,
+	}.customized(*reminder.Customization, reminder.EventIsAllDay)
+	reminder.EventTitle, reminder.EventLocation = values.Title, values.Location
+	reminder.EventStartsAt, reminder.EventEndsAt = values.StartsAt, values.EndsAt
+	setReminderOccurrence(reminder)
+}
+
+// setReminderOccurrence identifies the reminder by its event's start and
+// finds whether it was delivered for it.
+func setReminderOccurrence(reminder *db.Reminder) {
+	reminder.OccurrenceStart = reminder.EventStartsAt
+	reminder.RemindAt = reminder.EventStartsAt.Add(-time.Duration(reminder.OffsetSeconds) * time.Second)
+	reminder.NotifiedAt = nil
+	if notifiedAt, ok := reminder.Deliveries[reminder.EventStartsAt.UTC()]; ok {
+		reminder.NotifiedAt = &notifiedAt
+	}
 }
 
 func (h *Handler) CreateReminder(w http.ResponseWriter, r *http.Request) {

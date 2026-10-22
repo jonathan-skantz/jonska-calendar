@@ -23,35 +23,45 @@ type ReceivedValues struct {
 }
 
 // customize applies the recipient's customization of a received event and
-// keeps what they received as Original. The shifts are left out on all-day
-// events, whose edges are midnights, and when the shifted event would not
-// end after it starts, as after the owner shortened it.
+// keeps what they received as Original.
 func customize(item *TimelineItem) {
 	custom := item.Customization
 	if custom == nil || item.StartsAt == nil || item.EndsAt == nil {
 		return
 	}
-	item.Original = &ReceivedValues{
+	received := ReceivedValues{
 		Title: item.Title, Description: item.Description, URL: item.URL, Location: item.Location,
 		StartsAt: *item.StartsAt, EndsAt: *item.EndsAt,
 	}
-	if custom.Title != nil {
-		item.Title = *custom.Title
-	}
-	item.Description = customized(custom.Description, item.Description)
-	item.URL = customized(custom.URL, item.URL)
-	item.Location = customized(custom.Location, item.Location)
-	if item.IsAllDay {
-		return
-	}
-	startsAt := item.StartsAt.Add(time.Duration(custom.StartShiftSeconds) * time.Second)
-	endsAt := item.EndsAt.Add(time.Duration(custom.EndShiftSeconds) * time.Second)
-	if endsAt.After(startsAt) {
-		item.StartsAt, item.EndsAt = &startsAt, &endsAt
-	}
+	values := received.customized(*custom, item.IsAllDay)
+	item.Original = &received
+	item.Title, item.Description, item.URL, item.Location = values.Title, values.Description, values.URL, values.Location
+	item.StartsAt, item.EndsAt = &values.StartsAt, &values.EndsAt
 }
 
-func customized(custom, received *string) *string {
+// customized returns the values with the customization applied. The shifts
+// are left out on all-day events, whose edges are midnights, and when the
+// shifted event would not end after it starts, as after the owner shortened
+// it.
+func (values ReceivedValues) customized(custom db.Customization, isAllDay bool) ReceivedValues {
+	if custom.Title != nil {
+		values.Title = *custom.Title
+	}
+	values.Description = customizedText(custom.Description, values.Description)
+	values.URL = customizedText(custom.URL, values.URL)
+	values.Location = customizedText(custom.Location, values.Location)
+	if isAllDay {
+		return values
+	}
+	startsAt := values.StartsAt.Add(time.Duration(custom.StartShiftSeconds) * time.Second)
+	endsAt := values.EndsAt.Add(time.Duration(custom.EndShiftSeconds) * time.Second)
+	if endsAt.After(startsAt) {
+		values.StartsAt, values.EndsAt = startsAt, endsAt
+	}
+	return values
+}
+
+func customizedText(custom, received *string) *string {
 	if custom != nil {
 		return custom
 	}
