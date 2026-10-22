@@ -40,8 +40,15 @@ describe("canDrag", () => {
     expect(canDrag(task)).toBe(true);
   });
 
-  it("refuses shared, all-day and untimed items", () => {
+  it("refuses shared, subscribed, all-day and untimed items", () => {
     expect(canDrag(event({ shared_by: "Ana" }))).toBe(false);
+    expect(
+      canDrag(
+        event({
+          subscription: { id: "sub", name: "School", color: "#123456" },
+        }),
+      ),
+    ).toBe(false);
     expect(canDrag(event({ is_all_day: true }))).toBe(false);
     expect(canDrag(event({ ends_at: undefined }))).toBe(false);
     expect(canDrag({ ...task, deadline_at: undefined })).toBe(false);

@@ -9,6 +9,7 @@ import {
   getOccupiedRange,
   isBusy,
   isEventVisible,
+  getEntrySource,
 } from "./timeline";
 import type { TimelineEntry } from "../types";
 
@@ -73,6 +74,27 @@ describe("timeline behavior", () => {
     );
     expect(isEventVisible(event({ tags: [tag("work")] }), ["home"])).toBe(true);
     expect(isEventVisible({ ...event(), type: "task" }, ["work"])).toBe(true);
+  });
+
+  it("hides the events of a hidden subscription", () => {
+    const school = { id: "school", name: "School", color: "#123456" };
+    expect(isEventVisible(event({ subscription: school }), ["school"])).toBe(
+      false,
+    );
+    expect(isEventVisible(event({ subscription: school }), ["work"])).toBe(
+      true,
+    );
+  });
+
+  it("colors a subscribed event by its calendar and names its source", () => {
+    const school = { id: "school", name: "School", color: "#123456" };
+    expect(getMainTag(event({ subscription: school }))).toEqual({
+      ...school,
+      is_default: false,
+    });
+    expect(getEntrySource(event({ subscription: school }))).toBe("School");
+    expect(getEntrySource(event({ shared_by: "Ana" }))).toBe("Ana");
+    expect(getEntrySource(event())).toBeUndefined();
   });
 
   it("uses the selected main tag and falls back to the first tag", () => {

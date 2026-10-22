@@ -49,7 +49,9 @@ import { isReminderUpcoming } from "./features/reminders/reminders";
 import { useReminderActions } from "./features/reminders/useReminderActions";
 import { useReminderDelivery } from "./features/reminders/useReminderNotifications";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
+import { SharedEventDrawer } from "./features/sharing/SharedEventDrawer";
 import { SharedEventPanel } from "./features/sharing/SharedEventPanel";
+import { useSubscriptions } from "./features/subscriptions/useSubscriptions";
 import { TagEditorPanel } from "./features/tags/TagEditorPanel";
 import { useTagMutations } from "./features/tags/useTagMutations";
 import { useTagVisibility } from "./features/tags/useTagVisibility";
@@ -71,7 +73,8 @@ type OpenDrawer =
   | { kind: "tags" }
   | { kind: "transitCard" }
   | { kind: "reminders" }
-  | { kind: "sharedEvent"; entry: TimelineEntry };
+  | { kind: "sharedEvent"; entry: TimelineEntry }
+  | { kind: "subscribedEvent"; entry: TimelineEntry };
 
 // An event to open, and the start of the occurrence that is meant.
 type EventToOpen = { eventId: string; startsAt: string };
@@ -106,6 +109,7 @@ export function CalendarApp({ user }: { user: User }) {
   const tagsQuery = useTags();
   const entries = timelineQuery.data ?? [];
   const tags = tagsQuery.data ?? [];
+  const subscriptions = useSubscriptions().data ?? [];
   const { createTag } = useTagMutations(removeHiddenTag);
   const { toggleTask, moveItem } = useTimelineMutations();
   const scopePrompt = useRecurrenceScope();
@@ -142,9 +146,10 @@ export function CalendarApp({ user }: { user: User }) {
       return getRequestErrorMessage(error, "Couldn't read that");
     }
   };
-  // Events shared with the user are read-only, so they open a details view.
+  // Shared and subscribed events are read-only, so they open a details view.
   const openEntry = (entry: TimelineEntry) => {
     if (entry.is_shared) setDrawer({ kind: "sharedEvent", entry });
+    else if (entry.subscription) setDrawer({ kind: "subscribedEvent", entry });
     else composer.edit(entry);
   };
   // Reminders, their notifications and the assistant open an event by its id
@@ -248,6 +253,7 @@ export function CalendarApp({ user }: { user: User }) {
               ).length
             }
             tags={tags}
+            subscriptions={subscriptions}
             hiddenTagIds={hiddenTagIds}
             onToggleTagVisibility={toggleTagVisibility}
             onAddTag={promptForTag}
@@ -351,6 +357,9 @@ export function CalendarApp({ user }: { user: User }) {
           entry={drawer.entry}
           onClose={closeDrawer}
         />
+      )}
+      {drawer?.kind === "subscribedEvent" && (
+        <SharedEventDrawer entry={drawer.entry} onClose={closeDrawer} />
       )}
       {drawer?.kind === "assistant" && (
         <AssistantDrawer

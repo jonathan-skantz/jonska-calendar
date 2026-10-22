@@ -15,8 +15,8 @@ const DRAG_SNAP_MINUTES = 30;
 // A visible day column and where it is on screen.
 export type DragColumn = { date: Date; rect: DOMRect };
 
-// Own timed events and tasks can be dragged. Shared events are read-only,
-// and all-day events live in the header, not the hour grid.
+// Own timed events and tasks can be dragged. Shared and subscribed events
+// are read-only, and all-day events live in the header, not the hour grid.
 export const canDrag = (entry: TimelineEntry) =>
   entry.type === "task"
     ? Boolean(entry.deadline_at)
@@ -24,6 +24,7 @@ export const canDrag = (entry: TimelineEntry) =>
         entry.starts_at &&
         entry.ends_at &&
         !entry.shared_by &&
+        !entry.subscription &&
         !entry.is_all_day,
       );
 

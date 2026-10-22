@@ -47,7 +47,8 @@ const formatRange = (
     : `${startText} – ${formatDate(end)} ${endTime}${gathering}`;
 };
 
-// Recipients cannot change a shared event; only their own reminders.
+// Recipients cannot change a shared event; only their own reminders. Events
+// of a subscribed calendar show here too, without reminders.
 export const SharedEventDrawer = ({
   entry,
   onClose,
@@ -59,7 +60,11 @@ export const SharedEventDrawer = ({
   const { timeFormat } = usePreferences().preferences;
   return (
     <Drawer
-      eyebrow={`Shared by ${entry.shared_by}`}
+      eyebrow={
+        entry.subscription
+          ? `From ${entry.subscription.name}`
+          : `Shared by ${entry.shared_by}`
+      }
       title={entry.title}
       className="shared-event-view"
       onClose={onClose}
@@ -112,7 +117,11 @@ export const SharedEventDrawer = ({
           onRemove={onRemoveReminder}
         />
       )}
-      <p className="form-hint">Only {entry.shared_by} can change this event.</p>
+      <p className="form-hint">
+        {entry.subscription
+          ? "This event comes from a subscribed calendar and changes when the calendar does."
+          : `Only ${entry.shared_by} can change this event.`}
+      </p>
     </Drawer>
   );
 };

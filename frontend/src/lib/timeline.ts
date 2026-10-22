@@ -25,8 +25,17 @@ export const getTimelineEntryDate = (entry: TimelineEntry) =>
 export const getEntryMinutes = (entry: TimelineEntry) =>
   minutesIntoDay(getTimelineEntryDate(entry));
 
-export const getMainTag = (entry: TimelineEntry) =>
-  entry.tags?.find((tag) => tag.id === entry.main_tag_id) ?? entry.tags?.[0];
+// A subscribed event has no tags; its calendar colors it like a main tag.
+export const getMainTag = (entry: TimelineEntry): Tag | undefined =>
+  entry.subscription
+    ? { ...entry.subscription, is_default: false }
+    : (entry.tags?.find((tag) => tag.id === entry.main_tag_id) ??
+      entry.tags?.[0]);
+
+// Who an event the user cannot change comes from: the user who shared it, or
+// the subscribed calendar.
+export const getEntrySource = (entry: TimelineEntry) =>
+  entry.shared_by ?? entry.subscription?.name;
 
 export const getOrderedStripTags = (entry: TimelineEntry): Tag[] => {
   const mainTag = getMainTag(entry);
@@ -39,9 +48,14 @@ export const getOrderedStripTags = (entry: TimelineEntry): Tag[] => {
   return mainTag ? [mainTag, ...additionalTags] : additionalTags;
 };
 
-export const isEventVisible = (entry: TimelineEntry, hiddenTagIds: string[]) =>
+// hiddenIds holds the hidden tags and subscriptions; the sidebar filters by
+// both.
+export const isEventVisible = (entry: TimelineEntry, hiddenIds: string[]) =>
   entry.type !== "event" ||
-  !entry.tags?.some((tag) => hiddenTagIds.includes(tag.id));
+  !(
+    entry.tags?.some((tag) => hiddenIds.includes(tag.id)) ||
+    (entry.subscription && hiddenIds.includes(entry.subscription.id))
+  );
 
 // and skipped events stay visible but never push busy entries aside.
 export const isBusy = (entry: TimelineEntry) =>

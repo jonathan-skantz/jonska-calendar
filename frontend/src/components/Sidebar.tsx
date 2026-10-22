@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { tagTextColor } from "../lib/colors";
-import type { Tag } from "../types";
+import type { SubscriptionRef, Tag } from "../types";
 
 type SidebarProps = {
   open: boolean;
@@ -13,6 +13,8 @@ type SidebarProps = {
   drawerFooter?: ReactNode;
   openTaskCount: number;
   tags: Tag[];
+  subscriptions: SubscriptionRef[];
+  // The hidden tags and subscriptions; both filter events the same way.
   hiddenTagIds: string[];
   onToggleTagVisibility: (tagId: string) => void;
   onAddTag: () => void;
@@ -26,6 +28,7 @@ export const Sidebar = ({
   drawerFooter,
   openTaskCount,
   tags,
+  subscriptions,
   hiddenTagIds,
   onToggleTagVisibility,
   onAddTag,
@@ -47,6 +50,31 @@ export const Sidebar = ({
   const filterHelp = `Click a tag to hide or show its events. Default tag: ${
     tags.find((tag) => tag.is_default)?.name ?? "none"
   }. Events shared with you are read-only; only the owner can change them.`;
+  const filterButton = (
+    item: { id: string; name: string; color: string },
+    label: string,
+  ) => {
+    const isHidden = hiddenTagIds.includes(item.id);
+    return (
+      <div className="tag-control" key={item.id}>
+        <button
+          className={isHidden ? "tag large hidden" : "tag large"}
+          style={{
+            backgroundColor: item.color,
+            color: tagTextColor(item.color),
+          }}
+          onClick={() => onToggleTagVisibility(item.id)}
+          aria-label={`${isHidden ? "Show" : "Hide"} ${label}`}
+        >
+          <span
+            className={`eye-icon ${isHidden ? "closed" : "open"}`}
+            aria-hidden="true"
+          />
+          {item.name}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -89,28 +117,7 @@ export const Sidebar = ({
           </div>
           <div className="tag-cloud">
             {tags.length ? (
-              tags.map((tag) => {
-                const isHidden = hiddenTagIds.includes(tag.id);
-                return (
-                  <div className="tag-control" key={tag.id}>
-                    <button
-                      className={isHidden ? "tag large hidden" : "tag large"}
-                      style={{
-                        backgroundColor: tag.color,
-                        color: tagTextColor(tag.color),
-                      }}
-                      onClick={() => onToggleTagVisibility(tag.id)}
-                      aria-label={`${isHidden ? "Show" : "Hide"} ${tag.name} events`}
-                    >
-                      <span
-                        className={`eye-icon ${isHidden ? "closed" : "open"}`}
-                        aria-hidden="true"
-                      />
-                      {tag.name}
-                    </button>
-                  </div>
-                );
-              })
+              tags.map((tag) => filterButton(tag, `${tag.name} events`))
             ) : (
               <span className="muted">No tags yet</span>
             )}
@@ -121,6 +128,18 @@ export const Sidebar = ({
             Edit
           </button>
         </div>
+        {subscriptions.length > 0 && (
+          <div className="side-section">
+            <div className="section-heading small">
+              <h2>Subscribed calendars</h2>
+            </div>
+            <div className="tag-cloud">
+              {subscriptions.map((subscription) =>
+                filterButton(subscription, `events from ${subscription.name}`),
+              )}
+            </div>
+          </div>
+        )}
         {variant === "drawer" && drawerFooter}
       </aside>
     </>

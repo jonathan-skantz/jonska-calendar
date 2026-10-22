@@ -9,6 +9,7 @@ import { tagTextColor } from "../../lib/colors";
 import {
   getGathering,
   getGatheringStart,
+  getEntrySource,
   getMainTag,
   isBusy,
   getOrderedStripTags,
@@ -166,7 +167,7 @@ export const CalendarEntry = ({
     `${entry.is_skipped ? "Skipping · " : ""}${timeRange}`,
     entry.location,
     describeEntryRecurrence(entry),
-    entry.shared_by && `from ${entry.shared_by}`,
+    getEntrySource(entry) && `from ${getEntrySource(entry)}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -398,8 +399,8 @@ export const CalendarEntry = ({
           {entry.location && (
             <span className="entry-line">{entry.location}</span>
           )}
-          {entry.shared_by && (
-            <span className="entry-line">from {entry.shared_by}</span>
+          {getEntrySource(entry) && (
+            <span className="entry-line">from {getEntrySource(entry)}</span>
           )}
           {continuesToNextDay && (
             <ContinuationMarkers

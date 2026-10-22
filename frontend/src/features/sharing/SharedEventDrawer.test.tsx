@@ -38,6 +38,27 @@ describe("SharedEventDrawer", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
+  it("shows a subscribed event read-only without reminders", () => {
+    const { is_shared: _shared, shared_by: _sharedBy, ...rest } = entry;
+    renderWithPreferences(
+      <SharedEventDrawer
+        entry={{
+          ...rest,
+          subscription: { id: "sub-1", name: "School", color: "#123456" },
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("From School")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "This event comes from a subscribed calendar and changes when the calendar does.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Remind/)).toBeNull();
+  });
+
   it("marks approximate edges", () => {
     renderWithPreferences(
       <SharedEventDrawer
