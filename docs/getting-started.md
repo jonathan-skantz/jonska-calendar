@@ -62,6 +62,14 @@ ANTHROPIC_API_KEY=<key>
 
 Without a key, both show that they are not configured. Everything else still works.
 
+To subscribe to a calendar on your own network, or to a feed of this app on `localhost`, allow private addresses:
+
+```dotenv
+SUBSCRIPTIONS_ALLOW_PRIVATE=true
+```
+
+See [gotchas](gotchas.md#subscriptions-cannot-reach-private-addresses).
+
 `.claude/settings.json` stops Claude Code from reading `.env.local`.
 
 `goose.env` is not read by any command in these docs. Use the commands below.

@@ -59,6 +59,20 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 - **Why:** the owner's edits reach recipients automatically. There is no copy to sync and no second source of truth.
 - **Trade-off:** each read joins tables. Recipients see only what the owner allows. Per-recipient rules beyond four text fields are not built.
 
+## Subscribed calendars are read-only copies, replaced on refresh
+
+- **Chosen:** a subscription's events live in their own tables (`subscription_events`), are replaced as a whole on each refresh, and show read-only like shared events.
+- **Considered:** importing them into the user's own events and updating them by UID on each refresh. That would give them tags and reminders, but every write path (edit, drag, delete, tags, shares, the assistant) would need a read-only check, and a refresh would overwrite local edits.
+- **Trade-off:** no tags or reminders on subscribed events, and their IDs change on each refresh.
+- **Reconsider if:** reminders on subscribed events are wanted. They would need a stable key, such as the feed's UID.
+
+## Subscriptions refresh in the API process
+
+- **Chosen:** a goroutine started in `server.go` refreshes stale subscriptions, plus a "Refresh now" route. It is the only background job.
+- **Why:** the app runs as one process for a family. A separate worker or a queue would add deployment for no gain.
+- **Considered:** refreshing on demand when the timeline is loaded. That needs no job, but the week shows old events until the next load, and a slow feed delays the request.
+- **Reconsider if:** the API runs as several processes, which would each refresh the same subscriptions.
+
 ## Cookie sessions, not JWTs
 
 - **Chosen:** a random token in an `HttpOnly`, `SameSite=Lax` cookie. Only its SHA-256 is stored.

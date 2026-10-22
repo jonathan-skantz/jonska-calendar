@@ -14,7 +14,7 @@
 | `409` | Conflict: duplicate name, already shared, already a member, last or main tag removal.      |
 | `413` | The `.ics` import body is over 6 MB.                                                       |
 | `429` | Quick add rate limit reached (30 per user per hour).                                       |
-| `502` | Quick add: Anthropic failed.                                                               |
+| `502` | Quick add: Anthropic failed. Subscription refresh: the calendar could not be fetched.      |
 | `503` | Not configured or unavailable: quick add without a key, weather with no cache or upstream. |
 
 ## Routes
@@ -56,6 +56,17 @@
 | `GET /api/weather?lat=&lon=`                                            | None                                                  | `{date, conditions, sunrise?, sunset?}[]`; `503`                                     |
 | `POST /api/import/ics`                                                  | `ics`, `time_zone`, `tag_id?`, `dry_run`              | `{imported, skipped, warnings}`; `400`, `404` tag not yours, `413`                   |
 | `GET /api/export.ics?time_zone=`                                        | None                                                  | Your own events as a `text/calendar` file download                                   |
+| `GET /api/subscriptions`                                                | None                                                  | Array of subscriptions                                                               |
+| `POST /api/subscriptions`                                               | `url`, `time_zone`, `name?`, `color?`                 | `201` with the subscription; `400` bad or unreachable feed; `409` already subscribed |
+| `PATCH /api/subscriptions/{subscriptionID}`                             | `name`, `color` (both required)                       | The subscription                                                                     |
+| `POST /api/subscriptions/{subscriptionID}/refresh`                      | None                                                  | The subscription; `502` with why the feed failed                                     |
+| `DELETE /api/subscriptions/{subscriptionID}`                            | None                                                  | `204`; its events go with it                                                         |
+| `GET /api/feeds`                                                        | None                                                  | Array of feeds                                                                       |
+| `POST /api/feeds`                                                       | `name`, `time_zone`, `tag_id?`, `include_alarms`      | `201` with the feed; `404` tag not yours                                             |
+| `PATCH /api/feeds/{feedID}`                                             | `name`, `tag_id?`, `include_alarms`                   | The feed; `404` feed or tag not yours                                                |
+| `POST /api/feeds/{feedID}/token`                                        | None                                                  | The feed with a new `path`; the old one answers `404`                                |
+| `DELETE /api/feeds/{feedID}`                                            | None                                                  | `204`                                                                                |
+| `GET /api/feeds/{token}/calendar.ics`                                   | None, **no session**                                  | The feed as `text/calendar`; `404` unknown token                                     |
 | `GET /api/household`                                                    | None                                                  | Household, or `null`                                                                 |
 | `POST /api/household`                                                   | `name`, `transit_card_count`                          | `201`; `409` if already in a household                                               |
 | `PATCH /api/household`                                                  | `name`, `transit_card_count`                          | `204`; `404` without a household                                                     |
@@ -153,6 +164,22 @@ Required: `title`, `starts_at`, `ends_at`, `kind`.
   - A file holds at most 5000 events. A file that is not iCalendar answers `400`.
 - `GET /api/export.ics` returns your own events, not events shared with you, with your tags as `CATEGORIES` and your reminders as `VALARM`s. Fields only this app has are written as `X-JONSKA-*` properties, so importing the file again restores them.
 - See [data model: iCalendar UIDs](data-model.md#icalendar-uids) for how repeated imports are detected.
+
+## Subscriptions
+
+- The code is in `backend/internal/subscription`. See [data model: subscriptions](data-model.md#subscriptions).
+- `url` is `http`, `https`, or `webcal` (fetched as `https`), at most 2048 characters. The server fetches it before saving, so `400` says why a feed does not work: unreachable, an error status, over 10 MB, not iCalendar, or a private address.
+- `time_zone` is the browser's IANA zone. The feed's floating times and all-day dates are read in it, as on import.
+- `name` defaults to the calendar's `NAME` or `X-WR-CALNAME`, else the address's host. `color` is `#rrggbb` and defaults to `#547968`.
+- Responses contain `id`, `name`, `url`, `color`, `last_fetched_at`, `last_success_at`, and `last_error` when the last refresh failed.
+- Subscribed events are in `GET /api/timeline` with `subscription: {id, name, color}` and no tags, commute, `is_skipped`, or `main_tag_id`. Event routes answer `404` for them, as for any event that is not yours.
+
+## Feeds
+
+- A feed publishes your own events, all or those with `tag_id`, like `GET /api/export.ics`. Your reminders are `VALARM`s only with `include_alarms`. Events shared with you and subscribed events are never included.
+- Responses contain `id`, `name`, `tag_id` when set, `include_alarms`, and `path`, the address relative to the app (`/api/feeds/<token>/calendar.ics`). The browser adds its own origin.
+- `time_zone` is read on create only. All-day dates and plain times are written in it, because a feed request has no browser.
+- `GET /api/feeds/{token}/calendar.ics` needs no cookie: the token is the credential. It names the calendar (`NAME`, `X-WR-CALNAME`), asks apps to refresh hourly (`REFRESH-INTERVAL`, `X-PUBLISHED-TTL`), and sets `Cache-Control: private, max-age=300`.
 
 ## Quick add
 

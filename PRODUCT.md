@@ -302,8 +302,32 @@ separate from events and tasks.
 - [x] Repeating events are imported and exported with their excluded and
       changed occurrences. Rules the app cannot repeat by (e.g. several times
       a day) are skipped and listed in the preview.
-- [ ] Tasks are neither imported nor exported. Subscribing to other calendars
-      by URL and publishing a calendar feed are **Future**.
+- [ ] Tasks are neither imported nor exported.
+
+### Subscriptions and feeds (Demo)
+
+- [x] Settings can subscribe to another calendar by its address (http,
+      https, or webcal), e.g. a school schedule or public holidays. The
+      address is checked when subscribing; one that cannot be fetched or is
+      not a calendar is refused.
+- [x] A subscribed calendar's events show read-only, in the calendar's own
+      color and marked "from <calendar>". They follow the shared-event rules:
+      the publisher's commute, skips, categories, and alarms are left out,
+      and they cannot be dragged, edited, tagged, or given reminders.
+- [x] Subscriptions are refreshed every 6 hours and with "Refresh now". A
+      failed refresh is shown in Settings and keeps the last events.
+- [x] Each subscribed calendar can be renamed, recolored, hidden from the
+      sidebar like a tag, or removed with its events.
+- [x] The assistant sees subscribed events but never changes them.
+- [x] Settings can publish the user's own events as feeds that other
+      calendar apps subscribe to. Each feed has a secret address and covers
+      all own events or those with one tag; deleting the tag deletes the
+      feed. Events shared with the user and subscribed events are left out.
+- [x] A feed includes the user's reminders as alarms only when chosen.
+- [x] A feed's address can be copied, opened in a calendar app (webcal),
+      reset so the old address stops working, or deleted.
+- [ ] Reminders on subscribed events, editing a feed's name or tag, and
+      publishing tasks are **Future**.
 
 ### Week view
 
@@ -327,7 +351,6 @@ The following product ideas are intentionally deferred from the first demo:
 - [ ] task reminders, and reminder delivery while the app is closed (web push or
       a phone app)
 - [ ] repeating tasks
-- [ ] calendar subscriptions by URL (webcal), and publishing a subscribable feed
 - [ ] automatic task scheduling and scheduled task sessions
 - [ ] task priorities, richer statuses, estimated duration, and event attachments
 - [ ] busy-only sharing and advanced per-field sharing policies

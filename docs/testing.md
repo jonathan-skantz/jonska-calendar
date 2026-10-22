@@ -40,7 +40,7 @@ Every package that uses the database needs this in `main_test.go`, so the contai
 func TestMain(m *testing.M) { testutil.Run(m) }
 ```
 
-`timeline`, `auth`, `weather`, `ical`, and `db` have one. `db` tests are in the external `db_test` package, because `testutil` imports `db`. `quickadd` does not, because it never touches the database.
+`timeline`, `auth`, `weather`, `ical`, `subscription`, `assistant`, and `db` have one. `db` tests are in the external `db_test` package, because `testutil` imports `db`. `quickadd` does not, because it never touches the database.
 
 ### Writing a store test
 
@@ -69,6 +69,7 @@ handler := timeline.New(store, testutil.SignedInAs(userID))
 
 - Weather tests use a fake Open-Meteo server (`httptest`) and an injectable clock (`h.now`).
 - Quick add tests use a fake Anthropic server. `NewClient` takes options so tests can point it there.
+- Subscription tests serve feeds from `httptest` servers on `localhost`, so they build the client with `NewClient(true)` to allow private addresses. `TestFetch` checks that `NewClient(false)` refuses them.
 - No test calls a real service.
 
 ## Frontend: Vitest and Testing Library

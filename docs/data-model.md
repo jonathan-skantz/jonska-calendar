@@ -18,6 +18,11 @@ erDiagram
     households ||--o{ household_members : "has"
     users ||--o| household_members : "belongs to at most one"
     users ||--o{ sessions : "has"
+    users ||--o{ calendar_subscriptions : "follows"
+    calendar_subscriptions ||--o{ subscription_events : "holds"
+    subscription_events ||--o{ subscription_event_exceptions : "differs in"
+    users ||--o{ calendar_feeds : "publishes"
+    tags |o--o{ calendar_feeds : "limits"
 ```
 
 `weather_forecasts` has no owner, so it is not in the diagram. See [weather cache](#weather-cache).
@@ -77,6 +82,34 @@ Schema constraints:
 - Exported events use `ical_uid`, or `<id>@jonska-calendar` for events made in the app. Importing your own export skips those events too; another user importing it gets new events.
 - An event in a file without a UID cannot be recognized, so it is imported again each time.
 - `Store.ImportEvents` (`backend/db/ical.go`) writes all events, tags, and reminders in one transaction. A preview runs the same transaction and rolls it back.
+
+## Subscriptions
+
+```text
+calendar_subscriptions (user_id, name, url, color, time_zone, last_fetched_at, last_success_at, last_error)
+  └── subscription_events (subscription_id, the event fields)
+        └── subscription_event_exceptions (original_start, is_cancelled, starts_at, ends_at)
+```
+
+- A subscription is a calendar the user follows by URL (migration 28). Its events are a **projection** of the feed, like shares: read-only, never in `timeline_items`, and owned through `calendar_subscriptions.user_id`.
+- `subscription_events` mirrors `events` without the owner's own fields: no tags, commute, or skipping. Its checks repeat the event constraints. Exceptions mirror `event_occurrence_exceptions` without `is_skipped`.
+- A refresh replaces all of a subscription's events and exceptions in one transaction (`Store.ReplaceSubscriptionEvents`, `backend/db/subscriptions.go`). The rows are copied in with `COPY`, because a feed can hold thousands of events. Updating the subscription row first serializes two refreshes of one subscription.
+- A failed refresh sets `last_error` and `last_fetched_at` and keeps the events of the last success.
+- `time_zone` is the subscriber's browser zone. Floating times and all-day dates in the feed are read in it.
+- The URL is unique per user.
+- `listSubscribedTimeline` adds the events to `ListTimeline`, with the subscription as `{id, name, color}`. They expand like other series.
+- `Refresher.Run` (`backend/internal/subscription/refresh.go`) checks every 15 minutes for subscriptions last fetched more than 6 hours ago and refreshes them one at a time. It is the only background job and runs in the API process.
+
+## Feeds
+
+```text
+calendar_feeds (user_id, name, token UNIQUE, tag_id → tags ON DELETE CASCADE, include_alarms, time_zone)
+```
+
+- A feed publishes the user's own events at `/api/feeds/<token>/calendar.ics` (migration 27). The token is 32 random bytes, base64url. It is the only credential, and it is stored as is so the address can be shown again. Hashing it would not protect anything: whoever can read the table can read the events it serves.
+- A feed with `tag_id` publishes only events with that tag. Deleting the tag deletes the feed, so it never widens to every event.
+- The events come from the export query (`listEventsForExport`, `backend/db/ical.go`), so a feed and a download write the same file. Reminders are the owner's and are left out unless `include_alarms` is set.
+- `time_zone` is the creator's browser zone, used for all-day dates.
 
 ## Tasks
 
@@ -194,6 +227,6 @@ weather_forecasts (latitude, longitude, fetched_at, hourly JSONB, daily JSONB)
 
 - Files are `N_name.sql` in `backend/db/migrations`.
 - Numbers are **not zero-padded**. Sorting by name puts `10_` before `2_`. Goose and the tests sort by number.
-- The next file is `27_...`.
+- The next file is `29_...`.
 - Never edit an applied migration. Add a new one.
 - Each file has an `Up` part and a `Down` part, split by `-- +goose Down`. Tests run only `Up`.

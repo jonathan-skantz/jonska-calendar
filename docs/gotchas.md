@@ -101,6 +101,21 @@ The server rejects a `from` earlier than yesterday in UTC, because it does not k
 - `events.starts_at` is a series' **first** occurrence. Code that reads events directly must expand series through `timeline.ExpandTimeline` (or `recurrence.Series`); filtering on `starts_at` alone misses later occurrences.
 - An occurrence is identified by its event's `id` and its `occurrence_start`, which stays the same when it is moved. The frontend keys entries with `entryKey` (`lib/timeline.ts`).
 
+### Subscriptions cannot reach private addresses
+
+- The subscription client refuses loopback, private, link-local, carrier-grade NAT, and other non-public addresses. It checks the address it dials, so a hostname or a redirect cannot lead it into the server's network.
+- A calendar server on your own network (or another copy of this app on `localhost`) is refused. Set `SUBSCRIPTIONS_ALLOW_PRIVATE=true` to allow it, only where every user is trusted.
+
+### Subscriptions refresh in the background
+
+- `go Refresher.Run(ctx)` in `backend/cmd/server.go` is the only background job. Each API process runs one, so two processes refresh the same subscriptions twice; the row lock keeps the results consistent.
+- A subscription is refreshed when its last fetch is 6 hours old, checked every 15 minutes. A failed fetch counts as a fetch, so a broken feed is retried after 6 hours, not every 15 minutes.
+- Subscribed events are replaced on each refresh and get new IDs. Anything keyed by their ID, such as an open drawer, goes stale after a refresh.
+
+### Feed addresses are secrets
+
+A feed's token is its only credential. Anyone with the address sees the events. Resetting the address (`POST /api/feeds/{id}/token`) is the only way to revoke it.
+
 ### Exported series have no VTIMEZONE
 
 `.ics` exports write a series' times with a `TZID` that is an IANA name, without a `VTIMEZONE` component. Google, Apple, and this app read that; a strict RFC 5545 reader may not.
@@ -143,7 +158,7 @@ These are not bugs. [PRODUCT.md](../PRODUCT.md) lists the full set of **Future**
 - **Reminders need an open tab.** No push, no background worker. A reminder whose time passed while no tab was open shows as an in-page toast on the next load, not a system notification.
 - **No task reminders.** Event reminders exist.
 - **No task scheduling.** Tasks get no time slots.
-- **Import and export cover events only.** Tasks and shares are not exported, and repeat rules outside the supported ones are skipped. There are no calendar subscriptions.
+- **Import and export cover events only.** Tasks and shares are not exported, and repeat rules outside the supported ones are skipped. Subscribed events cannot have reminders.
 - **No password reset, email verification, password change, or account deletion.**
 - **No login throttling, CSRF token, or `Secure` cookie flag.** The cookie is `HttpOnly` and `SameSite=Lax`.
 - **No shared tags or tag adoption.**

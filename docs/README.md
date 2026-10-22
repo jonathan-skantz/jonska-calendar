@@ -1,6 +1,6 @@
 # Developer docs
 
-Jonska Calendar is a small family calendar. Create events and tasks, tag them, share events, plan transit-card needs, and see a week grid with weather and sun times.
+Jonska Calendar is a small family calendar. Create events and tasks, tag them, share events, subscribe to other calendars and publish your own, plan transit-card needs, and see a week grid with weather and sun times.
 
 - Why it differs from Google Calendar: [why this app exists](why-not-google-calendar.md).
 - What it should do: [PRODUCT.md](../PRODUCT.md). Items marked **Future** are not built.
