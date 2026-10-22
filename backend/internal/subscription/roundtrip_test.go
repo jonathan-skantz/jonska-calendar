@@ -87,4 +87,24 @@ func TestSubscribingToAPublishedFeed(t *testing.T) {
 	if want := []string{"2026-10-20 18:00", "2026-11-03 18:00"}; !slices.Equal(starts, want) {
 		t.Fatalf("expected %v, got %v", want, starts)
 	}
+
+	// The feed's UID keeps the subscriber's customization across refreshes.
+	if err := store.CustomizeSubscribedEvent(ctx, subscriberID, items[0].ID, db.Customization{Note: new("Bring shoes")}); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := store.GetSubscription(ctx, subscriberID, subscription.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&Refresher{Store: store, Client: NewClient(true)}).Refresh(ctx, stored); err != nil {
+		t.Fatal(err)
+	}
+	entries, err = store.ListTimeline(ctx, subscriberID, from, to)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].ID == items[0].ID || entries[0].Customization == nil ||
+		*entries[0].Customization.Note != "Bring shoes" {
+		t.Fatalf("expected the customization kept after the refresh, got %+v", entries)
+	}
 }

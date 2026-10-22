@@ -29,6 +29,9 @@ var (
 	ErrFeedNotFound         = errors.New("feed not found")
 	ErrSubscriptionNotFound = errors.New("subscription not found")
 	ErrSubscriptionExists   = errors.New("already subscribed to this calendar")
+
+	ErrSubscribedEventNotFound = errors.New("subscribed event not found")
+	ErrEventWithoutUID         = errors.New("the calendar gives this event no UID, so it cannot be customized")
 )
 
 func isUniqueViolation(err error) bool {

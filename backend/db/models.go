@@ -114,6 +114,19 @@ type ShareFields struct {
 	Location    *string `json:"location,omitempty"`
 }
 
+// Customization is a recipient's own change to an event they receive. A nil
+// field and a zero shift keep the received value. Note is the recipient's
+// own text, shown beside the event's.
+type Customization struct {
+	Title             *string `json:"title,omitempty"`
+	Description       *string `json:"description,omitempty"`
+	URL               *string `json:"url,omitempty"`
+	Location          *string `json:"location,omitempty"`
+	Note              *string `json:"note,omitempty"`
+	StartShiftSeconds int     `json:"start_shift_seconds,omitempty"`
+	EndShiftSeconds   int     `json:"end_shift_seconds,omitempty"`
+}
+
 // EventShare is the owner's view of one recipient of an event.
 type EventShare struct {
 	ID                   uuid.UUID `json:"id"`
@@ -177,8 +190,10 @@ type TimelineEntry struct {
 	ShareCount           int        `json:"share_count,omitempty"`
 	// Subscription is set on the read-only events of a subscribed calendar.
 	Subscription *SubscriptionRef `json:"subscription,omitempty"`
-	Tags         []Tag            `json:"tags,omitempty"`
-	MainTagID    *uuid.UUID       `json:"main_tag_id,omitempty"`
+	// Customization is the recipient's own change to a received event.
+	Customization *Customization `json:"customization,omitempty"`
+	Tags          []Tag          `json:"tags,omitempty"`
+	MainTagID     *uuid.UUID     `json:"main_tag_id,omitempty"`
 	// The series fields of a repeating event, expanded into occurrences
 	// before they reach a client.
 	RecurrenceRule     *string               `json:"-"`

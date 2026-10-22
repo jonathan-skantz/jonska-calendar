@@ -202,11 +202,13 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID, window
 			event.gathering_is_optional, event.gathering_label,
 			COALESCE(share.location, event.location),
 			user_display_name(owner.display_name, owner.email),
-			event.recurrence_rule, event.recurrence_time_zone, event.recurrence_ends_at
+			event.recurrence_rule, event.recurrence_time_zone, event.recurrence_ends_at,
+			`+customizationSQL+`
 		FROM event_shares AS share
 		JOIN timeline_items AS item ON item.id = share.event_id
 		JOIN events AS event ON event.timeline_item_id = share.event_id
 		JOIN users AS owner ON owner.id = item.user_id
+		LEFT JOIN share_customizations AS custom ON custom.event_share_id = share.id
 		WHERE share.recipient_user_id = $1 AND `+inWindowSQL+`
 	`, userID, from, to)
 	if err != nil {
@@ -214,7 +216,8 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID, window
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (TimelineEntry, error) {
 		entry := TimelineEntry{Type: "event", IsShared: true}
-		err := row.Scan(
+		var customization scannedCustomization
+		err := row.Scan(append([]any{
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind,
 			&entry.StartIsApproximate, &entry.EndIsApproximate, &entry.GatheringSeconds,
@@ -222,7 +225,8 @@ func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID, window
 			&entry.Location,
 			&entry.SharedBy,
 			&entry.RecurrenceRule, &entry.RecurrenceTimeZone, &entry.RecurrenceEndsAt,
-		)
+		}, customization.targets()...)...)
+		entry.Customization = customization.value()
 		return entry, err
 	})
 }

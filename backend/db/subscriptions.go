@@ -27,6 +27,8 @@ type Subscription struct {
 // (tags, commute, skipping) are never set.
 type SubscribedEvent struct {
 	Event
+	// UID is the feed's UID, nil when it gave none.
+	UID        *string
 	Exceptions []OccurrenceException
 }
 
@@ -182,7 +184,7 @@ func insertSubscribedEvents(ctx context.Context, tx pgx.Tx, subscriptionID uuid.
 			event.StartsAt, event.EndsAt, event.IsAllDay, event.Kind,
 			event.StartIsApproximate, event.EndIsApproximate,
 			event.GatheringSeconds, event.GatheringIsOptional, event.GatheringLabel,
-			event.RecurrenceRule, event.RecurrenceTimeZone, event.RecurrenceEndsAt,
+			event.RecurrenceRule, event.RecurrenceTimeZone, event.RecurrenceEndsAt, event.UID,
 		})
 		for _, exception := range event.Exceptions {
 			exceptionRows = append(exceptionRows, []any{
@@ -195,7 +197,7 @@ func insertSubscribedEvents(ctx context.Context, tx pgx.Tx, subscriptionID uuid.
 		"starts_at", "ends_at", "is_all_day", "kind",
 		"start_is_approximate", "end_is_approximate",
 		"gathering_seconds", "gathering_is_optional", "gathering_label",
-		"recurrence_rule", "recurrence_time_zone", "recurrence_ends_at",
+		"recurrence_rule", "recurrence_time_zone", "recurrence_ends_at", "uid",
 	}, pgx.CopyFromRows(eventRows)); err != nil {
 		return err
 	}
@@ -216,9 +218,12 @@ func (s *Store) listSubscribedTimeline(ctx context.Context, userID uuid.UUID, wi
 			event.start_is_approximate, event.end_is_approximate, event.gathering_seconds,
 			event.gathering_is_optional, event.gathering_label,
 			subscription.id, subscription.name, subscription.color,
-			event.recurrence_rule, event.recurrence_time_zone, event.recurrence_ends_at
+			event.recurrence_rule, event.recurrence_time_zone, event.recurrence_ends_at,
+			`+customizationSQL+`
 		FROM subscription_events AS event
 		JOIN calendar_subscriptions AS subscription ON subscription.id = event.subscription_id
+		LEFT JOIN subscription_customizations AS custom
+			ON custom.subscription_id = event.subscription_id AND custom.event_uid = event.uid
 		WHERE subscription.user_id = $1 AND `+subscribedInWindowSQL+`
 	`, userID, from, to)
 	if err != nil {
@@ -226,14 +231,16 @@ func (s *Store) listSubscribedTimeline(ctx context.Context, userID uuid.UUID, wi
 	}
 	entries, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (TimelineEntry, error) {
 		entry := TimelineEntry{Type: "event", Subscription: &SubscriptionRef{}}
-		err := row.Scan(
+		var customization scannedCustomization
+		err := row.Scan(append([]any{
 			&entry.ID, &entry.Title, &entry.Description, &entry.URL,
 			&entry.StartsAt, &entry.EndsAt, &entry.IsAllDay, &entry.Kind, &entry.Location,
 			&entry.StartIsApproximate, &entry.EndIsApproximate, &entry.GatheringSeconds,
 			&entry.GatheringIsOptional, &entry.GatheringLabel,
 			&entry.Subscription.ID, &entry.Subscription.Name, &entry.Subscription.Color,
 			&entry.RecurrenceRule, &entry.RecurrenceTimeZone, &entry.RecurrenceEndsAt,
-		)
+		}, customization.targets()...)...)
+		entry.Customization = customization.value()
 		return entry, err
 	})
 	if err != nil {

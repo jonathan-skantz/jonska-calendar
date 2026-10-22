@@ -69,7 +69,11 @@ func (r *Refresher) Load(ctx context.Context, feedURL string, loc *time.Location
 		if err != nil {
 			continue
 		}
-		feed.Events = append(feed.Events, db.SubscribedEvent{Event: validated, Exceptions: exceptions})
+		subscribed := db.SubscribedEvent{Event: validated, Exceptions: exceptions}
+		if event.UID != "" {
+			subscribed.UID = &event.UID
+		}
+		feed.Events = append(feed.Events, subscribed)
 	}
 	return feed, nil
 }
