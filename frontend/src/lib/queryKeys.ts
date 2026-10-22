@@ -4,6 +4,9 @@ export const queryKeys = {
   workspace: ["workspace"] as const,
   tags: ["workspace", "tags"] as const,
   timelines: ["workspace", "timeline"] as const,
+  // Under workspace: subscriptions change which events the calendar shows.
+  subscriptions: ["workspace", "subscriptions"] as const,
+  feeds: ["feeds"] as const,
   timeline: (from: string, to: string) =>
     ["workspace", "timeline", from, to] as const,
   transitCard: ["transit-card"] as const,

@@ -38,12 +38,39 @@ export type TimelineEntry = {
   shared_by?: string;
   // Number of recipients, only on the current user's own events.
   share_count?: number;
+  // Only on the read-only events of a calendar the user subscribes to.
+  subscription?: SubscriptionRef;
   tags?: Tag[];
   main_tag_id?: string;
   // On each occurrence of a repeating event: the start its rule gives it,
   // which identifies it even when it was moved, and the series' rule.
   occurrence_start?: string;
   recurrence?: Recurrence;
+};
+
+export type SubscriptionRef = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+// A calendar the user follows by URL. last_error is set when the last
+// refresh failed; the events of the last success stay.
+export type Subscription = SubscriptionRef & {
+  url: string;
+  last_fetched_at: string;
+  last_success_at: string;
+  last_error?: string;
+};
+
+// A secret address publishing the user's own events, or those with one tag.
+// path is served by this app; the browser adds its origin.
+export type Feed = {
+  id: string;
+  name: string;
+  tag_id?: string;
+  include_alarms: boolean;
+  path: string;
 };
 
 export type Weekday = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";

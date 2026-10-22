@@ -34,4 +34,5 @@ export const clearWorkspace = (queryClient: QueryClient) => {
   queryClient.removeQueries({ queryKey: queryKeys.transitCard });
   queryClient.removeQueries({ queryKey: queryKeys.household });
   queryClient.removeQueries({ queryKey: queryKeys.reminders });
+  queryClient.removeQueries({ queryKey: queryKeys.feeds });
 };

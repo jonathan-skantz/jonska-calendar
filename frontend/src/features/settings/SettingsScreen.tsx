@@ -1,9 +1,16 @@
 import type { User } from "../../types";
 import { useAuthActions } from "../auth/useAuth";
+import { FeedSettings } from "../feeds/FeedSettings";
+import { useFeedMutations, useFeeds } from "../feeds/useFeeds";
 import { HouseholdSettings } from "../household/HouseholdSettings";
 import { useHousehold, useHouseholdMutations } from "../household/useHousehold";
 import { IcsSettings } from "../icalendar/IcsSettings";
 import { icsExportUrl, useIcsImport } from "../icalendar/useIcsImport";
+import { SubscriptionSettings } from "../subscriptions/SubscriptionSettings";
+import {
+  useSubscriptionMutations,
+  useSubscriptions,
+} from "../subscriptions/useSubscriptions";
 import { useTags } from "../tags/useTags";
 import { SettingsPage } from "./SettingsPage";
 
@@ -12,7 +19,8 @@ type SettingsScreenProps = {
   onBack: () => void;
 };
 
-// The settings page with the profile, household, and tag data it uses.
+// The settings page with the profile, household, tag, subscription, and feed
+// data it uses.
 // Preferences come from PreferencesProvider.
 export const SettingsScreen = ({ user, onBack }: SettingsScreenProps) => {
   const { updateDisplayName } = useAuthActions();
@@ -20,6 +28,10 @@ export const SettingsScreen = ({ user, onBack }: SettingsScreenProps) => {
   const householdMutations = useHouseholdMutations();
   const tags = useTags().data ?? [];
   const icsImport = useIcsImport();
+  const subscriptions = useSubscriptions().data ?? [];
+  const subscriptionMutations = useSubscriptionMutations();
+  const feeds = useFeeds().data ?? [];
+  const feedMutations = useFeedMutations();
 
   return (
     <SettingsPage
@@ -40,6 +52,21 @@ export const SettingsScreen = ({ user, onBack }: SettingsScreenProps) => {
         tags={tags}
         exportUrl={icsExportUrl()}
         onImport={icsImport.mutateAsync}
+      />
+      <SubscriptionSettings
+        subscriptions={subscriptions}
+        onAdd={subscriptionMutations.add}
+        onUpdate={subscriptionMutations.update}
+        onRefresh={subscriptionMutations.refresh}
+        onRemove={subscriptionMutations.remove}
+      />
+      <FeedSettings
+        feeds={feeds}
+        tags={tags}
+        onCreate={feedMutations.create}
+        onUpdate={feedMutations.update}
+        onResetUrl={feedMutations.resetUrl}
+        onRemove={feedMutations.remove}
       />
     </SettingsPage>
   );
