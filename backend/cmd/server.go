@@ -101,6 +101,13 @@ func main() {
 	mux.HandleFunc("DELETE /api/household/members/me", timelineHandler.LeaveHousehold)
 	mux.HandleFunc("POST /api/import/ics", icalHandler.Import)
 	mux.HandleFunc("GET /api/export.ics", icalHandler.Export)
+	mux.HandleFunc("GET /api/feeds", icalHandler.ListFeeds)
+	mux.HandleFunc("POST /api/feeds", icalHandler.CreateFeed)
+	mux.HandleFunc("PATCH /api/feeds/{feedID}", icalHandler.UpdateFeed)
+	mux.HandleFunc("POST /api/feeds/{feedID}/token", icalHandler.ResetFeedToken)
+	mux.HandleFunc("DELETE /api/feeds/{feedID}", icalHandler.DeleteFeed)
+	// Calendar apps fetch feeds without a session; the token is the secret.
+	mux.HandleFunc("GET /api/feeds/{token}/calendar.ics", icalHandler.ServeFeed)
 	mux.HandleFunc("GET /api/weather", weatherHandler.Forecast)
 	mux.HandleFunc("POST /api/assistant/messages", assistantHandler.Message)
 	mux.HandleFunc("POST /api/assistant/conversations/{conversationID}/actions/{actionID}", assistantHandler.Decide)

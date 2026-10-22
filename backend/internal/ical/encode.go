@@ -20,15 +20,39 @@ const productID = "-//jonska-calendar//EN"
 // their wall-clock times across daylight saving changes. stamp is the
 // DTSTAMP, the time the file was made.
 func Encode(w io.Writer, events []db.ExportEvent, loc *time.Location, stamp time.Time) error {
-	calendar, err := ics.NewCalendarWithOptions(ics.WithVersion("2.0"), ics.WithProductId(productID))
+	calendar, err := encodeCalendar(events, loc, stamp)
 	if err != nil {
 		return err
+	}
+	return calendar.SerializeTo(w, ics.WithNewLineWindows)
+}
+
+// feedRefreshInterval is how often subscribing apps are asked to fetch a
+// feed again. Many apps ignore it and use their own schedule.
+const feedRefreshInterval = "PT1H"
+
+// EncodeFeed writes events like Encode, as a feed named name.
+func EncodeFeed(w io.Writer, name string, events []db.ExportEvent, loc *time.Location, stamp time.Time) error {
+	calendar, err := encodeCalendar(events, loc, stamp)
+	if err != nil {
+		return err
+	}
+	calendar.SetName(name)
+	calendar.SetXPublishedTTL(feedRefreshInterval)
+	calendar.SetRefreshInterval(feedRefreshInterval)
+	return calendar.SerializeTo(w, ics.WithNewLineWindows)
+}
+
+func encodeCalendar(events []db.ExportEvent, loc *time.Location, stamp time.Time) (*ics.Calendar, error) {
+	calendar, err := ics.NewCalendarWithOptions(ics.WithVersion("2.0"), ics.WithProductId(productID))
+	if err != nil {
+		return nil, err
 	}
 	for _, event := range events {
 		zone := loc
 		if event.RecurrenceTimeZone != nil {
 			if zone, err = time.LoadLocation(*event.RecurrenceTimeZone); err != nil {
-				return err
+				return nil, err
 			}
 		}
 		vevent := calendar.AddEvent(event.UID)
@@ -74,7 +98,7 @@ func Encode(w io.Writer, events []db.ExportEvent, loc *time.Location, stamp time
 			}
 		}
 	}
-	return calendar.SerializeTo(w, ics.WithNewLineWindows)
+	return calendar, nil
 }
 
 // writeEvent writes the fields an event and its changed occurrences share.

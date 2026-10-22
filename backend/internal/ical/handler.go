@@ -132,8 +132,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	if response.Warnings == nil {
 		response.Warnings = []string{}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	writeJSON(w, http.StatusOK, response)
 }
 
 // Validate checks a parsed event against the app's event rules and, for a

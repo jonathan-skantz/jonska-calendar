@@ -152,6 +152,12 @@ func exportedItemID(uid string) (uuid.UUID, bool) {
 // ListEventsForExport returns the user's own events, never events shared with
 // them, with the user's own reminders.
 func (s *Store) ListEventsForExport(ctx context.Context, userID uuid.UUID) ([]ExportEvent, error) {
+	return s.listEventsForExport(ctx, userID, nil, true)
+}
+
+// listEventsForExport returns the user's own events, only those with tagID
+// when it is not nil, and their reminders only when withReminders is set.
+func (s *Store) listEventsForExport(ctx context.Context, userID uuid.UUID, tagID *uuid.UUID, withReminders bool) ([]ExportEvent, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT item.id, COALESCE(item.ical_uid, item.id::text || $2),
 			item.title, item.description, item.url,
@@ -170,14 +176,17 @@ func (s *Store) ListEventsForExport(ctx context.Context, userID uuid.UUID) ([]Ex
 			ARRAY(
 				SELECT reminder.offset_seconds
 				FROM event_reminders AS reminder
-				WHERE reminder.event_id = item.id AND reminder.user_id = $1
+				WHERE reminder.event_id = item.id AND reminder.user_id = $1 AND $4
 				ORDER BY reminder.offset_seconds
 			)
 		FROM timeline_items AS item
 		JOIN events AS event ON event.timeline_item_id = item.id
-		WHERE item.user_id = $1
+		WHERE item.user_id = $1 AND ($3::uuid IS NULL OR EXISTS (
+			SELECT 1 FROM timeline_item_tags AS item_tag
+			WHERE item_tag.timeline_item_id = item.id AND item_tag.tag_id = $3
+		))
 		ORDER BY event.starts_at, item.id
-	`, userID, ExportUIDSuffix)
+	`, userID, ExportUIDSuffix, tagID, withReminders)
 	if err != nil {
 		return nil, err
 	}
