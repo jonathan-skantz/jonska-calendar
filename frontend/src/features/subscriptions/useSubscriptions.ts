@@ -38,8 +38,16 @@ export const useSubscriptionMutations = () => {
       }),
     update: (id: string, details: SubscriptionDetails) =>
       run({ path: path(id), method: "PATCH", body: details }),
-    refresh: (id: string) =>
-      run({ path: `${path(id)}/refresh`, method: "POST" }),
+    // A failed refresh is recorded on the subscription, so its status is
+    // reloaded either way.
+    refresh: async (id: string) => {
+      const error = await run({ path: `${path(id)}/refresh`, method: "POST" });
+      if (error)
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.subscriptions,
+        });
+      return error;
+    },
     remove: (id: string) => run({ path: path(id), method: "DELETE" }),
   };
 };
