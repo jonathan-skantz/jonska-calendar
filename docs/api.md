@@ -6,16 +6,16 @@
 
 ## Status codes
 
-| Code  | Meaning                                                                                    |
-| ----- | ------------------------------------------------------------------------------------------ |
-| `400` | Invalid input. The body says why.                                                          |
-| `401` | No valid session.                                                                          |
-| `404` | Not found **or** not yours. The server does not say which, on purpose.                     |
-| `409` | Conflict: duplicate name, already shared, already a member, last or main tag removal.      |
-| `413` | The `.ics` import body is over 6 MB.                                                       |
-| `429` | Quick add rate limit reached (30 per user per hour).                                       |
-| `502` | Quick add: Anthropic failed. Subscription refresh: the calendar could not be fetched.      |
-| `503` | Not configured or unavailable: quick add without a key, weather with no cache or upstream. |
+| Code  | Meaning                                                                                                                 |
+| ----- | ----------------------------------------------------------------------------------------------------------------------- |
+| `400` | Invalid input. The body says why.                                                                                       |
+| `401` | No valid session.                                                                                                       |
+| `404` | Not found **or** not yours. The server does not say which, on purpose.                                                  |
+| `409` | Conflict: duplicate name, already shared, already a member, last or main tag removal, a subscribed event without a UID. |
+| `413` | The `.ics` import body is over 6 MB.                                                                                    |
+| `429` | Quick add rate limit reached (30 per user per hour).                                                                    |
+| `502` | Quick add: Anthropic failed. Subscription refresh: the calendar could not be fetched.                                   |
+| `503` | Not configured or unavailable: quick add without a key, weather with no cache or upstream.                              |
 
 ## Routes
 
@@ -44,6 +44,10 @@
 | `POST /api/events/{eventID}/shares`                                     | `recipient_email`, optional share fields              | `201` with `{ "id": "<share-uuid>" }`                                                |
 | `PUT /api/events/{eventID}/shares/{shareID}`                            | Share fields                                          | `204`                                                                                |
 | `DELETE /api/events/{eventID}/shares/{shareID}`                         | None                                                  | `204`                                                                                |
+| `PUT /api/events/{eventID}/customization`                               | Customization fields                                  | `204`; `404` not shared with you                                                     |
+| `DELETE /api/events/{eventID}/customization`                            | None                                                  | `204`; `404` not shared with you                                                     |
+| `PUT /api/subscribed-events/{eventID}/customization`                    | Customization fields                                  | `204`; `404` not yours; `409` the feed gives it no UID                               |
+| `DELETE /api/subscribed-events/{eventID}/customization`                 | None                                                  | `204`; `404` not yours; `409` the feed gives it no UID                               |
 | `GET /api/reminders`                                                    | None                                                  | Your reminders for events that have not ended                                        |
 | `POST /api/events/{eventID}/reminders`                                  | `offset_seconds`                                      | `201`; `404` event not visible; `409` offset already set                             |
 | `DELETE /api/reminders/{reminderID}`                                    | None                                                  | `204`; `404` not yours                                                               |
@@ -108,6 +112,15 @@ Required: `title`, `starts_at`, `ends_at`, `kind`.
 - `PUT` replaces all four.
 - Responses contain `id`, `recipient_user_id`, `recipient_email`, `recipient_display_name`, and any share fields set.
 
+## Customization fields
+
+A recipient's own changes to an event shared with them or from a calendar they subscribe to. Nobody else sees them.
+
+- `title`, `description`, `url`, `location`, and `note` (the recipient's own text) are trimmed. An empty or missing field keeps the received value, so later changes at the source still show.
+- `start_shift_seconds` and `end_shift_seconds` move the start and end. They are whole minutes, at most 24 hours either way, and `0` or missing keeps the edge. Shifts are left out on all-day events, and when the shifted event would not end after it starts.
+- `PUT` replaces all of them. It applies to every occurrence of a repeating event.
+- A subscribed event is customized by its `id` in the timeline. The change is kept by the feed's UID, so it survives refreshes and covers every event the feed gives that UID.
+
 ## Timeline entries
 
 `GET /api/timeline` returns your owned items and items shared with you.
@@ -116,6 +129,7 @@ Required: `title`, `starts_at`, `ends_at`, `kind`.
 - Other fields appear only when they have a value. They include `kind`, `starts_at`, `ends_at`, `tags`, `main_tag_id`, and the commute and gathering fields.
 - `is_shared` and `shared_by` (the owner's display name) appear on items shared with you. Those never include tags, `main_tag_id`, commute, or `is_skipped`.
 - `share_count` appears on your own events that you have shared.
+- `customization` (the [customization fields](#customization-fields)) appears on received events you customized. They show your customized values, and `original` holds `{title, description?, url?, location?, starts_at, ends_at}` as you received them.
 - `from` and `to` are required RFC 3339 instants, at most 92 days apart. Events that overlap the range are returned; tasks are all returned. See [gotchas](gotchas.md#tasks-load-every-time).
 - Each occurrence of a repeating event is its own entry with the event's `id`, its own `starts_at` and `ends_at`, `occurrence_start` (the start its rule gives it, which identifies it even when moved), and `recurrence` (the rule).
 

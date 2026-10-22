@@ -20,6 +20,7 @@ var (
 	ErrInvalidCommute = errors.New("commute must be whole minutes up to 24 hours and is only allowed on timed attendable events")
 	ErrDeadlineNeeded = errors.New("deadline is required")
 	ErrInvalidOffset  = errors.New("reminder offset must be whole minutes, from 0 up to 30 days before the event")
+	ErrInvalidShift   = errors.New("start and end shifts must be whole minutes, at most 24 hours either way")
 
 	ErrInvalidApproximate = errors.New("approximate start or end is only allowed on timed events")
 	ErrInvalidGathering   = errors.New("gathering must be whole minutes up to 24 hours on a timed attendable event, with a label of at most 40 characters")
@@ -86,6 +87,27 @@ func ValidateEvent(event db.Event) (db.Event, error) {
 		return event, ErrInvalidApproximate
 	}
 	return event, nil
+}
+
+func validShiftSeconds(seconds int) bool {
+	return seconds >= -db.MaxShiftSeconds && seconds <= db.MaxShiftSeconds && seconds%60 == 0
+}
+
+// validateCustomizationRequest returns the customization with its text
+// trimmed; blank text keeps the received value.
+func validateCustomizationRequest(request customizationRequest) (db.Customization, error) {
+	if !validShiftSeconds(request.StartShiftSeconds) || !validShiftSeconds(request.EndShiftSeconds) {
+		return db.Customization{}, ErrInvalidShift
+	}
+	return db.Customization{
+		Title:             normalizeOptionalText(request.Title),
+		Description:       normalizeOptionalText(request.Description),
+		URL:               normalizeOptionalText(request.URL),
+		Location:          normalizeOptionalText(request.Location),
+		Note:              normalizeOptionalText(request.Note),
+		StartShiftSeconds: request.StartShiftSeconds,
+		EndShiftSeconds:   request.EndShiftSeconds,
+	}, nil
 }
 
 func validateReminderRequest(request reminderRequest) error {

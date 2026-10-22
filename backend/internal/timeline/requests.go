@@ -108,6 +108,19 @@ type shareFieldsRequest struct {
 	Location    *string `json:"location"`
 }
 
+// customizationRequest carries a recipient's own values for an event they
+// receive. An empty or missing field and a zero shift keep the received
+// value.
+type customizationRequest struct {
+	Title             *string `json:"title"`
+	Description       *string `json:"description"`
+	URL               *string `json:"url"`
+	Location          *string `json:"location"`
+	Note              *string `json:"note"`
+	StartShiftSeconds int     `json:"start_shift_seconds"`
+	EndShiftSeconds   int     `json:"end_shift_seconds"`
+}
+
 type tagRequest struct {
 	Name string `json:"name"`
 }
