@@ -82,6 +82,7 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 | Change event or task storage                  | `backend/db/events.go`, `backend/db/tasks.go`                              | Migrations 1 and 3                                                          |
 | Change repeat rules or occurrences            | `backend/internal/recurrence/`, `backend/internal/timeline/scopes.go`      | `backend/db/occurrences.go`, migration 25; `frontend/src/lib/recurrence.ts` |
 | Change sharing or per-recipient fields        | `backend/db/sharing.go`, `backend/db/timeline.go`                          | Migrations 4, 5, 16; `frontend/src/features/sharing/`                       |
+| Change customizing of received events         | `backend/internal/timeline/customization.go`                               | `db/customizations.go`, migration 29; `features/receivedCustomization/`     |
 | Change tags, defaults, or attachment          | `backend/db/tags.go`                                                       | Migrations 6, 7, 8, 9, 10                                                   |
 | Change reminders                              | `backend/db/reminders.go`, `backend/internal/timeline/reminders.go`        | Migrations 21 and 26                                                        |
 | Change transit-card declarations or conflicts | `backend/db/transit_card.go`, `backend/internal/timeline/transit_card.go`  | Migration 12; `frontend/src/features/transitCard/`                          |

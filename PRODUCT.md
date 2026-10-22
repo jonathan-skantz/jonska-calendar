@@ -85,16 +85,26 @@ Events have a start date/time and end date/time.
       tags or the owner's original values for fields customized for them.
 - [x] Recipients see shared events read-only, marked with the owner's name,
       and cannot edit them.
-- [ ] Recipient-local overrides of shared fields are **Future**.
+- [x] Recipients can make their own version of a shared event: its title,
+      details, URL, and location, a private note, and its start and end moved
+      by whole minutes (up to 24 hours either way, not on all-day events). A
+      blank field keeps what they received, and moved times move with the
+      event when the owner changes it. Nobody else sees the changes. The
+      event shows a ✎ marker and its details can show the original;
+      "Reset to original" removes the changes. Their reminders, free time, and
+      the assistant use their version. A change applies to every occurrence.
+- [ ] Rules that customize received events automatically (e.g. always rename
+      a word, move the start when the title matches) are **Future**.
 - [ ] Busy-only sharing and independently hiding or transforming fields are
       **Future** unless explicitly added to the demo scope.
 
 **Misc features:**
 
-- [ ] The user can add custom info in a separate field for events that are shared with them, e.g.:
+- [x] The user can add custom info in a separate field for events that are shared with them, e.g.:
   - `CUSTOM INFO: This lecture will be given on zoom: zoom.com/my-link/...`
   - `CUSTOM INFO: The company's URL: the-company.com/...`
-- [ ] Recipient-private custom info is **Future**.
+- [x] The custom info is the recipient's private note (see own versions of
+      shared events above).
 - [ ] Making an event appear in a TODO-list without being completeable is
       **Future**.
 
@@ -313,7 +323,9 @@ separate from events and tasks.
 - [x] A subscribed calendar's events show read-only, in the calendar's own
       color and marked "from <calendar>". They follow the shared-event rules:
       the publisher's commute, skips, categories, and alarms are left out,
-      and they cannot be dragged, edited, tagged, or given reminders.
+      and they cannot be dragged, edited, tagged, or given reminders. The
+      subscriber can make their own version of one, as of a shared event; it
+      is kept across refreshes by the calendar's UID for the event.
 - [x] Subscriptions are refreshed every 6 hours and with "Refresh now". A
       failed refresh is shown in Settings and keeps the last events.
 - [x] Each subscribed calendar can be renamed, recolored, hidden from the
