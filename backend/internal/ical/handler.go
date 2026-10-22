@@ -92,12 +92,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	response := importResponse{Skipped: parsed.Skipped, Warnings: parsed.Warnings}
 	var imports []db.ImportedEvent
 	for _, event := range parsed.Events {
-		validated, err := timeline.ValidateEvent(event.Event)
-		var exceptions []db.OccurrenceException
-		if err == nil && event.Recurrence != nil {
-			// Exceptions that are not occurrences of the rule are dropped.
-			validated, exceptions, err = timeline.WithSeries(validated, event.Recurrence, event.TimeZone, event.Exceptions)
-		}
+		validated, exceptions, err := Validate(event)
 		if err != nil {
 			response.Skipped = append(response.Skipped, Skipped{Title: event.Title, Reason: err.Error()})
 			continue
@@ -139,6 +134,17 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+// Validate checks a parsed event against the app's event rules and, for a
+// repeating event, sets its series fields. Exceptions that are not
+// occurrences of the rule are dropped.
+func Validate(event Event) (db.Event, []db.OccurrenceException, error) {
+	validated, err := timeline.ValidateEvent(event.Event)
+	if err != nil || event.Recurrence == nil {
+		return validated, nil, err
+	}
+	return timeline.WithSeries(validated, event.Recurrence, event.TimeZone, event.Exceptions)
 }
 
 // Export answers the user's own events as an iCalendar file download.
