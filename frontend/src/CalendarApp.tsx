@@ -49,7 +49,6 @@ import { isReminderUpcoming } from "./features/reminders/reminders";
 import { useReminderActions } from "./features/reminders/useReminderActions";
 import { useReminderDelivery } from "./features/reminders/useReminderNotifications";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
-import { SharedEventDrawer } from "./features/sharing/SharedEventDrawer";
 import { SharedEventPanel } from "./features/sharing/SharedEventPanel";
 import { useSubscriptions } from "./features/subscriptions/useSubscriptions";
 import { TagEditorPanel } from "./features/tags/TagEditorPanel";
@@ -73,8 +72,8 @@ type OpenDrawer =
   | { kind: "tags" }
   | { kind: "transitCard" }
   | { kind: "reminders" }
-  | { kind: "sharedEvent"; entry: TimelineEntry }
-  | { kind: "subscribedEvent"; entry: TimelineEntry };
+  // An event shared with the user or from a calendar they subscribe to.
+  | { kind: "receivedEvent"; entry: TimelineEntry };
 
 // An event to open, and the start of the occurrence that is meant.
 type EventToOpen = { eventId: string; startsAt: string };
@@ -148,8 +147,8 @@ export function CalendarApp({ user }: { user: User }) {
   };
   // Shared and subscribed events are read-only, so they open a details view.
   const openEntry = (entry: TimelineEntry) => {
-    if (entry.is_shared) setDrawer({ kind: "sharedEvent", entry });
-    else if (entry.subscription) setDrawer({ kind: "subscribedEvent", entry });
+    if (entry.is_shared || entry.subscription)
+      setDrawer({ kind: "receivedEvent", entry });
     else composer.edit(entry);
   };
   // Reminders, their notifications and the assistant open an event by its id
@@ -351,15 +350,17 @@ export function CalendarApp({ user }: { user: User }) {
           selectedDate={selectedDate}
         />
       )}
-      {drawer?.kind === "sharedEvent" && (
+      {drawer?.kind === "receivedEvent" && (
         <SharedEventPanel
-          key={drawer.entry.id}
-          entry={drawer.entry}
+          key={entryKey(drawer.entry)}
+          // The loaded entry, so the user's own changes show once saved.
+          entry={
+            entries.find(
+              (entry) => entryKey(entry) === entryKey(drawer.entry),
+            ) ?? drawer.entry
+          }
           onClose={closeDrawer}
         />
-      )}
-      {drawer?.kind === "subscribedEvent" && (
-        <SharedEventDrawer entry={drawer.entry} onClose={closeDrawer} />
       )}
       {drawer?.kind === "assistant" && (
         <AssistantDrawer

@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SharedEventDrawer } from "./SharedEventDrawer";
 import type { TimelineEntry } from "../../types";
@@ -87,5 +87,72 @@ describe("SharedEventDrawer", () => {
     expect(
       screen.getByText("Tue, Oct 20 18:00 – 19:30, Mingle 17:30 (optional)"),
     ).toBeTruthy();
+  });
+
+  it("shows the recipient's own version with the original on demand", () => {
+    const onCustomize = vi.fn();
+    const onReset = vi.fn();
+    renderWithPreferences(
+      <SharedEventDrawer
+        entry={{
+          ...entry,
+          title: "My lecture",
+          starts_at: "2026-10-20T18:15:00",
+          customization: { title: "My lecture", note: "Zoom link" },
+          original: {
+            title: "Title for Anna",
+            location: "Gate B",
+            starts_at: "2026-10-20T18:00:00",
+            ends_at: "2026-10-20T19:30:00",
+          },
+        }}
+        onClose={vi.fn()}
+        onCustomize={onCustomize}
+        onResetCustomization={onReset}
+      />,
+    );
+
+    expect(screen.getByText("My lecture")).toBeTruthy();
+    expect(screen.getByText("Zoom link")).toBeTruthy();
+    expect(screen.queryByLabelText("Original")).toBeNull();
+    fireEvent.click(screen.getByText("Show original"));
+    expect(screen.getByLabelText("Original").textContent).toContain(
+      "Title for AnnaWhenTue, Oct 20 18:00 – 19:30",
+    );
+
+    fireEvent.click(screen.getByText("Edit my version"));
+    fireEvent.click(screen.getByText("Reset to original"));
+    expect(onCustomize).toHaveBeenCalled();
+    expect(onReset).toHaveBeenCalled();
+  });
+
+  it("offers to customize an event not changed yet", () => {
+    renderWithPreferences(
+      <SharedEventDrawer
+        entry={entry}
+        onClose={vi.fn()}
+        onCustomize={vi.fn()}
+        onResetCustomization={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Customize")).toBeTruthy();
+    expect(screen.queryByText("Reset to original")).toBeNull();
+    expect(screen.queryByText(/You changed this event/)).toBeNull();
+  });
+
+  it("shows the editor in place of the details", () => {
+    renderWithPreferences(
+      <SharedEventDrawer
+        entry={entry}
+        onClose={vi.fn()}
+        onCustomize={vi.fn()}
+        editor={<p>Editing</p>}
+      />,
+    );
+
+    expect(screen.getByText("Editing")).toBeTruthy();
+    expect(screen.queryByText("Gate B")).toBeNull();
+    expect(screen.queryByText("Customize")).toBeNull();
   });
 });

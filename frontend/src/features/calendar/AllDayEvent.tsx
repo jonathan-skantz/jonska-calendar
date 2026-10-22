@@ -81,6 +81,16 @@ export function AllDayEvent({
               🔔{" "}
             </i>
           )}
+          {entry.original && (
+            <i
+              className="customized-marker"
+              role="img"
+              aria-label="Changed by you"
+              title="Changed by you"
+            >
+              ✎{" "}
+            </i>
+          )}
           {entry.recurrence && (
             <i
               className="repeat-marker"

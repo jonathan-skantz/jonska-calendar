@@ -426,6 +426,43 @@
   white-space: pre-wrap;
 }
 
+/* The recipient's own version of a received event. */
+.customized-notice {
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.customized-notice dl {
+  margin: 8px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+
+.customization-form {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.customization-shifts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.customization-shifts .form-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.customization-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 /* Reminders are private and never shown as calendar blocks: they are edited
    here, listed in the reminders drawer, and delivered as notifications. */
 .reminder-editor {

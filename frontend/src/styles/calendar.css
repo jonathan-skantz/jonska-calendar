@@ -833,7 +833,8 @@
 }
 
 .reminder-marker,
-.repeat-marker {
+.repeat-marker,
+.customized-marker {
   font-style: normal;
   font-size: 0.9em;
 }

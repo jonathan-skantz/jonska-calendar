@@ -40,12 +40,38 @@ export type TimelineEntry = {
   share_count?: number;
   // Only on the read-only events of a calendar the user subscribes to.
   subscription?: SubscriptionRef;
+  // Only on received (shared or subscribed) events the user customized:
+  // their own change, and the values as they received them. The other
+  // fields already show the customized values.
+  customization?: Customization;
+  original?: ReceivedValues;
   tags?: Tag[];
   main_tag_id?: string;
   // On each occurrence of a repeating event: the start its rule gives it,
   // which identifies it even when it was moved, and the series' rule.
   occurrence_start?: string;
   recurrence?: Recurrence;
+};
+
+// A recipient's own change to an event they receive. A missing field or
+// shift keeps the received value; note is their own text.
+export type Customization = {
+  title?: string;
+  description?: string;
+  url?: string;
+  location?: string;
+  note?: string;
+  start_shift_seconds?: number;
+  end_shift_seconds?: number;
+};
+
+export type ReceivedValues = {
+  title: string;
+  description?: string;
+  url?: string;
+  location?: string;
+  starts_at: string;
+  ends_at: string;
 };
 
 export type SubscriptionRef = {
