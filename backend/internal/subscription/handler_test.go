@@ -144,10 +144,27 @@ func TestSubscribeRefreshAndUnsubscribe(t *testing.T) {
 	if code := send(t, other.Refresh, id, nil).Code; code != http.StatusNotFound {
 		t.Fatalf("expected %d for another user's refresh, got %d", http.StatusNotFound, code)
 	}
-	if code := send(t, other.Update, id, map[string]any{"name": "Mine"}).Code; code != http.StatusNotFound {
+	if code := send(t, other.Update, id, map[string]any{"name": "Mine", "color": "#112233"}).Code; code != http.StatusNotFound {
 		t.Fatalf("expected %d for another user's update, got %d", http.StatusNotFound, code)
 	}
 
+	// A rename replaces both fields, so a blank name or a missing color is
+	// refused rather than defaulted.
+	for name, body := range map[string]map[string]any{
+		"blank name":    {"name": "   ", "color": "#112233"},
+		"missing color": {"name": "Uni"},
+	} {
+		response := send(t, handler.Update, id, body)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("%s: expected %d, got %d", name, http.StatusBadRequest, response.Code)
+		}
+		if name == "blank name" && !strings.Contains(response.Body.String(), errNameRequired.Error()) {
+			t.Fatalf("expected %q, got %q", errNameRequired, response.Body.String())
+		}
+	}
+	if unchanged, _ := store.GetSubscription(ctx, userID, created.ID); unchanged.Name != "School" || unchanged.Color != defaultColor {
+		t.Fatalf("expected a refused rename to change nothing, got %+v", unchanged)
+	}
 	renamed := decodeSubscription(t, send(t, handler.Update, id, map[string]any{"name": " Uni ", "color": "#112233"}), http.StatusOK)
 	if renamed.Name != "Uni" || renamed.Color != "#112233" {
 		t.Fatalf("unexpected update %+v", renamed)

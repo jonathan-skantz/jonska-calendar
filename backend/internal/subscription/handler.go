@@ -23,7 +23,8 @@ const (
 )
 
 var (
-	errInvalidName  = errors.New("name must be at most 100 characters")
+	errNameTooLong  = errors.New("name must be at most 100 characters")
+	errNameRequired = errors.New("name must be 1 to 100 characters")
 	errInvalidColor = errors.New("color must be a #rrggbb hex color")
 )
 
@@ -153,10 +154,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, timeline.ErrInvalidRequest.Error(), http.StatusBadRequest)
 		return
 	}
-	name, color, err := validateFields(request.Name, request.Color)
-	if err == nil && name == "" {
-		err = errInvalidName
-	}
+	name, color, err := validateUpdate(request)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -214,7 +212,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 func validateFields(name, color string) (string, string, error) {
 	name = strings.TrimSpace(name)
 	if utf8.RuneCountInString(name) > maxNameLength {
-		return "", "", errInvalidName
+		return "", "", errNameTooLong
 	}
 	if color == "" {
 		color = defaultColor
@@ -223,6 +221,19 @@ func validateFields(name, color string) (string, string, error) {
 		return "", "", errInvalidColor
 	}
 	return name, color, nil
+}
+
+// validateUpdate checks a rename: it replaces both fields, so both are
+// required and nothing is defaulted.
+func validateUpdate(request updateRequest) (string, string, error) {
+	name := strings.TrimSpace(request.Name)
+	if name == "" || utf8.RuneCountInString(name) > maxNameLength {
+		return "", "", errNameRequired
+	}
+	if !timeline.ValidColor(request.Color) {
+		return "", "", errInvalidColor
+	}
+	return name, request.Color, nil
 }
 
 // defaultName is the calendar's own name, or its host.
