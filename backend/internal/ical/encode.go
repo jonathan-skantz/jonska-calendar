@@ -31,9 +31,11 @@ func Encode(w io.Writer, events []db.ExportEvent, loc *time.Location, stamp time
 // feed again. Many apps ignore it and use their own schedule.
 const feedRefreshInterval = "PT1H"
 
-// EncodeFeed writes events like Encode, as a feed named name.
+// EncodeFeed writes events like Encode, as a feed named name. The
+// publisher's commute and skips are their own, as on a shared event, so a
+// feed leaves them out; gathering describes the event and stays.
 func EncodeFeed(w io.Writer, name string, events []db.ExportEvent, loc *time.Location, stamp time.Time) error {
-	calendar, err := encodeCalendar(events, loc, stamp)
+	calendar, err := encodeCalendar(publishedEvents(events), loc, stamp)
 	if err != nil {
 		return err
 	}
@@ -41,6 +43,25 @@ func EncodeFeed(w io.Writer, name string, events []db.ExportEvent, loc *time.Loc
 	calendar.SetXPublishedTTL(feedRefreshInterval)
 	calendar.SetRefreshInterval(feedRefreshInterval)
 	return calendar.SerializeTo(w, ics.WithNewLineWindows)
+}
+
+// publishedEvents returns the events without commute and skips. An
+// occurrence that differed only by being skipped no longer differs.
+func publishedEvents(events []db.ExportEvent) []db.ExportEvent {
+	published := make([]db.ExportEvent, len(events))
+	for index, event := range events {
+		event.CommuteBeforeSeconds, event.CommuteAfterSeconds, event.IsSkipped = 0, 0, false
+		var exceptions []db.OccurrenceException
+		for _, exception := range event.Exceptions {
+			exception.IsSkipped = nil
+			if exception.IsCancelled || exception.StartsAt != nil {
+				exceptions = append(exceptions, exception)
+			}
+		}
+		event.Exceptions = exceptions
+		published[index] = event
+	}
+	return published
 }
 
 func encodeCalendar(events []db.ExportEvent, loc *time.Location, stamp time.Time) (*ics.Calendar, error) {

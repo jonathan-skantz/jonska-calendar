@@ -334,7 +334,8 @@ separate from events and tasks.
 - [x] Settings can publish the user's own events as feeds that other
       calendar apps subscribe to. Each feed has a secret address and covers
       all own events or those with one tag; deleting the tag deletes the
-      feed. Events shared with the user and subscribed events are left out.
+      feed. Events shared with the user and subscribed events are left out,
+      and so are the user's commute and skips; gathering is published.
 - [x] A feed includes the user's reminders as alarms only when chosen.
 - [x] A feed's address can be copied, opened in a calendar app (webcal),
       reset so the old address stops working, or deleted.

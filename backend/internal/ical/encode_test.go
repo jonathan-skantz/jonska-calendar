@@ -75,6 +75,36 @@ func TestEncodeWritesValidICalendar(t *testing.T) {
 	}
 }
 
+func TestEncodeFeedLeavesOutCommuteAndSkips(t *testing.T) {
+	events := exportEvents()
+	start := events[0].StartsAt
+	rule, moved := "FREQ=DAILY", start.Add(time.Hour)
+	skipped := true
+	events[0].RecurrenceRule, events[0].RecurrenceTimeZone = &rule, new("UTC")
+	events[0].Exceptions = []db.OccurrenceException{
+		{OriginalStart: start.AddDate(0, 0, 1), IsSkipped: &skipped},
+		{OriginalStart: start.AddDate(0, 0, 2), StartsAt: &moved, EndsAt: new(moved.Add(time.Hour)), IsSkipped: &skipped},
+	}
+	var file strings.Builder
+	if err := EncodeFeed(&file, "Family", events, stockholm, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	text := file.String()
+	for _, unwanted := range []string{"COMMUTE", "SKIPPED", "RECURRENCE-ID;TZID=UTC:20261025"} {
+		if strings.Contains(text, unwanted) {
+			t.Errorf("expected no %q in:\n%s", unwanted, text)
+		}
+	}
+	for _, want := range []string{"X-JONSKA-GATHERING:PT15M\r\n", "RECURRENCE-ID;TZID=UTC:20261026T160000\r\n"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("expected %q in:\n%s", want, text)
+		}
+	}
+	if events[0].CommuteBeforeSeconds == 0 || events[0].Exceptions[0].IsSkipped == nil {
+		t.Fatal("expected the caller's events unchanged")
+	}
+}
+
 func TestEncodeThenParseKeepsEvents(t *testing.T) {
 	events := exportEvents()
 	var file strings.Builder

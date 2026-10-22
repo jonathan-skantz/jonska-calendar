@@ -190,7 +190,7 @@ A recipient's own changes to an event shared with them or from a calendar they s
 
 ## Feeds
 
-- A feed publishes your own events, all or those with `tag_id`, like `GET /api/export.ics`. Your reminders are `VALARM`s only with `include_alarms`. Events shared with you and subscribed events are never included.
+- A feed publishes your own events, all or those with `tag_id`, like `GET /api/export.ics`. Your commute and skips are left out, and your reminders are `VALARM`s only with `include_alarms`. Events shared with you and subscribed events are never included.
 - Responses contain `id`, `name`, `tag_id` when set, `include_alarms`, and `path`, the address relative to the app (`/api/feeds/<token>/calendar.ics`). The browser adds its own origin.
 - `time_zone` is read on create only. All-day dates and plain times are written in it, because a feed request has no browser.
 - `GET /api/feeds/{token}/calendar.ics` needs no cookie: the token is the credential. It names the calendar (`NAME`, `X-WR-CALNAME`), asks apps to refresh hourly (`REFRESH-INTERVAL`, `X-PUBLISHED-TTL`), and sets `Cache-Control: private, max-age=300`.

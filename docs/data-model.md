@@ -111,7 +111,7 @@ calendar_feeds (user_id, name, token UNIQUE, tag_id → tags ON DELETE CASCADE, 
 
 - A feed publishes the user's own events at `/api/feeds/<token>/calendar.ics` (migration 27). The token is 32 random bytes, base64url. It is the only credential, and it is stored as is so the address can be shown again. Hashing it would not protect anything: whoever can read the table can read the events it serves.
 - A feed with `tag_id` publishes only events with that tag. Deleting the tag deletes the feed, so it never widens to every event.
-- The events come from the export query (`listEventsForExport`, `backend/db/ical.go`), so a feed and a download write the same file. Reminders are the owner's and are left out unless `include_alarms` is set.
+- The events come from the export query (`listEventsForExport`, `backend/db/ical.go`), so a feed and a download write the same file, except that a feed leaves out the owner's commute and skips (`EncodeFeed`), as sharing does. Gathering stays. Reminders are the owner's and are left out unless `include_alarms` is set.
 - `time_zone` is the creator's browser zone, used for all-day dates.
 
 ## Tasks
