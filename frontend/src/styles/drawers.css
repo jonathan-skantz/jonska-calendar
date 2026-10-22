@@ -445,13 +445,13 @@
   margin: 24px 0;
 }
 
-.customization-shifts {
+.customization-numbers {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
 
-.customization-shifts .form-hint {
+.customization-numbers .form-hint {
   grid-column: 1 / -1;
   margin: 0;
 }

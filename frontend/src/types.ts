@@ -54,7 +54,8 @@ export type TimelineEntry = {
 };
 
 // A recipient's own change to an event they receive. A missing field or
-// shift keeps the received value; note is their own text.
+// shift keeps the received value; note and commute are their own. A missing
+// gathering_seconds keeps the received gathering, 0 removes it.
 export type Customization = {
   title?: string;
   description?: string;
@@ -63,6 +64,11 @@ export type Customization = {
   note?: string;
   start_shift_seconds?: number;
   end_shift_seconds?: number;
+  commute_before_seconds?: number;
+  commute_after_seconds?: number;
+  gathering_seconds?: number;
+  gathering_is_optional?: boolean;
+  gathering_label?: string;
 };
 
 export type ReceivedValues = {
@@ -72,6 +78,9 @@ export type ReceivedValues = {
   location?: string;
   starts_at: string;
   ends_at: string;
+  gathering_seconds?: number;
+  gathering_is_optional?: boolean;
+  gathering_label?: string;
 };
 
 export type SubscriptionRef = {

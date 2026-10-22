@@ -46,6 +46,37 @@ describe("customization drafts", () => {
     ).toBeNull();
   });
 
+  it("converts commute and gathering", () => {
+    const customization = {
+      commute_before_seconds: 1200,
+      gathering_seconds: 1800,
+      gathering_is_optional: true,
+      gathering_label: "Mingle",
+    };
+    expect(customizationFrom(draftFrom(customization))).toEqual(customization);
+    // 0 removes the received gathering, with its label and flag.
+    expect(
+      customizationFrom({
+        ...draftFrom(customization),
+        commuteBeforeMinutes: "",
+        gatheringMinutes: "0",
+      }),
+    ).toEqual({ gathering_seconds: 0 });
+    // Blank keeps the received gathering.
+    expect(
+      customizationFrom({ ...draftFrom(customization), gatheringMinutes: " " }),
+    ).toEqual({ commute_before_seconds: 1200 });
+  });
+
+  it("refuses negative commute and gathering", () => {
+    expect(
+      customizationFrom({ ...draftFrom(), commuteAfterMinutes: "-5" }),
+    ).toBeNull();
+    expect(
+      customizationFrom({ ...draftFrom(), gatheringMinutes: "-5" }),
+    ).toBeNull();
+  });
+
   it("customizes subscribed events by their own route", () => {
     const entry = { id: "e1", type: "event" } as TimelineEntry;
     expect(customizationPath(entry)).toBe("/api/events/e1/customization");

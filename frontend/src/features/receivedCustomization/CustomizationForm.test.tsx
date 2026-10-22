@@ -92,6 +92,64 @@ describe("CustomizationForm", () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
+  it("offers commute and gathering on events the user attends", async () => {
+    const onSave = vi.fn().mockResolvedValue(null);
+    render(
+      <CustomizationForm
+        entry={{
+          ...entry,
+          kind: "attendable",
+          gathering_seconds: 900,
+          original: { ...entry.original!, gathering_seconds: 900 },
+        }}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Gathering (min)")).toHaveProperty(
+      "placeholder",
+      "15",
+    );
+    expect(screen.getByLabelText("Gathering label")).toHaveProperty(
+      "disabled",
+      true,
+    );
+    fireEvent.change(screen.getByLabelText("Commute before (min)"), {
+      target: { value: "20" },
+    });
+    fireEvent.change(screen.getByLabelText("Gathering (min)"), {
+      target: { value: "30" },
+    });
+    fireEvent.change(screen.getByLabelText("Gathering label"), {
+      target: { value: "Warm-up" },
+    });
+    fireEvent.click(screen.getByText("Save my version"));
+
+    await vi.waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith({
+        title: "My lecture",
+        start_shift_seconds: 900,
+        commute_before_seconds: 1200,
+        gathering_seconds: 1800,
+        gathering_label: "Warm-up",
+      }),
+    );
+  });
+
+  it("does not offer commute or gathering on a heads-up", () => {
+    render(
+      <CustomizationForm
+        entry={{ ...entry, kind: "informational" }}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByLabelText("Commute before (min)")).toBeNull();
+    expect(screen.queryByLabelText("Gathering (min)")).toBeNull();
+  });
+
   it("does not offer moving the times of an all-day event", () => {
     render(
       <CustomizationForm

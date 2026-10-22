@@ -126,6 +126,33 @@ describe("SharedEventDrawer", () => {
     expect(onReset).toHaveBeenCalled();
   });
 
+  it("shows the recipient's own commute and the original gathering", () => {
+    renderWithPreferences(
+      <SharedEventDrawer
+        entry={{
+          ...entry,
+          kind: "attendable",
+          commute_before_seconds: 1200,
+          commute_after_seconds: 600,
+          customization: { commute_before_seconds: 1200 },
+          original: {
+            title: "Title for Anna",
+            starts_at: "2026-10-20T18:00:00",
+            ends_at: "2026-10-20T19:30:00",
+            gathering_seconds: 1800,
+          },
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("20 min before, 10 min after")).toBeTruthy();
+    fireEvent.click(screen.getByText("Show original"));
+    expect(screen.getByLabelText("Original").textContent).toContain(
+      "Tue, Oct 20 18:00 – 19:30, gather 17:30",
+    );
+  });
+
   it("offers to customize an event not changed yet", () => {
     renderWithPreferences(
       <SharedEventDrawer

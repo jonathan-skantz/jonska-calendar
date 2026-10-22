@@ -73,6 +73,15 @@ export const SharedEventDrawer = ({
   const { timeFormat } = usePreferences().preferences;
   const [showOriginal, setShowOriginal] = useState(false);
   const { original } = entry;
+  // Only the recipient's own commute: owners never share theirs.
+  const commute = [
+    entry.commute_before_seconds &&
+      `${entry.commute_before_seconds / 60} min before`,
+    entry.commute_after_seconds &&
+      `${entry.commute_after_seconds / 60} min after`,
+  ]
+    .filter(Boolean)
+    .join(", ");
   return (
     <Drawer
       eyebrow={
@@ -94,6 +103,12 @@ export const SharedEventDrawer = ({
           <dl>
             <dt>When</dt>
             <dd>{formatRange(entry, timeFormat)}</dd>
+            {commute && (
+              <>
+                <dt>My commute</dt>
+                <dd>{commute}</dd>
+              </>
+            )}
             {entry.recurrence && (
               <>
                 <dt>Repeats</dt>
@@ -164,6 +179,9 @@ export const SharedEventDrawer = ({
                         ...entry,
                         starts_at: original.starts_at,
                         ends_at: original.ends_at,
+                        gathering_seconds: original.gathering_seconds,
+                        gathering_is_optional: original.gathering_is_optional,
+                        gathering_label: original.gathering_label,
                       },
                       timeFormat,
                     )}
