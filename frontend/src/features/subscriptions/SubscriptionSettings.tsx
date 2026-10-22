@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { formatShortDate, formatTime } from "../../lib/calendar";
+import type { TimeFormatPreference } from "../../lib/calendar";
 import type { Subscription } from "../../types";
+import { usePreferences } from "../calendar/preferencesContext";
 import type { SubscriptionDetails } from "./useSubscriptions";
 
 const defaultColor = "#547968";
@@ -16,7 +18,8 @@ type SubscriptionSettingsProps = {
   onRemove: (id: string) => Promise<string | null>;
 };
 
-const formatTime = (value: string) => format(new Date(value), "d MMM HH:mm");
+const formatWhen = (value: string, preference: TimeFormatPreference) =>
+  `${formatShortDate(new Date(value))} ${formatTime(value, { preference })}`;
 
 export function SubscriptionSettings({
   subscriptions,
@@ -25,6 +28,7 @@ export function SubscriptionSettings({
   onRefresh,
   onRemove,
 }: SubscriptionSettingsProps) {
+  const { timeFormat } = usePreferences().preferences;
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const run = async (action: () => Promise<string | null>, success: string) => {
@@ -166,8 +170,8 @@ export function SubscriptionSettings({
                 {subscription.url}
                 <br />
                 {subscription.last_error
-                  ? `Last refresh failed (${formatTime(subscription.last_fetched_at)}): ${subscription.last_error}. Showing events from ${formatTime(subscription.last_success_at)}.`
-                  : `Updated ${formatTime(subscription.last_success_at)}.`}
+                  ? `Last refresh failed (${formatWhen(subscription.last_fetched_at, timeFormat)}): ${subscription.last_error}. Showing events from ${formatWhen(subscription.last_success_at, timeFormat)}.`
+                  : `Updated ${formatWhen(subscription.last_success_at, timeFormat)}.`}
               </p>
             </li>
           ))}

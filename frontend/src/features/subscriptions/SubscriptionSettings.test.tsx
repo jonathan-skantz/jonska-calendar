@@ -1,12 +1,8 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Subscription } from "../../types";
+import { renderWithPreferences } from "../../test/renderWithPreferences";
+import type { CalendarPreferences } from "../calendar/calendarPreferences";
 import { SubscriptionSettings } from "./SubscriptionSettings";
 
 afterEach(() => {
@@ -26,6 +22,7 @@ const school: Subscription = {
 const renderSettings = (
   subscriptions: Subscription[],
   handlers: Partial<Parameters<typeof SubscriptionSettings>[0]> = {},
+  preferences?: Partial<CalendarPreferences>,
 ) => {
   const props = {
     subscriptions,
@@ -35,7 +32,7 @@ const renderSettings = (
     onRemove: vi.fn().mockResolvedValue(null),
     ...handlers,
   };
-  render(<SubscriptionSettings {...props} />);
+  renderWithPreferences(<SubscriptionSettings {...props} />, preferences);
   return props;
 };
 
@@ -81,6 +78,16 @@ describe("SubscriptionSettings", () => {
         /Last refresh failed .*: the calendar's server answered 410 Gone\. Showing events from/,
       ),
     ).toBeTruthy();
+  });
+
+  it("shows refresh times in the user's time format", () => {
+    const at = new Date(2026, 9, 22, 14, 5).toISOString();
+    renderSettings(
+      [{ ...school, last_fetched_at: at, last_success_at: at }],
+      {},
+      { timeFormat: "12-hour" },
+    );
+    expect(screen.getByText(/Updated Oct 22 2:05\sPM\./)).toBeTruthy();
   });
 
   it("renames, refreshes and unsubscribes", async () => {
