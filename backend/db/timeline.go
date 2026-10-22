@@ -12,13 +12,30 @@ import (
 // ListTimeline returns the user's events, the events shared with them, and
 // the events of their subscriptions that may happen in [from, to): plain
 // events that overlap it, and series that may have an occurrence in it, as
-// series. Tasks are all returned.
+// series. Tasks are all returned. A recipient's customization may shift a
+// received event by up to MaxShiftSeconds, so received events are read that
+// much around the range; the caller keeps those that overlap it once
+// shifted.
 func (s *Store) ListTimeline(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]TimelineEntry, error) {
 	return s.listTimeline(ctx, userID, &timeWindow{from: from, to: to})
 }
 
 type timeWindow struct {
 	from, to time.Time
+}
+
+// widened returns the window grown by margin at both ends.
+func (window *timeWindow) widened(margin time.Duration) *timeWindow {
+	if window == nil {
+		return nil
+	}
+	return &timeWindow{from: window.from.Add(-margin), to: window.to.Add(margin)}
+}
+
+// receivedWindow is the window to read received events in: wide enough for
+// any shift a customization can give them.
+func (window *timeWindow) receivedWindow() *timeWindow {
+	return window.widened(MaxShiftSeconds * time.Second)
 }
 
 // bounds returns the window as query arguments; both are NULL without one.
@@ -185,7 +202,7 @@ func (s *Store) listOwnedTasks(ctx context.Context, userID uuid.UUID) ([]Timelin
 }
 
 func (s *Store) listSharedTimeline(ctx context.Context, userID uuid.UUID, window *timeWindow) ([]TimelineEntry, error) {
-	from, to := window.bounds()
+	from, to := window.receivedWindow().bounds()
 	rows, err := s.db.Query(ctx, `
 		-- Recipients only ever see the effective values: the owner's
 		-- per-recipient field when set, otherwise the event's own value. The

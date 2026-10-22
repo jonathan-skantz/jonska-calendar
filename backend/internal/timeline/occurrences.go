@@ -14,50 +14,78 @@ var ErrInvalidTimeZone = errors.New("time_zone must be an IANA time zone")
 
 // TimelineItem is a timeline entry as clients see it: an item, or one
 // occurrence of a repeating event. An occurrence carries the start its rule
-// gives it, which identifies it, and the series' rule.
+// gives it, which identifies it, and the series' rule. A received event the
+// recipient customized carries what they received as Original.
 type TimelineItem struct {
 	db.TimelineEntry
 	OccurrenceStart *time.Time       `json:"occurrence_start,omitempty"`
 	Recurrence      *recurrence.Rule `json:"recurrence,omitempty"`
+	Original        *ReceivedValues  `json:"original,omitempty"`
 }
 
 // ExpandTimeline turns the series among entries into their occurrences in
-// [from, to), and keeps every other entry. The result is ordered by time,
-// like the store's.
+// [from, to), applies the recipient's customizations to received events,
+// and keeps every other entry. The result is ordered by time, like the
+// store's.
 func ExpandTimeline(entries []db.TimelineEntry, from, to time.Time) ([]TimelineItem, error) {
+	// A customization may shift an occurrence into the range from just
+	// outside it, so series expand that much around it.
+	margin := db.MaxShiftSeconds * time.Second
 	items := make([]TimelineItem, 0, len(entries))
 	for _, entry := range entries {
-		if entry.RecurrenceRule == nil {
-			items = append(items, TimelineItem{TimelineEntry: entry})
-			continue
-		}
-		series, err := seriesOf(entry)
-		if err != nil {
-			return nil, fmt.Errorf("event %s: %w", entry.ID, err)
-		}
-		occurrences, err := series.Occurrences(exceptionsOf(entry.Exceptions), from, to)
-		if err != nil {
-			return nil, fmt.Errorf("event %s: %w", entry.ID, err)
-		}
-		for _, occurrence := range occurrences {
-			item := TimelineItem{
-				TimelineEntry:   entry,
-				OccurrenceStart: &occurrence.OriginalStart,
-				Recurrence:      &series.Rule,
+		expanded := []TimelineItem{{TimelineEntry: entry}}
+		if entry.RecurrenceRule != nil {
+			var err error
+			if expanded, err = expandSeries(entry, from.Add(-margin), to.Add(margin)); err != nil {
+				return nil, fmt.Errorf("event %s: %w", entry.ID, err)
 			}
-			item.StartsAt, item.EndsAt = &occurrence.StartsAt, &occurrence.EndsAt
-			// Recipients never see the owner's skips; the store leaves them
-			// out of a shared series' exceptions.
-			if occurrence.IsSkipped != nil {
-				item.IsSkipped = *occurrence.IsSkipped
+		}
+		for _, item := range expanded {
+			customize(&item)
+			if overlaps(item, from, to) {
+				items = append(items, item)
 			}
-			items = append(items, item)
 		}
 	}
 	slices.SortStableFunc(items, func(a, b TimelineItem) int {
 		return itemTime(a).Compare(itemTime(b))
 	})
 	return items, nil
+}
+
+func expandSeries(entry db.TimelineEntry, from, to time.Time) ([]TimelineItem, error) {
+	series, err := seriesOf(entry)
+	if err != nil {
+		return nil, err
+	}
+	occurrences, err := series.Occurrences(exceptionsOf(entry.Exceptions), from, to)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]TimelineItem, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		item := TimelineItem{
+			TimelineEntry:   entry,
+			OccurrenceStart: &occurrence.OriginalStart,
+			Recurrence:      &series.Rule,
+		}
+		item.StartsAt, item.EndsAt = &occurrence.StartsAt, &occurrence.EndsAt
+		// Recipients never see the owner's skips; the store leaves them
+		// out of a shared series' exceptions.
+		if occurrence.IsSkipped != nil {
+			item.IsSkipped = *occurrence.IsSkipped
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// overlaps reports whether an event overlaps [from, to). Tasks always do.
+func overlaps(item TimelineItem, from, to time.Time) bool {
+	if item.StartsAt == nil || item.EndsAt == nil {
+		return true
+	}
+	return item.StartsAt.Before(to) && item.EndsAt.After(from)
 }
 
 func itemTime(item TimelineItem) time.Time {

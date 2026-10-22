@@ -46,6 +46,7 @@ const (
 	MaxCommuteSeconds        = 24 * 60 * 60
 	MaxGatheringLabelLength  = 40
 	MaxReminderOffsetSeconds = 30 * 24 * 60 * 60
+	MaxShiftSeconds          = 24 * 60 * 60
 )
 
 type Event struct {

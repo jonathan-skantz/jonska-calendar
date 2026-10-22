@@ -211,7 +211,7 @@ func insertSubscribedEvents(ctx context.Context, tx pgx.Tx, subscriptionID uuid.
 // may happen in the window, with their exceptions. They are read-only and
 // carry the subscription instead of tags.
 func (s *Store) listSubscribedTimeline(ctx context.Context, userID uuid.UUID, window *timeWindow) ([]TimelineEntry, error) {
-	from, to := window.bounds()
+	from, to := window.receivedWindow().bounds()
 	rows, err := s.db.Query(ctx, `
 		SELECT event.id, event.title, event.description, event.url,
 			event.starts_at, event.ends_at, event.is_all_day, event.kind, event.location,

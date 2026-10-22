@@ -12,6 +12,8 @@ import (
 )
 
 // receivedEntry returns the user's only timeline entry around startsAt.
+// Received events are read a day around the range, so tests keep them
+// further apart.
 func receivedEntry(t *testing.T, store *db.Store, userID uuid.UUID, startsAt time.Time) db.TimelineEntry {
 	t.Helper()
 	entries, err := store.ListTimeline(context.Background(), userID, startsAt.Add(-time.Hour), startsAt.Add(2*time.Hour))
@@ -96,7 +98,7 @@ func TestSubscribedEventCustomizationSurvivesARefresh(t *testing.T) {
 	startsAt := time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)
 	lecture := subscribedEvent("Lecture", startsAt)
 	lecture.UID = new("lecture@school")
-	exam := subscribedEvent("Exam", startsAt.Add(24*time.Hour))
+	exam := subscribedEvent("Exam", startsAt.AddDate(0, 0, 3))
 
 	subscription, err := store.CreateSubscription(ctx, db.Subscription{
 		UserID: userID, Name: "School", URL: "https://example.com/school.ics", Color: "#336699", TimeZone: "UTC",
@@ -105,7 +107,7 @@ func TestSubscribedEventCustomizationSurvivesARefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	lectureID := receivedEntry(t, store, userID, startsAt).ID
-	examID := receivedEntry(t, store, userID, startsAt.Add(24*time.Hour)).ID
+	examID := receivedEntry(t, store, userID, startsAt.AddDate(0, 0, 3)).ID
 
 	customization := db.Customization{Location: new("Zoom"), EndShiftSeconds: -1800}
 	if err := store.CustomizeSubscribedEvent(ctx, otherID, lectureID, customization); !errors.Is(err, db.ErrSubscribedEventNotFound) {
