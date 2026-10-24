@@ -20,6 +20,8 @@ mise exec -- go run ./cmd                          # API on :8080
 cd frontend && mise exec -- npm run dev            # app on http://localhost:5173
 ```
 
+To run the whole app in Docker instead (no hot reload): `docker compose up -d --build`, then open `http://localhost`.
+
 ## Documentation
 
 Start with [docs/README.md](docs/README.md), which gives a reading order.

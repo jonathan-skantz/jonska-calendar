@@ -18,11 +18,12 @@ Prefix Go and Node commands with `mise exec --`. Without it, your shell may use 
 
 ## Ports
 
-| Port | What                                             | Set in                  |
-| ---- | ------------------------------------------------ | ----------------------- |
-| 5432 | PostgreSQL (Docker publishes it to your machine) | `compose.yaml`          |
-| 8080 | Go API (hard-coded)                              | `backend/cmd/server.go` |
-| 5173 | Vite dev server (the page you open)              | Vite default            |
+| Port    | What                                             | Set in                  |
+| ------- | ------------------------------------------------ | ----------------------- |
+| 5432    | PostgreSQL (Docker publishes it to your machine) | `compose.yaml`          |
+| 8080    | Go API (hard-coded)                              | `backend/cmd/server.go` |
+| 5173    | Vite dev server (the page you open)              | Vite default            |
+| 80, 443 | Caddy, in the full stack only (see below)        | `compose.yaml`          |
 
 If PostgreSQL already runs on port 5432, stop it first.
 
@@ -109,6 +110,29 @@ cd frontend && mise exec -- npm run dev
 Open `http://localhost:5173`, register, and create an event.
 
 The Vite dev server forwards every `/api` request to `http://localhost:8080`. The browser never talks to PostgreSQL directly.
+
+## Full stack in Docker
+
+To check the production build, or to run the app without Go and Node installed:
+
+```sh
+docker compose up -d --build
+```
+
+This starts four services. Open `http://localhost`.
+
+| Service   | What it does                                                                     |
+| --------- | -------------------------------------------------------------------------------- |
+| `db`      | PostgreSQL, published on `127.0.0.1:5432` only.                                  |
+| `migrate` | Runs Goose once after `db` is healthy, then exits.                               |
+| `api`     | The Go API. Not published; reached only through `web`.                           |
+| `web`     | Caddy. Serves the built frontend and forwards `/api` to `api`. Ports 80 and 443. |
+
+- The full stack has no hot reload. Develop with the three-terminal setup above.
+- After changing one part, rebuild only that part: `docker compose up -d --build api` (or `web`). The others keep running.
+- It uses the same database volume as development.
+- `backend/.env.local`, if present, gives the API its secrets. `backend/.env` is not used; compose builds `DATABASE_URL` from `.env`.
+- Stop it with `docker compose down`. Data stays in the volume.
 
 ## Day to day
 
