@@ -48,7 +48,8 @@ func main() {
 	log.Println("Connected to the database")
 
 	store := db.NewStore(dbPool)
-	authHandler := auth.New(store)
+	// Behind HTTPS, the session cookie must never travel over plain HTTP.
+	authHandler := auth.New(store, os.Getenv("SESSION_COOKIE_SECURE") == "true")
 	timelineHandler := timeline.New(store, authHandler.CurrentUserID)
 	weatherHandler := weather.New(store, authHandler.CurrentUserID, weather.NewClient())
 	icalHandler := ical.New(store, authHandler.CurrentUserID)

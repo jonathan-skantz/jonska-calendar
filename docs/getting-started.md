@@ -76,6 +76,12 @@ SUBSCRIPTIONS_ALLOW_PRIVATE=true
 
 See [gotchas](gotchas.md#subscriptions-cannot-reach-private-addresses).
 
+Behind HTTPS, send the session cookie only over HTTPS. Leave it off on plain HTTP, where some browsers would drop the cookie:
+
+```dotenv
+SESSION_COOKIE_SECURE=true
+```
+
 `.claude/settings.json` stops Claude Code from reading `.env.local`.
 
 ## First run

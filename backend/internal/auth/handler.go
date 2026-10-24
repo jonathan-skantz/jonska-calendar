@@ -34,10 +34,12 @@ const (
 
 type Handler struct {
 	Store *db.Store
+	// secureCookies sends the session cookie over HTTPS only.
+	secureCookies bool
 }
 
-func New(store *db.Store) *Handler {
-	return &Handler{Store: store}
+func New(store *db.Store, secureCookies bool) *Handler {
+	return &Handler{Store: store, secureCookies: secureCookies}
 }
 
 type registerRequest struct {
@@ -161,6 +163,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		Expires:  expiresAt,
 		HttpOnly: true,
+		Secure:   h.secureCookies,
 		SameSite: http.SameSiteLaxMode,
 	})
 	w.Header().Set("Content-Type", "application/json")
@@ -213,6 +216,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   h.secureCookies,
 		SameSite: http.SameSiteLaxMode,
 	})
 	w.WriteHeader(http.StatusNoContent)

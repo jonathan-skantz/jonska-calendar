@@ -77,9 +77,8 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 
 - **Chosen:** a random token in an `HttpOnly`, `SameSite=Lax` cookie. Only its SHA-256 is stored.
 - **Why:** deleting a row revokes a session. JavaScript cannot read the token.
-- **Trade-off:** no `Secure` flag and no CSRF token. Cross-site protection relies on `SameSite=Lax`.
-- **Revisit before:** the app is served outside a trusted local network.
-- **TODO(maintainer):** confirm the intended deployment, because `Secure` depends on it.
+- **Secure flag:** set when `SESSION_COOKIE_SECURE=true`. A public deployment serves HTTPS and sets it. Local development runs on plain HTTP and leaves it off.
+- **Trade-off:** no CSRF token. Cross-site protection relies on `SameSite=Lax`.
 
 ## Weather cache rounded to 0.1 degrees
 
