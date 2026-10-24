@@ -77,6 +77,7 @@ func TestValidateRejects(t *testing.T) {
 		{"count and until", Rule{Frequency: Daily, Interval: 1, Count: 2, Until: new("2026-12-01")}, tuesday, ErrInvalidRule},
 		{"bad until", Rule{Frequency: Daily, Interval: 1, Until: new("1 Dec")}, tuesday, ErrInvalidRule},
 		{"until before the start", Rule{Frequency: Daily, Interval: 1, Until: new("2026-10-12")}, tuesday, ErrUntil},
+		{"until after the supported years", Rule{Frequency: Daily, Interval: 1, Until: new("2201-01-01")}, tuesday, ErrUntilTooLate},
 		{"unknown weekday", Rule{Frequency: Weekly, Interval: 1, Weekdays: []string{"TU", "XX"}}, tuesday, ErrInvalidRule},
 		{"weekdays without the start's", Rule{Frequency: Weekly, Interval: 1, Weekdays: []string{"WE"}}, tuesday, ErrWeekdays},
 		{"fifth weekday", Rule{Frequency: Monthly, Interval: 1, MonthlyBy: Weekday}, fifthThursday, ErrMonthlyBy},

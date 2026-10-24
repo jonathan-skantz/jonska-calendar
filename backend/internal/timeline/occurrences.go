@@ -167,13 +167,21 @@ func matchingExceptions(event db.Event, exceptions []db.OccurrenceException) ([]
 	if err != nil {
 		return nil, err
 	}
+	// Exceptions outside the supported years are dropped unchecked, so they
+	// cannot stretch the walk below.
+	var starts []time.Time
+	for _, exception := range exceptions {
+		if recurrence.InYearRange(exception.OriginalStart) {
+			starts = append(starts, exception.OriginalStart)
+		}
+	}
+	occurs, err := series.OccursAmong(starts)
+	if err != nil {
+		return nil, err
+	}
 	var kept []db.OccurrenceException
 	for _, exception := range exceptions {
-		ok, err := series.IsOccurrence(exception.OriginalStart)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
+		if occurs[exception.OriginalStart.UTC()] {
 			kept = append(kept, exception)
 		}
 	}
@@ -197,7 +205,7 @@ func ParseTimeZone(name string) (*time.Location, error) {
 func isRecurrenceError(err error) bool {
 	for _, target := range []error{
 		ErrInvalidTimeZone, recurrence.ErrInvalidRule, recurrence.ErrWeekdays,
-		recurrence.ErrMonthlyBy, recurrence.ErrUntil,
+		recurrence.ErrMonthlyBy, recurrence.ErrUntil, recurrence.ErrUntilTooLate,
 	} {
 		if errors.Is(err, target) {
 			return true

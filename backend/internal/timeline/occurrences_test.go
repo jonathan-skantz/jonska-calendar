@@ -184,6 +184,15 @@ func TestRepeatValidation(t *testing.T) {
 		"start's weekday missing": {lecture(map[string]any{"frequency": "weekly", "interval": 1, "weekdays": []string{"WE"}}), recurrence.ErrWeekdays},
 		"unknown frequency":       {lecture(map[string]any{"frequency": "hourly", "interval": 1}), recurrence.ErrInvalidRule},
 		"ends before the start":   {lecture(map[string]any{"frequency": "daily", "interval": 1, "until": "2026-10-01"}), recurrence.ErrUntil},
+		"ends after 2200":         {lecture(map[string]any{"frequency": "daily", "interval": 1, "until": "9999-12-31"}), recurrence.ErrUntilTooLate},
+		"starts before 1900": {
+			func() map[string]any {
+				body := lecture(map[string]any{"frequency": "daily", "interval": 1})
+				body["starts_at"] = time.Date(1, 1, 1, 10, 0, 0, 0, time.UTC)
+				return body
+			}(),
+			ErrYearOutOfRange,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			response := sendEvent(t, handler, http.MethodPost, "", test.body)

@@ -207,3 +207,21 @@ func TestIsOccurrenceAndLastEnd(t *testing.T) {
 		t.Fatal("a rule without count or until never ends")
 	}
 }
+
+func TestOccursAmongChecksAllStartsInOneWalk(t *testing.T) {
+	series := Series{
+		StartsAt: tuesday, EndsAt: tuesday.Add(time.Hour),
+		Rule: Rule{Frequency: Weekly, Interval: 1, Weekdays: []string{"TU"}}, Zone: stockholm,
+	}
+	occurrence, other := day(2026, 11, 3, 10), day(2026, 11, 4, 10)
+	got, err := series.OccursAmong([]time.Time{other, occurrence, day(2027, 6, 1, 10)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got[occurrence.UTC()] || got[other.UTC()] || !got[day(2027, 6, 1, 10).UTC()] {
+		t.Fatalf("unexpected occurrences %v", got)
+	}
+	if got, _ := series.OccursAmong(nil); len(got) != 0 {
+		t.Fatalf("expected no occurrences, got %v", got)
+	}
+}

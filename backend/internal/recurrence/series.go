@@ -93,12 +93,16 @@ func (series Series) Occurrences(exceptions []Exception, from, to time.Time) ([]
 		add(start)
 	}
 	// A moved occurrence can land in the window from outside it.
+	var moved []time.Time
 	for _, exception := range exceptions {
-		if seen[exception.OriginalStart.UTC()] || exception.StartsAt == nil {
-			continue
+		if !seen[exception.OriginalStart.UTC()] && exception.StartsAt != nil {
+			moved = append(moved, exception.OriginalStart)
 		}
-		if series.isOccurrence(rule, exception.OriginalStart) {
-			add(exception.OriginalStart.In(series.Zone))
+	}
+	occurs := occursAmong(rule, moved)
+	for _, start := range moved {
+		if occurs[start.UTC()] {
+			add(start.In(series.Zone))
 		}
 	}
 	slices.SortFunc(occurrences, func(a, b Occurrence) int { return a.StartsAt.Compare(b.StartsAt) })
@@ -118,6 +122,52 @@ func (series Series) IsOccurrence(originalStart time.Time) (bool, error) {
 func (series Series) isOccurrence(rule *rrule.RRule, originalStart time.Time) bool {
 	found := rule.Between(originalStart, originalStart, true)
 	return len(found) == 1 && found[0].Equal(originalStart)
+}
+
+// OccursAmong returns which of starts, keyed in UTC, the rule gives an
+// occurrence at.
+func (series Series) OccursAmong(starts []time.Time) (map[time.Time]bool, error) {
+	rule, err := series.rrule()
+	if err != nil {
+		return nil, err
+	}
+	return occursAmong(rule, starts), nil
+}
+
+// occursAmong checks all starts in one walk of the rule. The rule is walked
+// from its first occurrence each time, so checking starts one by one would
+// repeat that walk for each.
+func occursAmong(rule *rrule.RRule, starts []time.Time) map[time.Time]bool {
+	found := map[time.Time]bool{}
+	if len(starts) == 0 {
+		return found
+	}
+	wanted := make(map[time.Time]bool, len(starts))
+	earliest, latest := starts[0], starts[0]
+	for _, start := range starts {
+		wanted[start.UTC()] = true
+		earliest, latest = minTime(earliest, start), maxTime(latest, start)
+	}
+	for _, start := range rule.Between(earliest, latest, true) {
+		if wanted[start.UTC()] {
+			found[start.UTC()] = true
+		}
+	}
+	return found
+}
+
+func minTime(a, b time.Time) time.Time {
+	if b.Before(a) {
+		return b
+	}
+	return a
+}
+
+func maxTime(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
 }
 
 // LastEnd is when the last occurrence ends, counting moved occurrences, or

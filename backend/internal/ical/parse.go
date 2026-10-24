@@ -20,8 +20,9 @@ import (
 const MaxEvents = 5000
 
 var (
-	ErrInvalidFile   = errors.New("the file is not a valid iCalendar file")
-	ErrTooManyEvents = fmt.Errorf("a file can hold at most %d events", MaxEvents)
+	errTooManyExceptions = errors.New("too many changed or excluded occurrences")
+	ErrInvalidFile       = errors.New("the file is not a valid iCalendar file")
+	ErrTooManyEvents     = fmt.Errorf("a file can hold at most %d events", MaxEvents)
 )
 
 // Reasons an event in a file is not imported.
@@ -32,6 +33,12 @@ const (
 	ReasonNoStart          = "no start time"
 	ReasonBadTime          = "unreadable start or end time"
 )
+
+// MaxExceptions bounds the changed and excluded occurrences one series keeps,
+// so a file cannot make a series costly to store and read.
+const MaxExceptions = 1000
+
+const warningTooManyExceptions = "only the first 1000 changed or excluded occurrences were kept"
 
 // Properties for the fields only this app has, so an exported file imports
 // back unchanged. Durations use the iCalendar format, such as PT30M.
@@ -140,6 +147,8 @@ func Parse(r io.Reader, loc *time.Location) (Result, error) {
 		}
 		result.Events = append(result.Events, event)
 	}
+	// Series that reached MaxExceptions, warned about once each.
+	full := map[int]bool{}
 	for _, override := range overrides {
 		title := titleOf(override)
 		index, ok := -1, false
@@ -157,7 +166,11 @@ func Parse(r io.Reader, loc *time.Location) (Result, error) {
 			result.Skipped = append(result.Skipped, Skipped{Title: title, Reason: ReasonBadTime})
 			continue
 		}
-		master.Exceptions = setException(master.Exceptions, exception)
+		var kept bool
+		if master.Exceptions, kept = setException(master.Exceptions, exception); !kept && !full[index] {
+			full[index] = true
+			warn(master.Title, []string{warningTooManyExceptions})
+		}
 	}
 	return result, nil
 }
@@ -169,15 +182,20 @@ func titleOf(vevent *ics.VEvent) string {
 	return "Untitled"
 }
 
-// setException adds an exception, replacing one for the same occurrence.
-func setException(exceptions []db.OccurrenceException, exception db.OccurrenceException) []db.OccurrenceException {
+// setException adds an exception, replacing one for the same occurrence. It
+// reports false, leaving exceptions unchanged, when the series already holds
+// MaxExceptions.
+func setException(exceptions []db.OccurrenceException, exception db.OccurrenceException) ([]db.OccurrenceException, bool) {
 	for index, other := range exceptions {
 		if other.OriginalStart.Equal(exception.OriginalStart) {
 			exceptions[index] = exception
-			return exceptions
+			return exceptions, true
 		}
 	}
-	return append(exceptions, exception)
+	if len(exceptions) >= MaxExceptions {
+		return exceptions, false
+	}
+	return append(exceptions, exception), true
 }
 
 // parseEvent maps one VEVENT. A non-empty reason means it is skipped; the
@@ -237,7 +255,10 @@ func parseEvent(vevent *ics.VEvent, loc *time.Location) (event Event, warnings [
 		}
 		event.Recurrence, event.TimeZone = &rule, zone.String()
 		excluded, err := excludedDates(vevent, loc)
-		if err != nil {
+		switch {
+		case errors.Is(err, errTooManyExceptions):
+			warnings = append(warnings, warningTooManyExceptions)
+		case err != nil:
 			warnings = append(warnings, "excluded dates that could not be read were left out")
 		}
 		event.Exceptions = excluded
@@ -398,7 +419,11 @@ func excludedDates(vevent *ics.VEvent, loc *time.Location) ([]db.OccurrenceExcep
 			if err != nil {
 				return exceptions, err
 			}
-			exceptions = setException(exceptions, db.OccurrenceException{OriginalStart: excluded.at, IsCancelled: true})
+			var kept bool
+			exceptions, kept = setException(exceptions, db.OccurrenceException{OriginalStart: excluded.at, IsCancelled: true})
+			if !kept {
+				return exceptions, errTooManyExceptions
+			}
 		}
 	}
 	return exceptions, nil

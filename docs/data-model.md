@@ -74,6 +74,7 @@ Schema constraints:
 - `event_occurrence_exceptions` holds the occurrences that differ from their series, keyed by `(event_id, original_start)`, the start the rule gives them (an iCalendar RECURRENCE-ID). An occurrence can be cancelled, moved (`starts_at`, `ends_at`), or skipped. Nothing else differs per occurrence.
 - An exception's `is_skipped` is the owner's own decision and is never sent to recipients.
 - The handler works out the rule, the end, and which exceptions still match it (`backend/internal/timeline/scopes.go`). The store writes what it is given and checks ownership.
+- Expanding walks the rule from its first occurrence, so the work per series is bounded: events start and end in the years 1900 to 2200, a repeat ends by 2200 or after at most 999 times, and an imported series keeps at most 1000 exceptions. Exceptions are checked against the rule in one walk (`Series.OccursAmong`), not one walk each.
 - "This and following" is `Store.SplitSeries`. In one transaction it ends the old series the day before the occurrence, creates a new series, and copies the tags, the shares with their per-recipient fields, and everyone's reminders. Later exceptions move to the new series when they still match it.
 
 ### Gathering and commute

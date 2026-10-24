@@ -38,15 +38,26 @@ const (
 const (
 	MaxInterval = 99
 	MaxCount    = 999
+	// Events and repeats stay within these years. Expanding a series walks
+	// from its first occurrence, so the bounds also cap how much work one
+	// series can cause.
+	MinYear = 1900
+	MaxYear = 2200
 )
 
 var (
-	ErrInvalidRule = fmt.Errorf("repeat must be daily, weekly, monthly or yearly, every 1 to %d, ending never, on a date or after 1 to %d times", MaxInterval, MaxCount)
-	ErrWeekdays    = errors.New("a weekly repeat must include the weekday the event starts on")
-	ErrMonthlyBy   = errors.New("a monthly repeat must be on the start's day of the month, or on its weekday as the 1st to 4th or last of the month")
-	ErrUntil       = errors.New("a repeat cannot end before the event starts")
-	ErrUnsupported = errors.New("unsupported repeat rule")
+	ErrInvalidRule  = fmt.Errorf("repeat must be daily, weekly, monthly or yearly, every 1 to %d, ending never, on a date or after 1 to %d times", MaxInterval, MaxCount)
+	ErrWeekdays     = errors.New("a weekly repeat must include the weekday the event starts on")
+	ErrMonthlyBy    = errors.New("a monthly repeat must be on the start's day of the month, or on its weekday as the 1st to 4th or last of the month")
+	ErrUntil        = errors.New("a repeat cannot end before the event starts")
+	ErrUntilTooLate = fmt.Errorf("a repeat must end by %d", MaxYear)
+	ErrUnsupported  = errors.New("unsupported repeat rule")
 )
+
+// InYearRange reports whether t falls within MinYear to MaxYear.
+func InYearRange(t time.Time) bool {
+	return t.Year() >= MinYear && t.Year() <= MaxYear
+}
 
 // weekdayCodes are the RFC 5545 weekday names, Monday first.
 var weekdayCodes = []string{"MO", "TU", "WE", "TH", "FR", "SA", "SU"}
@@ -123,6 +134,9 @@ func Validate(rule Rule, start time.Time) (Rule, error) {
 		startDate := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, time.UTC)
 		if until.Before(startDate) {
 			return rule, ErrUntil
+		}
+		if until.Year() > MaxYear {
+			return rule, ErrUntilTooLate
 		}
 	}
 	return rule, nil

@@ -428,3 +428,26 @@ func TestParseReadsCalendarName(t *testing.T) {
 		})
 	}
 }
+
+func TestParseKeepsAtMostMaxExceptions(t *testing.T) {
+	var excluded []string
+	for i := range MaxExceptions + 500 {
+		excluded = append(excluded, time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC).AddDate(0, 0, i).Format("20060102T150405Z"))
+	}
+	result, err := Parse(strings.NewReader(calendar(`
+UID:daily
+SUMMARY:Daily
+DTSTART:20260101T090000Z
+DTEND:20260101T100000Z
+RRULE:FREQ=DAILY
+EXDATE:`+strings.Join(excluded, ","))), stockholm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Events) != 1 || len(result.Events[0].Exceptions) != MaxExceptions {
+		t.Fatalf("expected one series with %d exceptions, got %+v", MaxExceptions, len(result.Events))
+	}
+	if len(result.Warnings) != 1 || !strings.Contains(result.Warnings[0], "only the first 1000") {
+		t.Fatalf("expected a warning about the cap, got %v", result.Warnings)
+	}
+}

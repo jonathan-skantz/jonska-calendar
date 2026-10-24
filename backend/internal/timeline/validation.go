@@ -2,6 +2,7 @@ package timeline
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -9,12 +10,14 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/recurrence"
 )
 
 var (
 	ErrInvalidRequest = errors.New("invalid request body")
 	ErrTitleRequired  = errors.New("title cannot be empty")
 	ErrInvalidTimes   = errors.New("end time must be after start time")
+	ErrYearOutOfRange = fmt.Errorf("events must start and end between the years %d and %d", recurrence.MinYear, recurrence.MaxYear)
 	ErrInvalidKind    = errors.New("kind must be attendable or informational")
 	ErrInvalidSkip    = errors.New("only attendable events can be skipped")
 	ErrInvalidCommute = errors.New("commute must be whole minutes up to 24 hours and is only allowed on timed attendable events")
@@ -63,6 +66,9 @@ func ValidateEvent(event db.Event) (db.Event, error) {
 	}
 	if !event.EndsAt.After(event.StartsAt) {
 		return event, ErrInvalidTimes
+	}
+	if !recurrence.InYearRange(event.StartsAt) || !recurrence.InYearRange(event.EndsAt) {
+		return event, ErrYearOutOfRange
 	}
 	// Commute and gathering only make sense for timed events the user attends.
 	timedAttendable := event.Kind == db.EventKindAttendable && !event.IsAllDay
