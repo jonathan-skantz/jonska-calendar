@@ -35,6 +35,7 @@ var (
 	ErrSessionTokenMissing   = errors.New("session token missing")
 	ErrTooManyAttempts       = errors.New("too many attempts, try again later")
 	ErrRegistrationClosed    = errors.New("registration is invite-only")
+	ErrNotInDemo             = errors.New("not available in the demo")
 )
 
 const (
@@ -99,9 +100,10 @@ type registerResponse struct {
 }
 
 type currentUserResponse struct {
-	ID          uuid.UUID `json:"id"`
-	Email       string    `json:"email"`
-	DisplayName *string   `json:"display_name,omitempty"`
+	ID            uuid.UUID  `json:"id"`
+	Email         string     `json:"email"`
+	DisplayName   *string    `json:"display_name,omitempty"`
+	DemoExpiresAt *time.Time `json:"demo_expires_at,omitempty"`
 }
 
 type updateCurrentUserRequest struct {
@@ -270,20 +272,26 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := make([]byte, 32)
-	if _, err := rand.Read(token); err != nil {
-		log.Printf("Failed to create session token: %v", err)
-		http.Error(w, "Failed to log in", http.StatusInternalServerError)
-		return
-	}
-	expiresAt := time.Now().Add(sessionDuration)
-	tokenHash := sha256.Sum256(token)
-	if err := h.Store.CreateSession(r.Context(), user.ID, tokenHash[:], expiresAt); err != nil {
+	if err := h.StartSession(w, r, user.ID, time.Now().Add(sessionDuration)); err != nil {
 		log.Printf("Failed to create session: %v", err)
 		http.Error(w, "Failed to log in", http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(registerResponse{ID: user.ID})
+}
 
+// StartSession signs the user in until expiresAt by storing a new session
+// and setting its cookie on w.
+func (h *Handler) StartSession(w http.ResponseWriter, r *http.Request, userID uuid.UUID, expiresAt time.Time) error {
+	token := make([]byte, 32)
+	if _, err := rand.Read(token); err != nil {
+		return err
+	}
+	tokenHash := sha256.Sum256(token)
+	if err := h.Store.CreateSession(r.Context(), userID, tokenHash[:], expiresAt); err != nil {
+		return err
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    base64.RawURLEncoding.EncodeToString(token),
@@ -293,8 +301,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Secure:   h.secureCookies,
 		SameSite: http.SameSiteLaxMode,
 	})
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(registerResponse{ID: user.ID})
+	return nil
 }
 
 // CurrentUser resolves the signed-in user's ID for a request. Handlers in
@@ -310,6 +317,22 @@ func RequireUser(w http.ResponseWriter, r *http.Request, currentUser CurrentUser
 		return uuid.Nil, false
 	}
 	return userID, true
+}
+
+// RejectDemo answers 403 and returns true when userID is a demo user. Demo
+// users may not reach other users or make the server fetch from the
+// internet, so routes that would do either call this first.
+func RejectDemo(w http.ResponseWriter, r *http.Request, store *db.Store, userID uuid.UUID) bool {
+	isDemo, err := store.IsDemoUser(r.Context(), userID)
+	if err != nil {
+		log.Printf("Failed to check for a demo user: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return true
+	}
+	if isDemo {
+		http.Error(w, ErrNotInDemo.Error(), http.StatusForbidden)
+	}
+	return isDemo
 }
 
 // CurrentUserID is the CurrentUser for real requests, read from the session
@@ -357,7 +380,9 @@ func (h *Handler) CurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(currentUserResponse{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName})
+	_ = json.NewEncoder(w).Encode(currentUserResponse{
+		ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, DemoExpiresAt: user.DemoExpiresAt,
+	})
 }
 
 func (h *Handler) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) {

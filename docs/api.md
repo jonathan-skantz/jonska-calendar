@@ -11,13 +11,13 @@
 | ----- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `400` | Invalid input. The body says why.                                                                                                 |
 | `401` | No valid session.                                                                                                                 |
-| `403` | Registration is invite-only and the email is not on the list.                                                                     |
+| `403` | Registration is invite-only and the email is not on the list, or a demo account tried to share, use a household, or subscribe.    |
 | `404` | Not found **or** not yours. The server does not say which, on purpose.                                                            |
 | `409` | Conflict: duplicate name, already shared, already a member, last or main tag removal, a subscribed event without a UID.           |
 | `413` | The body is over 64 KB, or over 6 MB for an `.ics` import.                                                                        |
 | `429` | Rate limit reached: login (20 per client per 15 minutes), registration (5 per client per hour), quick add (30 per user per hour). |
 | `502` | Quick add: Anthropic failed. Subscription refresh: the calendar could not be fetched.                                             |
-| `503` | Not configured or unavailable: quick add without a key, weather with no cache or upstream.                                        |
+| `503` | Not configured or unavailable: quick add without a key, weather with no cache or upstream, the demo when 200 demo accounts exist. |
 
 ## Routes
 
@@ -26,7 +26,8 @@
 | `POST /api/auth/register`                                               | `email` (a valid address), `password` (8+ characters) | `201` with `{ "id": "<uuid>" }`                                                      |
 | `POST /api/auth/login`                                                  | `email`, `password`                                   | `200` with `{ "id": "<uuid>" }` and a session cookie                                 |
 | `POST /api/auth/logout`                                                 | None                                                  | `204`; clears the cookie                                                             |
-| `GET /api/auth/me`                                                      | None                                                  | `{ "id", "email" }`, plus `display_name` when set                                    |
+| `POST /api/auth/demo`                                                   | `time_zone`                                           | `201` with `{ "id" }` and a session cookie for a new demo account (24 hours)         |
+| `GET /api/auth/me`                                                      | None                                                  | `{ "id", "email" }`, plus `display_name` when set and `demo_expires_at` for a demo   |
 | `PATCH /api/auth/me`                                                    | `display_name` (empty clears it)                      | `204`                                                                                |
 | `GET /api/timeline?from=&to=`                                           | None                                                  | Events in the range, each occurrence on its own, and all tasks                       |
 | `POST /api/events`                                                      | Event fields                                          | `201` with `{ "id": "<uuid>" }`                                                      |

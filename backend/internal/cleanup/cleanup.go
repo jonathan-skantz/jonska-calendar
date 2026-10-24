@@ -31,9 +31,13 @@ func Run(ctx context.Context, store *db.Store) {
 	}
 }
 
-// Once deletes expired sessions and old weather forecasts. Failures are
-// logged, and the next run tries again.
+// Once deletes expired demo users with everything they own, expired
+// sessions, and old weather forecasts. Failures are logged, and the next run
+// tries again.
 func Once(ctx context.Context, store *db.Store) {
+	if _, err := store.DeleteExpiredDemoUsers(ctx); err != nil {
+		log.Printf("deleting expired demo users: %v", err)
+	}
 	if _, err := store.DeleteExpiredSessions(ctx); err != nil {
 		log.Printf("deleting expired sessions: %v", err)
 	}

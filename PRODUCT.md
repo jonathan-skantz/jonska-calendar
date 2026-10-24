@@ -66,6 +66,10 @@ testable product over polish.
 
 - [x] People sign in with an email and a password.
 - [x] Sign-up is invite-only: only emails the host lists can register.
+- [x] Anyone can try the app with a demo account, without signing up. Each
+      visitor gets their own account with a sample week. It is deleted, with
+      all its data, after 24 hours. A demo account cannot share events, use a
+      household, or subscribe to calendars.
 
 ### Timeline Item Type 1: Events
 

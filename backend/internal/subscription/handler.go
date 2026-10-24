@@ -91,7 +91,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // that does not work is refused and nothing is saved.
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.RequireUser(w, r, h.CurrentUser)
-	if !ok {
+	if !ok || auth.RejectDemo(w, r, h.Store, userID) {
 		return
 	}
 	var request createRequest
@@ -167,7 +167,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 // why; the subscription keeps its last events.
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.RequireUser(w, r, h.CurrentUser)
-	if !ok {
+	if !ok || auth.RejectDemo(w, r, h.Store, userID) {
 		return
 	}
 	subscriptionID, ok := subscriptionIDFrom(w, r)

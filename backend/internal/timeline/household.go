@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 )
 
 var (
@@ -46,7 +47,7 @@ func (h *Handler) decodeHouseholdRequest(w http.ResponseWriter, r *http.Request)
 
 func (h *Handler) CreateHousehold(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.requireUser(w, r)
-	if !ok {
+	if !ok || auth.RejectDemo(w, r, h.Store, userID) {
 		return
 	}
 	request, ok := h.decodeHouseholdRequest(w, r)
@@ -85,7 +86,7 @@ func (h *Handler) UpdateHousehold(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AddHouseholdMember(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.requireUser(w, r)
-	if !ok {
+	if !ok || auth.RejectDemo(w, r, h.Store, userID) {
 		return
 	}
 	var request householdMemberRequest

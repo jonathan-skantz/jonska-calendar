@@ -79,7 +79,12 @@ func TestSubscriptionRoutesRequireAuthentication(t *testing.T) {
 
 func TestCreateRejectsBadRequests(t *testing.T) {
 	server, _ := feedServer(t, "not a calendar")
-	handler := New(nil, testutil.SignedInAs(uuid.New()), NewClient(true))
+	store := testutil.NewStore(t)
+	userID, err := store.Register(context.Background(), "user@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(store, testutil.SignedInAs(userID), NewClient(true))
 	for name, body := range map[string]map[string]any{
 		"bad scheme":     {"url": "ftp://example.com/a.ics", "time_zone": "UTC"},
 		"no time zone":   {"url": server.URL},

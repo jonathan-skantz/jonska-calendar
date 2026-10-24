@@ -11,6 +11,8 @@ type User struct {
 	Email        string
 	PasswordHash string
 	DisplayName  *string
+	// DemoExpiresAt is set for demo users, who are deleted when it passes.
+	DemoExpiresAt *time.Time
 }
 
 // TransitCardDay is one reported day. Days without a row are not reported.

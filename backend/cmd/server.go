@@ -18,6 +18,7 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/internal/assistant"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 	"github.com/jonathan-skantz/calendar/backend/internal/cleanup"
+	"github.com/jonathan-skantz/calendar/backend/internal/demo"
 	"github.com/jonathan-skantz/calendar/backend/internal/ical"
 	"github.com/jonathan-skantz/calendar/backend/internal/middleware"
 	"github.com/jonathan-skantz/calendar/backend/internal/quickadd"
@@ -60,6 +61,7 @@ func main() {
 	if !authHandler.RegistrationRestricted() {
 		log.Println("REGISTRATION_ALLOWED_EMAILS is not set: anyone can register")
 	}
+	demoHandler := demo.New(store, authHandler)
 	timelineHandler := timeline.New(store, authHandler.CurrentUserID)
 	weatherHandler := weather.New(store, authHandler.CurrentUserID, weather.NewClient())
 	icalHandler := ical.New(store, authHandler.CurrentUserID)
@@ -85,6 +87,7 @@ func main() {
 	mux.HandleFunc("POST /api/auth/register", authHandler.Register)
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
+	mux.HandleFunc("POST /api/auth/demo", demoHandler.Start)
 	mux.HandleFunc("GET /api/auth/me", authHandler.CurrentUser)
 	mux.HandleFunc("PATCH /api/auth/me", authHandler.UpdateCurrentUser)
 	mux.HandleFunc("POST /api/events", timelineHandler.CreateEvent)

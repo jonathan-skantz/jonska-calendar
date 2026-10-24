@@ -35,6 +35,13 @@ erDiagram
 - `events` and `tasks` are subtype rows keyed by `timeline_item_id`. The API uses that ID as the event or task ID.
 - A write to both a parent and a subtype row runs in one transaction. Example: `Store.CreateEvent` (`backend/db/events.go`) writes `timeline_items`, `events`, and the first `timeline_item_tags` row together. If one fails, all roll back.
 
+## Demo users
+
+- A user with `demo_expires_at` set (migration 31) is a demo account, made by `POST /api/auth/demo` with sample data (`backend/internal/demo`).
+- Its email ends in `@demo.invalid` and its password hash is not a valid hash, so no one can log in as it, share with it, or add it to a household.
+- The hourly cleanup job deletes it once `demo_expires_at` passes. Every foreign key to `users` cascades, so everything it owns goes with it.
+- Demo users cannot share, create or join a household, or add or refresh subscriptions (`auth.RejectDemo`), so they cannot reach real users or make the server fetch URLs.
+
 ## Events
 
 An event stores:

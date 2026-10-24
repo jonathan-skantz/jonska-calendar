@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 )
 
 // Only the event owner manages shares. Recipients are read-only and see a
@@ -42,7 +43,7 @@ func (h *Handler) ListEventShares(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.requireUser(w, r)
-	if !ok {
+	if !ok || auth.RejectDemo(w, r, h.Store, ownerID) {
 		return
 	}
 	eventID, ok := pathID(w, r, "eventID")
