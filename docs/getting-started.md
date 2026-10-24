@@ -69,6 +69,8 @@ ANTHROPIC_API_KEY=<key>
 
 Without a key, both show that they are not configured. Everything else still works.
 
+Together they may make 200 requests a day across all users, which caps spending on the key. Change it with `LLM_DAILY_REQUEST_LIMIT` (`0` turns both off). An assistant message counts once, though it may make several model calls.
+
 To subscribe to a calendar on your own network, or to a feed of this app on `localhost`, allow private addresses:
 
 ```dotenv

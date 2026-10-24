@@ -45,7 +45,8 @@ chmod 600 .env.prod
 - `REGISTRATION_ALLOWED_EMAILS` lists who may create an account. Leaving it empty lets anyone on the internet register. To invite someone later, add their email and run the start command again.
 - The password goes into a database URL, so keep it URL-safe. Hex is.
 - PostgreSQL sets the password only when it creates the volume. Changing it later needs `ALTER USER` as well.
-- For quick add and the assistant, put `ANTHROPIC_API_KEY` in `backend/.env.local`. Without it, both report that they are not configured.
+- For quick add and the assistant, put `ANTHROPIC_API_KEY` in `backend/.env.local`. Without it, both report that they are not configured. They share a limit of 200 requests a day across all users; set `LLM_DAILY_REQUEST_LIMIT` in `.env.prod` to change it.
+- Settings that compose passes to the API (`SESSION_COOKIE_SECURE`, `REGISTRATION_ALLOWED_EMAILS`, `LLM_DAILY_REQUEST_LIMIT`) go in `.env.prod`. Compose's values win over `backend/.env.local`.
 - Do not set `SUBSCRIPTIONS_ALLOW_PRIVATE`. On AWS it would let a subscription URL reach the instance metadata service at `169.254.169.254`.
 
 ## 3. Start

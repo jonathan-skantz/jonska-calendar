@@ -32,6 +32,9 @@ type Handler struct {
 	CurrentUser auth.CurrentUser
 	// Client is nil when no API key is configured.
 	Client *Client
+	// Budget is shared with quick add and caps calls on the API key per day
+	// across all users. Nil means no cap.
+	Budget *ratelimit.Budget
 
 	now           func() time.Time
 	limiter       *ratelimit.Limiter[uuid.UUID]
@@ -86,6 +89,10 @@ func (h *Handler) Message(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.limiter.Allow(userID) {
 		http.Error(w, "Too many messages, try again later", http.StatusTooManyRequests)
+		return
+	}
+	if !h.Budget.Allow() {
+		http.Error(w, ratelimit.ErrDailyBudget.Error(), http.StatusServiceUnavailable)
 		return
 	}
 	start, err := h.conversations.claim(userID, request.ConversationID)

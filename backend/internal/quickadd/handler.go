@@ -34,7 +34,10 @@ type Handler struct {
 	Tags        TagLister
 	CurrentUser auth.CurrentUser
 	// Client is nil when no API key is configured.
-	Client  parser
+	Client parser
+	// Budget is shared with the assistant and caps calls on the API key per
+	// day across all users. Nil means no cap.
+	Budget  *ratelimit.Budget
 	limiter *ratelimit.Limiter[uuid.UUID]
 }
 
@@ -73,6 +76,10 @@ func (h *Handler) Parse(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.limiter.Allow(userID) {
 		http.Error(w, "Too many quick adds, try again later", http.StatusTooManyRequests)
+		return
+	}
+	if !h.Budget.Allow() {
+		http.Error(w, ratelimit.ErrDailyBudget.Error(), http.StatusServiceUnavailable)
 		return
 	}
 

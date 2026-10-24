@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	// Embeds the time zone database, so the assistant can read the browser's
@@ -22,6 +23,7 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/internal/ical"
 	"github.com/jonathan-skantz/calendar/backend/internal/middleware"
 	"github.com/jonathan-skantz/calendar/backend/internal/quickadd"
+	"github.com/jonathan-skantz/calendar/backend/internal/ratelimit"
 	"github.com/jonathan-skantz/calendar/backend/internal/subscription"
 	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
 	"github.com/jonathan-skantz/calendar/backend/internal/weather"
@@ -82,6 +84,9 @@ func main() {
 	}
 	quickAddHandler := quickadd.New(store, authHandler.CurrentUserID, quickAddClient)
 	assistantHandler := assistant.New(store, authHandler.CurrentUserID, assistantClient)
+	// Quick add and the assistant share one daily budget on the API key.
+	llmBudget := ratelimit.NewBudget(dailyLLMRequests())
+	quickAddHandler.Budget, assistantHandler.Budget = llmBudget, llmBudget
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/auth/register", authHandler.Register)
@@ -159,4 +164,21 @@ func main() {
 		dbPool.Close()
 		log.Fatal(err)
 	}
+}
+
+// defaultDailyLLMRequests caps quick add and assistant requests per UTC day
+// across all users when LLM_DAILY_REQUEST_LIMIT is not set.
+const defaultDailyLLMRequests = 200
+
+func dailyLLMRequests() int {
+	value := os.Getenv("LLM_DAILY_REQUEST_LIMIT")
+	if value == "" {
+		return defaultDailyLLMRequests
+	}
+	limit, err := strconv.Atoi(value)
+	if err != nil || limit < 0 {
+		log.Printf("LLM_DAILY_REQUEST_LIMIT must be a whole number, using %d", defaultDailyLLMRequests)
+		return defaultDailyLLMRequests
+	}
+	return limit
 }

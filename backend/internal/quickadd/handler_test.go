@@ -14,6 +14,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/ratelimit"
 	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
@@ -184,6 +185,20 @@ func TestParseRateLimitsPerUser(t *testing.T) {
 	now = now.Add(rateWindow)
 	if code := post(handler, `{"text":"lunch"}`).Code; code != http.StatusOK {
 		t.Fatalf("expected the budget to reset after the window, got %d", code)
+	}
+}
+
+func TestParseStopsWhenTheDailyBudgetIsSpent(t *testing.T) {
+	upstream := newFakeAnthropic(t)
+	handler := New(fakeTags{}, testutil.SignedInAs(uuid.New()), upstream.client())
+	handler.Budget = ratelimit.NewBudget(1)
+
+	if code := post(handler, `{"text":"lunch"}`).Code; code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, code)
+	}
+	handler.CurrentUser = testutil.SignedInAs(uuid.New())
+	if code := post(handler, `{"text":"lunch"}`).Code; code != http.StatusServiceUnavailable {
+		t.Fatalf("expected another user to share the spent budget, got %d", code)
 	}
 }
 
