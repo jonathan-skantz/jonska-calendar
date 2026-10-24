@@ -1,4 +1,4 @@
-module github.com/jonathan-skantz/calendar
+module github.com/jonathan-skantz/calendar/backend
 
 go 1.27.1
 

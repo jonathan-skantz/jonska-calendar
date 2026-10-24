@@ -13,9 +13,9 @@ The pre-commit hook runs all of them. There is no CI.
 Run from the repository root unless noted. Prefix with `mise exec --`.
 
 ```sh
-mise exec -- go vet ./...
-mise exec -- go test ./... -count=1
-mise exec -- go test ./backend/internal/timeline -run TestName -count=1   # one Go test
+cd backend && mise exec -- go vet ./...
+cd backend && mise exec -- go test ./... -count=1
+cd backend && mise exec -- go test ./internal/timeline -run TestName -count=1   # one Go test
 cd frontend && mise exec -- npm run test                                  # all frontend tests
 cd frontend && mise exec -- npx vitest run src/lib/timeline.test.ts       # one frontend file
 cd frontend && mise exec -- npm run lint                                  # oxlint

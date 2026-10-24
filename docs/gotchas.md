@@ -122,17 +122,13 @@ A feed's token is its only credential. Anyone with the address sees the events. 
 
 ## Setup and tooling
 
-### `goose` does not read `.env`
+### `goose` does not read `DATABASE_URL`
 
-`docker compose` reads `.env`. Goose does not. Export it first ([getting started](getting-started.md#environment-files)).
+Goose reads only `GOOSE_*` keys from `.env`. Export `backend/.env` first ([getting started](getting-started.md#environment-files)).
 
-### `goose.env` is not read by anything
+### Run the API from `backend/`
 
-Its migration path points at `backend/db/migrations` now, but no command loads it. Use the commands in [getting started](getting-started.md).
-
-### Run the API from the repo root
-
-The API loads `.env` and `.env.local` from its working directory. From a subdirectory, `DATABASE_URL` is empty.
+The API loads `.env` and `.env.local` from its working directory. From anywhere else, `DATABASE_URL` is empty.
 
 ### Migrations sort by number, not by name
 

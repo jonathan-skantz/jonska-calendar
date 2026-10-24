@@ -9,9 +9,14 @@ You need Docker, [mise](https://mise.jdx.dev), and [Goose](https://github.com/pr
 ```sh
 cd frontend && mise exec -- npm install && cd ..  # once
 docker compose up -d db                            # PostgreSQL
+
+# terminal 1: API
+cd backend
 set -a; . ./.env; set +a                           # export DATABASE_URL for goose
-goose -dir backend/db/migrations postgres "$DATABASE_URL" up
-mise exec -- go run ./backend/cmd                  # API on :8080, from the repo root
+goose -dir db/migrations postgres "$DATABASE_URL" up
+mise exec -- go run ./cmd                          # API on :8080
+
+# terminal 2: frontend
 cd frontend && mise exec -- npm run dev            # app on http://localhost:5173
 ```
 

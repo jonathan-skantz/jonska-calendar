@@ -4,22 +4,22 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 
 ## Stack
 
-| Layer          | Choice                                                     | Source                       |
-| -------------- | ---------------------------------------------------------- | ---------------------------- |
-| Backend        | Go 1.27; standard `net/http` with method and path patterns | `mise.toml`, `go.mod`        |
-| Database       | PostgreSQL 18 (dev), through the pgx driver                | `compose.yaml`               |
-| Migrations     | Goose, SQL files                                           | `backend/db/migrations`      |
-| Passwords      | Argon2id                                                   | `backend/internal/auth`      |
-| Frontend       | React 19, Vite, TypeScript                                 | `frontend/package.json`      |
-| Server state   | TanStack Query                                             | `frontend/package.json`      |
-| Dates          | `date-fns`                                                 | `frontend/package.json`      |
-| Color contrast | `culori` (WCAG ratio for tag text)                         | `frontend/package.json`      |
-| Frontend tests | Vitest, jsdom, Testing Library                             | `frontend/package.json`      |
-| Lint           | oxlint                                                     | `frontend/package.json`      |
-| Quick add      | Anthropic Messages API, official Go SDK                    | `backend/internal/quickadd`  |
-| Assistant      | Anthropic Messages API, Go SDK tool runner (beta)          | `backend/internal/assistant` |
-| Weather        | Open-Meteo, cached in PostgreSQL                           | `backend/internal/weather`   |
-| Tool versions  | mise                                                       | `mise.toml`                  |
+| Layer          | Choice                                                     | Source                        |
+| -------------- | ---------------------------------------------------------- | ----------------------------- |
+| Backend        | Go 1.27; standard `net/http` with method and path patterns | `mise.toml`, `backend/go.mod` |
+| Database       | PostgreSQL 18 (dev), through the pgx driver                | `compose.yaml`                |
+| Migrations     | Goose, SQL files                                           | `backend/db/migrations`       |
+| Passwords      | Argon2id                                                   | `backend/internal/auth`       |
+| Frontend       | React 19, Vite, TypeScript                                 | `frontend/package.json`       |
+| Server state   | TanStack Query                                             | `frontend/package.json`       |
+| Dates          | `date-fns`                                                 | `frontend/package.json`       |
+| Color contrast | `culori` (WCAG ratio for tag text)                         | `frontend/package.json`       |
+| Frontend tests | Vitest, jsdom, Testing Library                             | `frontend/package.json`       |
+| Lint           | oxlint                                                     | `frontend/package.json`       |
+| Quick add      | Anthropic Messages API, official Go SDK                    | `backend/internal/quickadd`   |
+| Assistant      | Anthropic Messages API, Go SDK tool runner (beta)          | `backend/internal/assistant`  |
+| Weather        | Open-Meteo, cached in PostgreSQL                           | `backend/internal/weather`    |
+| Tool versions  | mise                                                       | `mise.toml`                   |
 
 **TODO(maintainer):** why Go, PostgreSQL, React, Vite, TanStack Query, and Goose were chosen. The repo does not say.
 

@@ -14,17 +14,17 @@ Tool versions come from `mise.toml` (Go 1.27, Node 22). Prefix commands with `mi
 
 ```sh
 docker compose up -d db                                      # PostgreSQL (needs .env)
-goose -dir backend/db/migrations postgres "$DATABASE_URL" up # apply migrations
-go run ./backend/cmd                                         # API on :8080
+cd backend && goose -dir db/migrations postgres "$DATABASE_URL" up # apply migrations (export backend/.env first)
+cd backend && go run ./cmd                                   # API on :8080, reads backend/.env
 cd frontend && mise exec -- npm run dev                      # Vite on :5173, proxies /api to :8080
 ```
 
 Tests and checks:
 
 ```sh
-mise exec -- go vet ./...
-mise exec -- go test ./... -count=1
-mise exec -- go test ./backend/internal/timeline -run TestName -count=1   # single Go test
+cd backend && mise exec -- go vet ./...
+cd backend && mise exec -- go test ./... -count=1
+cd backend && mise exec -- go test ./internal/timeline -run TestName -count=1   # single Go test
 cd frontend && mise exec -- npm run test                                  # vitest (jsdom)
 cd frontend && mise exec -- npx vitest run src/lib/timeline.test.ts       # single frontend test file
 cd frontend && mise exec -- npm run lint                                  # oxlint
@@ -81,7 +81,7 @@ Invariants that span several files:
 
 ### Research and technology choices
 
-- Check installed versions (`mise.toml`, `go.mod`, `frontend/package.json`) before using an API or pattern that may be newer than them.
+- Check installed versions (`mise.toml`, `backend/go.mod`, `frontend/package.json`) before using an API or pattern that may be newer than them.
 - For new libraries, framework features, architectural decisions, or patterns that may have changed recently, verify current recommendations first. Prefer official docs for Go, React, TypeScript, PostgreSQL, and the other tools in use. Patterns.dev is a reference for JavaScript and React patterns, not a checklist.
 - When a recommendation is uncertain or has real trade-offs, lay out the options briefly instead of presenting a guess as fact.
 

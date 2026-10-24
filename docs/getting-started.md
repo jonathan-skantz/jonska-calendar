@@ -28,10 +28,11 @@ If PostgreSQL already runs on port 5432, stop it first.
 
 ## Environment files
 
-| File         | Committed?       | Contains                                     |
-| ------------ | ---------------- | -------------------------------------------- |
-| `.env`       | Yes              | Local PostgreSQL settings. Development only. |
-| `.env.local` | No (git-ignored) | Secrets, such as `ANTHROPIC_API_KEY`.        |
+| File                 | Committed?       | Contains                                            |
+| -------------------- | ---------------- | --------------------------------------------------- |
+| `.env`               | Yes              | PostgreSQL settings for `docker compose`. Dev only. |
+| `backend/.env`       | Yes              | The API's `DATABASE_URL`. Dev only.                 |
+| `backend/.env.local` | No (git-ignored) | API secrets, such as `ANTHROPIC_API_KEY`.           |
 
 `.env` has these keys:
 
@@ -39,20 +40,25 @@ If PostgreSQL already runs on port 5432, stop it first.
 POSTGRES_DB=...
 POSTGRES_USER=...
 POSTGRES_PASSWORD=...
+```
+
+`backend/.env` points at that database:
+
+```dotenv
 DATABASE_URL=postgres://<user>:<password>@localhost:5432/<database>?sslmode=disable
 ```
 
 Who reads them:
 
 - `docker compose` reads `.env` for the `POSTGRES_*` values.
-- The API reads `.env`, then `.env.local`, from its working directory (`backend/cmd/server.go`). Run it from the repo root.
-- Goose does **not** read `.env`. Export it into your shell first:
+- The API reads `.env`, then `.env.local`, from its working directory (`backend/cmd/server.go`). Run it from `backend/`.
+- Goose does **not** read `DATABASE_URL`. Export `backend/.env` into your shell first:
 
   ```sh
-  set -a; . ./.env; set +a
+  cd backend && set -a; . ./.env; set +a
   ```
 
-Quick add (the box that turns "lunch with Sam tomorrow noon" into an event) and the assistant need a key in `.env.local`:
+Quick add (the box that turns "lunch with Sam tomorrow noon" into an event) and the assistant need a key in `backend/.env.local`:
 
 ```dotenv
 ANTHROPIC_API_KEY=<key>
@@ -72,8 +78,6 @@ See [gotchas](gotchas.md#subscriptions-cannot-reach-private-addresses).
 
 `.claude/settings.json` stops Claude Code from reading `.env.local`.
 
-`goose.env` is not read by any command in these docs. Use the commands below.
-
 ## First run
 
 From the repository root:
@@ -85,11 +89,12 @@ cd frontend && mise exec -- npm install && cd ..
 # 2. Start PostgreSQL
 docker compose up -d db
 
-# 3. Apply migrations (after exporting .env, see above)
-goose -dir backend/db/migrations postgres "$DATABASE_URL" up
+# 3. Apply migrations (terminal 1, after exporting backend/.env, see above)
+cd backend
+goose -dir db/migrations postgres "$DATABASE_URL" up
 
-# 4. Start the API (terminal 1, from the repository root)
-mise exec -- go run ./backend/cmd
+# 4. Start the API (terminal 1, from backend/)
+mise exec -- go run ./cmd
 
 # 5. Start the frontend (terminal 2)
 cd frontend && mise exec -- npm run dev
@@ -113,18 +118,18 @@ This deletes users, events, tags, shares, and migration history. Source files an
 ```sh
 docker compose down -v
 docker compose up -d db
-goose -dir backend/db/migrations postgres "$DATABASE_URL" up
+cd backend && goose -dir db/migrations postgres "$DATABASE_URL" up
 ```
 
 ## Troubleshooting
 
 | Symptom                                           | Likely cause                                                                          | Fix                                                                    |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `goose` has an empty `DATABASE_URL` or is refused | `.env` was not exported into the shell.                                               | Run `set -a; . ./.env; set +a`, then retry.                            |
-| API cannot connect to the database                | The database container is not running, or `DATABASE_URL` does not match `POSTGRES_*`. | `docker compose ps`, then compare the two values.                      |
-| `docker compose up` fails on port 5432            | Another PostgreSQL is running.                                                        | Stop it, or change the host port in `compose.yaml` and `DATABASE_URL`. |
+| `goose` has an empty `DATABASE_URL` or is refused | `backend/.env` was not exported into the shell.                                       | In `backend/`, run `set -a; . ./.env; set +a`, then retry.             |
+| API cannot connect to the database                | The database container is not running, or `DATABASE_URL` does not match `POSTGRES_*`. | `docker compose ps`, then compare `backend/.env` with `.env`.          |
+| `docker compose up` fails on port 5432            | Another PostgreSQL is running.                                                        | Stop it, or change the host port in `compose.yaml` and `backend/.env`. |
 | Database container exits after an upgrade         | The volume came from an older PostgreSQL image (this repo uses `postgres:18`).        | `docker compose down -v`, then start again. This deletes local data.   |
-| API starts but `DATABASE_URL` is empty            | Run from a subdirectory, so `.env` was not found.                                     | Run `go run ./backend/cmd` from the repo root.                         |
-| Quick add says "not configured"                   | No `ANTHROPIC_API_KEY` in `.env.local`.                                               | Add the key and restart the API. Expected without a key.               |
+| API starts but `DATABASE_URL` is empty            | Not run from `backend/`, so `.env` was not found.                                     | Run `go run ./cmd` from `backend/`.                                    |
+| Quick add says "not configured"                   | No `ANTHROPIC_API_KEY` in `backend/.env.local`.                                       | Add the key and restart the API. Expected without a key.               |
 | Go tests cannot start a container                 | Docker is not running. The first run also downloads an image.                         | Start Docker and retry.                                                |
 | `git commit` skips checks                         | The pre-commit hook is not enabled.                                                   | `git config core.hooksPath .githooks`                                  |
