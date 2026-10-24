@@ -1,5 +1,6 @@
 # Local secrets such as ANTHROPIC_API_KEY. Never commit.
 .env.local
+.env.prod
 
 .playwright-mcp
 node_modules/

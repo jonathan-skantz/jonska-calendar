@@ -22,6 +22,7 @@ Jonska Calendar is a small family calendar. Create events and tasks, tag them, s
 
 - [API](api.md): routes, fields, status codes.
 - [Decisions](decisions.md): why key tools were chosen.
+- [Deployment](deployment.md): host the app on AWS with Docker Compose.
 
 ## Agent instructions
 
