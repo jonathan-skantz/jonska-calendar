@@ -103,8 +103,10 @@ The server rejects a `from` earlier than yesterday in UTC, because it does not k
 
 ### Subscriptions cannot reach private addresses
 
-- The subscription client refuses loopback, private, link-local, carrier-grade NAT, and other non-public addresses. It checks the address it dials, so a hostname or a redirect cannot lead it into the server's network.
-- A calendar server on your own network (or another copy of this app on `localhost`) is refused. Set `SUBSCRIPTIONS_ALLOW_PRIVATE=true` to allow it, only where every user is trusted.
+- The subscription client refuses loopback, private, link-local, carrier-grade NAT, IPv6 ranges that embed an IPv4 address (NAT64, 6to4, Teredo), and other non-public addresses, and connects only to ports 80 and 443. It checks the address it dials, so a hostname or a redirect cannot lead it into the server's network.
+- A user can follow at most 20 calendars, and subscribing plus "Refresh now" make at most 20 fetches per user per hour.
+- Fetch errors leave the feed URL out, so a private calendar link does not end up in the server log.
+- A calendar server on your own network (or another copy of this app on `localhost`) is refused. Set `SUBSCRIPTIONS_ALLOW_PRIVATE=true` to allow it, and any port, only where every user is trusted.
 
 ### Subscriptions refresh in the background
 

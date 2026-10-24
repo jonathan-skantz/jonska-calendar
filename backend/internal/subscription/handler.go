@@ -14,28 +14,42 @@ import (
 
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
+	"github.com/jonathan-skantz/calendar/backend/internal/ratelimit"
 	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
 )
 
 const (
 	maxNameLength = 100
 	defaultColor  = "#547968"
+	// maxPerUser bounds the feeds the background refresh fetches for one
+	// user.
+	maxPerUser = 20
+	// fetchesPerWindow bounds how often one user can make the server fetch
+	// a feed by subscribing or refreshing.
+	fetchesPerWindow = 20
+	fetchWindow      = time.Hour
 )
 
 var (
 	errNameTooLong  = errors.New("name must be at most 100 characters")
 	errNameRequired = errors.New("name must be 1 to 100 characters")
 	errInvalidColor = errors.New("color must be a #rrggbb hex color")
+	errTooMany      = errors.New("you can follow at most 20 calendars")
+	errTooOften     = errors.New("too many fetches, try again later")
 )
 
 type Handler struct {
 	Store       *db.Store
 	CurrentUser auth.CurrentUser
 	Refresher   *Refresher
+	fetches     *ratelimit.Limiter[uuid.UUID]
 }
 
 func New(store *db.Store, currentUser auth.CurrentUser, client *Client) *Handler {
-	return &Handler{Store: store, CurrentUser: currentUser, Refresher: &Refresher{Store: store, Client: client}}
+	return &Handler{
+		Store: store, CurrentUser: currentUser, Refresher: &Refresher{Store: store, Client: client},
+		fetches: ratelimit.New[uuid.UUID](fetchesPerWindow, fetchWindow),
+	}
 }
 
 type createRequest struct {
@@ -114,6 +128,26 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Checked before fetching, so a refused subscription costs no fetch.
+	existing, err := h.Store.ListSubscriptions(r.Context(), userID)
+	if err != nil {
+		writeServerError(w, "failed to subscribe", err)
+		return
+	}
+	for _, other := range existing {
+		if other.URL == feedURL {
+			http.Error(w, db.ErrSubscriptionExists.Error(), http.StatusConflict)
+			return
+		}
+	}
+	if len(existing) >= maxPerUser {
+		http.Error(w, errTooMany.Error(), http.StatusConflict)
+		return
+	}
+	if !h.fetches.Allow(userID) {
+		http.Error(w, errTooOften.Error(), http.StatusTooManyRequests)
+		return
+	}
 	feed, err := h.Refresher.Load(r.Context(), feedURL, loc)
 	if IsFeedError(err) {
 		http.Error(w, Message(err), http.StatusBadRequest)
@@ -177,6 +211,10 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	subscription, err := h.Store.GetSubscription(r.Context(), userID, subscriptionID)
 	if err != nil {
 		writeSubscription(w, subscription, err)
+		return
+	}
+	if !h.fetches.Allow(userID) {
+		http.Error(w, errTooOften.Error(), http.StatusTooManyRequests)
 		return
 	}
 	subscription, err = h.Refresher.Refresh(r.Context(), subscription)

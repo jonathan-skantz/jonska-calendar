@@ -44,6 +44,11 @@ func TestIsPublic(t *testing.T) {
 		"fe80::1":          false,
 		"::ffff:127.0.0.1": false,
 		"224.0.0.1":        false,
+		"198.18.0.1":       false,
+		"64:ff9b::a00:1":   false,
+		"2002:a00:1::1":    false,
+		"2001:0:a00:1::1":  false,
+		"::10.0.0.1":       false,
 	} {
 		if got := isPublic(netip.MustParseAddr(address)); got != want {
 			t.Errorf("%s: expected %v, got %v", address, want, got)
@@ -85,5 +90,33 @@ func TestFetch(t *testing.T) {
 	}
 	if _, err := NewClient(false).Fetch(ctx, "http://127.0.0.1:1/ok.ics"); Message(err) != ErrBlockedAddress.Error() {
 		t.Fatalf("expected the blocked message, got %q", Message(err))
+	}
+}
+
+func TestRefusePrivateAllowsOnlyWebPorts(t *testing.T) {
+	for address, want := range map[string]error{
+		"93.184.216.34:443":  nil,
+		"93.184.216.34:80":   nil,
+		"93.184.216.34:22":   ErrBlockedAddress,
+		"[2606:4700::1]:443": nil,
+		"10.0.0.1:443":       ErrBlockedAddress,
+	} {
+		if err := refusePrivate("tcp", address, nil); !errors.Is(err, want) {
+			t.Errorf("%s: expected %v, got %v", address, want, err)
+		}
+	}
+}
+
+func TestFetchKeepsTheURLOutOfErrors(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	feedURL := server.URL + "/private/secret-token.ics"
+	server.Close()
+
+	_, err := NewClient(true).Fetch(context.Background(), feedURL)
+	if !errors.Is(err, ErrUnreachable) {
+		t.Fatalf("expected an unreachable feed, got %v", err)
+	}
+	if strings.Contains(err.Error(), "secret-token") {
+		t.Fatalf("expected the URL to be left out, got %q", err.Error())
 	}
 }

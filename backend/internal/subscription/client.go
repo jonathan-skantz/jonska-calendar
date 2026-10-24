@@ -15,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/jonathan-skantz/calendar/backend/internal/ical"
 )
 
 const (
@@ -102,8 +104,10 @@ func NewClient(allowPrivate bool) *Client {
 	}}
 }
 
+// refusePrivate allows only public addresses on the web's own ports, so a
+// feed URL cannot probe other services.
 func refusePrivate(_, address string, _ syscall.RawConn) error {
-	host, _, err := net.SplitHostPort(address)
+	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return err
 	}
@@ -111,19 +115,38 @@ func refusePrivate(_, address string, _ syscall.RawConn) error {
 	if err != nil {
 		return err
 	}
-	if !isPublic(ip) {
+	if !isPublic(ip) || (port != "80" && port != "443") {
 		return ErrBlockedAddress
 	}
 	return nil
 }
 
-// sharedAddressSpace is carrier-grade NAT (RFC 6598), which IsPrivate does
-// not cover.
-var sharedAddressSpace = netip.MustParsePrefix("100.64.0.0/10")
+// nonPublic are ranges that IsGlobalUnicast and IsPrivate let through but
+// that are not ordinary public hosts: carrier-grade NAT, benchmarking and
+// IETF protocol ranges, and the IPv6 ranges that embed an IPv4 address,
+// which a NAT64 or 6to4 gateway could route to a private one.
+var nonPublic = []netip.Prefix{
+	netip.MustParsePrefix("100.64.0.0/10"),
+	netip.MustParsePrefix("192.0.0.0/24"),
+	netip.MustParsePrefix("198.18.0.0/15"),
+	netip.MustParsePrefix("::/96"),
+	netip.MustParsePrefix("64:ff9b::/96"),
+	netip.MustParsePrefix("64:ff9b:1::/48"),
+	netip.MustParsePrefix("2001::/32"),
+	netip.MustParsePrefix("2002::/16"),
+}
 
 func isPublic(ip netip.Addr) bool {
 	ip = ip.Unmap()
-	return ip.IsGlobalUnicast() && !ip.IsPrivate() && !sharedAddressSpace.Contains(ip)
+	if !ip.IsGlobalUnicast() || ip.IsPrivate() {
+		return false
+	}
+	for _, prefix := range nonPublic {
+		if prefix.Contains(ip) {
+			return false
+		}
+	}
+	return true
 }
 
 // Fetch downloads a feed at a URL that NormalizeURL accepted.
@@ -142,6 +165,11 @@ func (c *Client) Fetch(ctx context.Context, feedURL string) ([]byte, error) {
 		if errors.Is(err, ErrInvalidURL) {
 			return nil, ErrInvalidURL
 		}
+		// The URL can hold a secret, as private calendar links do, so it
+		// is kept out of the error and the server's log.
+		if urlErr, ok := errors.AsType[*url.Error](err); ok {
+			err = urlErr.Err
+		}
 		return nil, fmt.Errorf("%w: %v", ErrUnreachable, err)
 	}
 	defer response.Body.Close()
@@ -158,16 +186,21 @@ func (c *Client) Fetch(ctx context.Context, feedURL string) ([]byte, error) {
 	return body, nil
 }
 
+// ErrUnreadable is what a subscriber is told about any other failure.
+var ErrUnreadable = errors.New("the calendar could not be read")
+
 // Message is what a subscriber is told about a failed fetch. Network
 // details stay in the server's log.
 func Message(err error) string {
 	if _, ok := errors.AsType[statusError](err); ok {
 		return err.Error()
 	}
-	for _, known := range []error{ErrInvalidURL, ErrBlockedAddress, ErrTooLarge, ErrUnreachable} {
+	for _, known := range []error{
+		ErrInvalidURL, ErrBlockedAddress, ErrTooLarge, ErrUnreachable, ical.ErrInvalidFile, ical.ErrTooManyEvents,
+	} {
 		if errors.Is(err, known) {
 			return known.Error()
 		}
 	}
-	return err.Error()
+	return ErrUnreadable.Error()
 }

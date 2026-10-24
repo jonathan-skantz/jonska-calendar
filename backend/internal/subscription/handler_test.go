@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -95,6 +96,38 @@ func TestCreateRejectsBadRequests(t *testing.T) {
 		if code := send(t, handler.Create, "", body).Code; code != http.StatusBadRequest {
 			t.Errorf("%s: expected %d, got %d", name, http.StatusBadRequest, code)
 		}
+	}
+}
+
+func TestCreateChecksLimitsBeforeFetching(t *testing.T) {
+	ctx := context.Background()
+	fetched := &atomic.Bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { fetched.Store(true) }))
+	t.Cleanup(server.Close)
+	store := testutil.NewStore(t)
+	userID, err := store.Register(ctx, "user@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(store, testutil.SignedInAs(userID), NewClient(true))
+	for i := range maxPerUser {
+		if _, err := store.CreateSubscription(ctx, db.Subscription{
+			UserID: userID, Name: "Feed", URL: server.URL + "/" + strconv.Itoa(i), Color: defaultColor, TimeZone: "UTC",
+		}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	duplicate := send(t, handler.Create, "", map[string]any{"url": server.URL + "/0", "time_zone": "UTC"})
+	if duplicate.Code != http.StatusConflict || !strings.Contains(duplicate.Body.String(), db.ErrSubscriptionExists.Error()) {
+		t.Fatalf("duplicate: expected 409 for the existing URL, got %d: %s", duplicate.Code, duplicate.Body.String())
+	}
+	tooMany := send(t, handler.Create, "", map[string]any{"url": server.URL + "/new", "time_zone": "UTC"})
+	if tooMany.Code != http.StatusConflict || !strings.Contains(tooMany.Body.String(), errTooMany.Error()) {
+		t.Fatalf("over the cap: expected 409, got %d: %s", tooMany.Code, tooMany.Body.String())
+	}
+	if fetched.Load() {
+		t.Fatal("expected no fetch for refused subscriptions")
 	}
 }
 
