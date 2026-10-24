@@ -84,6 +84,7 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 
 - **Chosen:** coordinates are rounded to 0.1 degrees (about 10 km) before caching. Raw Open-Meteo codes are stored, and icons are chosen at read time.
 - **Why:** users in one area share one upstream call, and exact positions are never stored. Changing the icon rule needs no refetch.
+- **Limits:** a user may ask 60 times an hour, and all users together make at most 2000 upstream calls a day, well inside Open-Meteo's free quota. Past that, cached forecasts are served however old they are.
 
 ## Quick add is parse-only
 

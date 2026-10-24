@@ -12,8 +12,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
+	"github.com/jonathan-skantz/calendar/backend/internal/ratelimit"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -23,6 +26,16 @@ const cacheTTL = 3 * time.Hour
 
 // fetchTimeout bounds the shared lookup, which outlives any one request.
 const fetchTimeout = 30 * time.Second
+
+const (
+	// Each request may need an upstream call for a new cell, so one user
+	// cannot walk the map.
+	requestsPerWindow = 60
+	requestWindow     = time.Hour
+	// upstreamCallsPerDay keeps every user together well inside Open-Meteo's
+	// free quota of 10 000 calls a day.
+	upstreamCallsPerDay = 2000
+)
 
 var (
 	ErrInvalidCoordinates = errors.New("lat and lon must be valid coordinates")
@@ -35,14 +48,25 @@ type Handler struct {
 	Client      *Client
 	now         func() time.Time
 	fetches     singleflight.Group
+	requests    *ratelimit.Limiter[uuid.UUID]
+	upstream    *ratelimit.Budget
 }
 
 func New(store *db.Store, currentUser auth.CurrentUser, client *Client) *Handler {
-	return &Handler{Store: store, CurrentUser: currentUser, Client: client, now: time.Now}
+	return &Handler{
+		Store: store, CurrentUser: currentUser, Client: client, now: time.Now,
+		requests: ratelimit.New[uuid.UUID](requestsPerWindow, requestWindow),
+		upstream: ratelimit.NewBudget(upstreamCallsPerDay),
+	}
 }
 
 func (h *Handler) Forecast(w http.ResponseWriter, r *http.Request) {
-	if _, ok := auth.RequireUser(w, r, h.CurrentUser); !ok {
+	userID, ok := auth.RequireUser(w, r, h.CurrentUser)
+	if !ok {
+		return
+	}
+	if !h.requests.Allow(userID) {
+		http.Error(w, "too many weather requests, try again later", http.StatusTooManyRequests)
 		return
 	}
 	latitude, longitude, err := parseCoordinates(r.URL.Query())
@@ -88,6 +112,13 @@ func (h *Handler) forecast(ctx context.Context, latitude, longitude float64) (Fo
 		return decodeForecast(cached)
 	}
 
+	// Past the daily budget, a cached forecast is served however old it is.
+	if !h.upstream.Allow() {
+		if hasCached {
+			return decodeForecast(cached)
+		}
+		return Forecast{}, errUnavailable
+	}
 	fresh, err := h.Client.Forecast(ctx, latitude, longitude)
 	if err != nil {
 		log.Printf("weather: refreshing %.1f,%.1f: %v", latitude, longitude, err)

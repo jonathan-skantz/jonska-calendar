@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/ratelimit"
 	"github.com/jonathan-skantz/calendar/backend/internal/testutil"
 )
 
@@ -105,6 +106,31 @@ func TestForecastSharesCacheAndRefreshes(t *testing.T) {
 	}
 	if code := get(handler, "lat=10&lon=10").Code; code != http.StatusServiceUnavailable {
 		t.Fatalf("expected status %d for an uncached cell, got %d", http.StatusServiceUnavailable, code)
+	}
+}
+
+func TestForecastLimitsRequestsAndUpstreamCalls(t *testing.T) {
+	store := testutil.NewStore(t)
+	upstream := newFakeUpstream(t)
+	userID := uuid.New()
+	handler := New(store, testutil.SignedInAs(userID), &Client{BaseURL: upstream.server.URL, HTTP: upstream.server.Client()})
+	handler.upstream = ratelimit.NewBudget(1)
+
+	if code := get(handler, "lat=59.3&lon=18.1").Code; code != http.StatusOK {
+		t.Fatalf("first cell: expected status %d, got %d", http.StatusOK, code)
+	}
+	if code := get(handler, "lat=57.7&lon=12.0").Code; code != http.StatusServiceUnavailable {
+		t.Fatalf("uncached cell past the budget: expected status %d, got %d", http.StatusServiceUnavailable, code)
+	}
+	if calls := upstream.calls.Load(); calls != 1 {
+		t.Fatalf("expected one upstream call, got %d", calls)
+	}
+
+	for range requestsPerWindow - 2 {
+		get(handler, "lat=59.3&lon=18.1")
+	}
+	if code := get(handler, "lat=59.3&lon=18.1").Code; code != http.StatusTooManyRequests {
+		t.Fatalf("over the user's limit: expected status %d, got %d", http.StatusTooManyRequests, code)
 	}
 }
 
