@@ -2,3 +2,4 @@
 .env.local
 
 .playwright-mcp
+node_modules/
