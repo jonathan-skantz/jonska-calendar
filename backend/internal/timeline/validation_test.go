@@ -2,6 +2,7 @@ package timeline
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,6 +71,44 @@ func TestValidatorsReturnNormalizedRequests(t *testing.T) {
 	household, err := validateHouseholdRequest(householdRequest{Name: " Home ", TransitCardCount: 1})
 	if err != nil || household.Name != "Home" {
 		t.Fatalf("expected trimmed household name, got %q (err %v)", household.Name, err)
+	}
+}
+
+func TestTextLengthsAreLimited(t *testing.T) {
+	long := func(length int) *string {
+		value := strings.Repeat("x", length)
+		return &value
+	}
+	event := db.Event{
+		Title:    *long(db.MaxTitleLength),
+		Kind:     db.EventKindInformational,
+		StartsAt: time.Date(2026, 10, 15, 18, 0, 0, 0, time.UTC),
+		EndsAt:   time.Date(2026, 10, 15, 19, 0, 0, 0, time.UTC),
+		Location: long(db.MaxLocationLength),
+	}
+	if _, err := ValidateEvent(event); err != nil {
+		t.Fatalf("text at the limits: %v", err)
+	}
+	for name, change := range map[string]func(*db.Event){
+		"title":       func(event *db.Event) { event.Title = *long(db.MaxTitleLength + 1) },
+		"description": func(event *db.Event) { event.Description = long(db.MaxDescriptionLength + 1) },
+		"url":         func(event *db.Event) { event.URL = long(db.MaxURLLength + 1) },
+		"location":    func(event *db.Event) { event.Location = long(db.MaxLocationLength + 1) },
+	} {
+		changed := event
+		change(&changed)
+		if _, err := ValidateEvent(changed); !errors.Is(err, ErrTextTooLong) {
+			t.Errorf("%s: expected %v, got %v", name, ErrTextTooLong, err)
+		}
+	}
+	if _, err := normalizeShareFields(shareFieldsRequest{Description: long(db.MaxDescriptionLength + 1)}); !errors.Is(err, ErrTextTooLong) {
+		t.Errorf("share fields: expected %v, got %v", ErrTextTooLong, err)
+	}
+	if _, err := validateCustomizationRequest(customizationRequest{Note: long(db.MaxDescriptionLength + 1)}); !errors.Is(err, ErrTextTooLong) {
+		t.Errorf("customization note: expected %v, got %v", ErrTextTooLong, err)
+	}
+	if _, err := validateTagName(*long(db.MaxTagNameLength + 1)); !errors.Is(err, ErrTagNameTooLong) {
+		t.Errorf("tag name: expected %v, got %v", ErrTagNameTooLong, err)
 	}
 }
 

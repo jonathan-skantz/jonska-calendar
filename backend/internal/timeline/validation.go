@@ -17,6 +17,10 @@ var (
 	ErrInvalidRequest = errors.New("invalid request body")
 	ErrTitleRequired  = errors.New("title cannot be empty")
 	ErrInvalidTimes   = errors.New("end time must be after start time")
+	ErrTextTooLong    = fmt.Errorf("text is too long: at most %d characters for a title, %d for a description or note, %d for a URL and %d for a location",
+		db.MaxTitleLength, db.MaxDescriptionLength, db.MaxURLLength, db.MaxLocationLength)
+	ErrTagNameTooLong = fmt.Errorf("a tag name can be at most %d characters", db.MaxTagNameLength)
+	ErrTooManyTags    = fmt.Errorf("you can have at most %d tags", db.MaxTagsPerUser)
 	ErrYearOutOfRange = fmt.Errorf("events must start and end between the years %d and %d", recurrence.MinYear, recurrence.MaxYear)
 	ErrInvalidKind    = errors.New("kind must be attendable or informational")
 	ErrInvalidSkip    = errors.New("only attendable events can be skipped")
@@ -57,6 +61,9 @@ func ValidateEvent(event db.Event) (db.Event, error) {
 	event.GatheringLabel = normalizeOptionalText(event.GatheringLabel)
 	if event.Title == "" {
 		return event, ErrTitleRequired
+	}
+	if !itemTextFits(&event.Title, event.Description, event.URL) || tooLong(event.Location, db.MaxLocationLength) {
+		return event, ErrTextTooLong
 	}
 	if event.Kind != db.EventKindAttendable && event.Kind != db.EventKindInformational {
 		return event, ErrInvalidKind
@@ -104,6 +111,10 @@ func validShiftSeconds(seconds int) bool {
 // the limits of an event's own; whether the event can have them is decided
 // when it is shown, since the owner may change it.
 func validateCustomizationRequest(request customizationRequest) (db.Customization, error) {
+	if !itemTextFits(request.Title, request.Description, request.URL) ||
+		tooLong(request.Location, db.MaxLocationLength) || tooLong(request.Note, db.MaxDescriptionLength) {
+		return db.Customization{}, ErrTextTooLong
+	}
 	if !validShiftSeconds(request.StartShiftSeconds) || !validShiftSeconds(request.EndShiftSeconds) {
 		return db.Customization{}, ErrInvalidShift
 	}
@@ -146,6 +157,9 @@ func validateTaskRequest(request taskRequest) (taskRequest, error) {
 	if request.Title == "" {
 		return request, ErrTitleRequired
 	}
+	if !itemTextFits(&request.Title, request.Description, request.URL) {
+		return request, ErrTextTooLong
+	}
 	if request.DeadlineAt.IsZero() {
 		return request, ErrDeadlineNeeded
 	}
@@ -157,6 +171,9 @@ func validateTagName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", ErrInvalidRequest
+	}
+	if tooLong(&name, db.MaxTagNameLength) {
+		return "", ErrTagNameTooLong
 	}
 	return name, nil
 }
@@ -293,11 +310,25 @@ func normalizeOptionalText(value *string) *string {
 	return &trimmed
 }
 
-func normalizeShareFields(request shareFieldsRequest) db.ShareFields {
+func normalizeShareFields(request shareFieldsRequest) (db.ShareFields, error) {
+	if !itemTextFits(request.Title, request.Description, request.URL) || tooLong(request.Location, db.MaxLocationLength) {
+		return db.ShareFields{}, ErrTextTooLong
+	}
 	return db.ShareFields{
 		Title:       normalizeOptionalText(request.Title),
 		Description: normalizeOptionalText(request.Description),
 		URL:         normalizeOptionalText(request.URL),
 		Location:    normalizeOptionalText(request.Location),
-	}
+	}, nil
+}
+
+// itemTextFits reports whether the fields every timeline item has are within
+// their limits. Nil fields fit.
+func itemTextFits(title, description, url *string) bool {
+	return !tooLong(title, db.MaxTitleLength) && !tooLong(description, db.MaxDescriptionLength) &&
+		!tooLong(url, db.MaxURLLength)
+}
+
+func tooLong(value *string, max int) bool {
+	return value != nil && utf8.RuneCountInString(*value) > max
 }

@@ -54,6 +54,11 @@ func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
+	fields, err := normalizeShareFields(request.shareFieldsRequest)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	recipient, ok := h.findUserByEmail(w, r, request.RecipientEmail, "recipient not found")
 	if !ok {
 		return
@@ -62,7 +67,7 @@ func (h *Handler) ShareEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "you cannot share an event with yourself", http.StatusBadRequest)
 		return
 	}
-	shareID, err := h.Store.ShareEvent(r.Context(), ownerID, eventID, recipient.ID, normalizeShareFields(request.shareFieldsRequest))
+	shareID, err := h.Store.ShareEvent(r.Context(), ownerID, eventID, recipient.ID, fields)
 	if err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to share event"},
@@ -94,7 +99,12 @@ func (h *Handler) UpdateEventShare(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	if err := h.Store.UpdateEventShare(r.Context(), ownerID, eventID, shareID, normalizeShareFields(request)); err != nil {
+	fields, err := normalizeShareFields(request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.Store.UpdateEventShare(r.Context(), ownerID, eventID, shareID, fields); err != nil {
 		writeMappedError(w, err,
 			httpErrorResponse{status: http.StatusInternalServerError, message: "failed to update share"},
 			shareNotFound,

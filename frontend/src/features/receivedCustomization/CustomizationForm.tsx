@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ChangeEvent } from "react";
+import { TEXT_LIMITS } from "../../lib/calendar";
 import type { Customization, TimelineEntry } from "../../types";
 import { TEXT_FIELDS, customizationFrom, draftFrom } from "./customization";
 import type { CustomizationDraft, MinutesField } from "./customization";
@@ -72,6 +73,7 @@ export const CustomizationForm = ({
       {TEXT_FIELDS.map(({ name, label, ...field }) => {
         const props = {
           name,
+          maxLength: TEXT_LIMITS[name],
           value: draft[name],
           placeholder:
             (name === "note" ? undefined : received[name]) || "Not set",

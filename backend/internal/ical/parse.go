@@ -176,10 +176,22 @@ func Parse(r io.Reader, loc *time.Location) (Result, error) {
 }
 
 func titleOf(vevent *ics.VEvent) string {
-	if title := textValue(vevent, ics.ComponentPropertySummary); title != nil {
+	if title := truncated(textValue(vevent, ics.ComponentPropertySummary), db.MaxTitleLength); title != nil {
 		return *title
 	}
 	return "Untitled"
+}
+
+// truncated cuts value to at most limit characters.
+func truncated(value *string, limit int) *string {
+	if value == nil {
+		return nil
+	}
+	if runes := []rune(*value); len(runes) > limit {
+		cut := strings.TrimSpace(string(runes[:limit]))
+		return &cut
+	}
+	return value
 }
 
 // setException adds an exception, replacing one for the same occurrence. It
@@ -264,9 +276,13 @@ func parseEvent(vevent *ics.VEvent, loc *time.Location) (event Event, warnings [
 		event.Exceptions = excluded
 	}
 
-	event.Description = textValue(vevent, ics.ComponentPropertyDescription)
-	event.URL = textValue(vevent, ics.ComponentPropertyUrl)
-	event.Location = textValue(vevent, ics.ComponentPropertyLocation)
+	// Text past the app's limits is cut rather than skipping the event; a
+	// URL cannot be cut, so a long one is left out.
+	event.Description = truncated(textValue(vevent, ics.ComponentPropertyDescription), db.MaxDescriptionLength)
+	if event.URL = textValue(vevent, ics.ComponentPropertyUrl); event.URL != nil && len(*event.URL) > db.MaxURLLength {
+		event.URL = nil
+	}
+	event.Location = truncated(textValue(vevent, ics.ComponentPropertyLocation), db.MaxLocationLength)
 	if uid := textValue(vevent, ics.ComponentPropertyUniqueId); uid != nil {
 		event.UID = *uid
 	}

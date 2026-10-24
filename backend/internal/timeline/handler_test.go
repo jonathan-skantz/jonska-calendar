@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -682,6 +683,25 @@ func TestDeleteTimelineItem(t *testing.T) {
 	otherHandler.DeleteTimelineItem(response, request)
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("other user delete: expected status %d, got %d", http.StatusNotFound, response.Code)
+	}
+}
+
+func TestCreateTagStopsAtTheLimit(t *testing.T) {
+	store, userID := setupTestStore(t)
+	handler := New(store, testutil.SignedInAs(userID))
+	existing, err := store.ListTags(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := len(existing); i < db.MaxTagsPerUser; i++ {
+		if _, err := store.CreateTag(context.Background(), userID, "tag "+strconv.Itoa(i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	response := httptest.NewRecorder()
+	handler.CreateTag(response, httptest.NewRequest(http.MethodPost, "/api/tags", strings.NewReader(`{"name":"one more"}`)))
+	if response.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusConflict, response.Code, response.Body.String())
 	}
 }
 

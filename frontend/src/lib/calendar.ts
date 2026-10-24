@@ -9,6 +9,15 @@ export const HOURS_PER_DAY = 24;
 export const MINUTES_PER_HOUR = 60;
 export const SECONDS_PER_MINUTE = 60;
 export const MAX_GATHERING_LABEL_LENGTH = 40;
+// The API's text limits, in characters (backend/db/models.go).
+export const TEXT_LIMITS = {
+  title: 200,
+  description: 10000,
+  url: 2048,
+  location: 500,
+  note: 10000,
+} as const;
+export const MAX_TAG_NAME_LENGTH = 50;
 export const MAX_COMMUTE_MINUTES = 24 * 60;
 export const TASK_DISPLAY_DURATION_MINUTES = 45;
 export const MINIMUM_ENTRY_DURATION_MINUTES = 90;

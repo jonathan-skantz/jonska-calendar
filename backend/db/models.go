@@ -42,6 +42,17 @@ const (
 	EventKindInformational = "informational"
 )
 
+// Longest text the API accepts, in characters, and the most tags a user may
+// have. They bound storage and the text the assistant sends to its model.
+const (
+	MaxTitleLength       = 200
+	MaxDescriptionLength = 10000
+	MaxURLLength         = 2048
+	MaxLocationLength    = 500
+	MaxTagNameLength     = 50
+	MaxTagsPerUser       = 100
+)
+
 // Limits shared by event validation and quick add. They mirror the
 // database's CHECK constraints.
 const (

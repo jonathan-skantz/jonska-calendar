@@ -3,6 +3,7 @@ import type { ChangeEvent } from "react";
 import type { ShareFieldsUpdate } from "./useEventShares";
 import type { EventShare, ShareFields, TimelineEntry } from "../../types";
 import { Drawer } from "../../components/Drawer";
+import { TEXT_LIMITS } from "../../lib/calendar";
 import { cx } from "../../lib/classNames";
 
 type ShareEventDrawerProps = {
@@ -98,6 +99,7 @@ const RecipientCard = ({
           {FIELDS.map(({ name, label, multiline }) => {
             const props = {
               name,
+              maxLength: TEXT_LIMITS[name],
               value: draft[name],
               placeholder: event[name] || "Not set",
               onChange: (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Drawer } from "../../components/Drawer";
+import { TEXT_LIMITS } from "../../lib/calendar";
 import type { TimelineEntry } from "../../types";
 import type { ResolvedDraft } from "../quickAdd/resolveDraft";
 import { EventFields } from "./EventFields";
@@ -81,6 +82,7 @@ export const ComposerDrawer = ({
         <textarea
           name="description"
           {...fields.inputProps("description")}
+          maxLength={TEXT_LIMITS.description}
           defaultValue={initial?.description}
         />
       </label>
@@ -89,6 +91,7 @@ export const ComposerDrawer = ({
         <input
           name="url"
           {...fields.inputProps("url")}
+          maxLength={TEXT_LIMITS.url}
           type="url"
           defaultValue={initial?.url}
           placeholder="https://"
@@ -139,6 +142,7 @@ export const ComposerDrawer = ({
           <input
             name="title"
             {...fields.inputProps("title")}
+            maxLength={TEXT_LIMITS.title}
             defaultValue={initial?.title}
             placeholder={
               type === "event" ? "What is happening?" : "What needs doing?"

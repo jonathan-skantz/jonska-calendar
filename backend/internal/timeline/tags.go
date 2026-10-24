@@ -25,6 +25,15 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	tags, err := h.Store.ListTags(r.Context(), userID)
+	if err != nil {
+		writeServerError(w, "failed to create tag", err)
+		return
+	}
+	if len(tags) >= db.MaxTagsPerUser {
+		http.Error(w, ErrTooManyTags.Error(), http.StatusConflict)
+		return
+	}
 	tag, err := h.Store.CreateTag(r.Context(), userID, name)
 	if err != nil {
 		writeMappedError(w, err,

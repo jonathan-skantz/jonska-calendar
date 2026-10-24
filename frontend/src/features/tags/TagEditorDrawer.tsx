@@ -1,5 +1,6 @@
 import type { Tag } from "../../types";
 import { Drawer } from "../../components/Drawer";
+import { MAX_TAG_NAME_LENGTH } from "../../lib/calendar";
 
 type TagEditorDrawerProps = {
   tags: Tag[];
@@ -40,7 +41,12 @@ export const TagEditorDrawer = ({
         >
           <label>
             Name
-            <input name="name" defaultValue={tag.name} required />
+            <input
+              name="name"
+              defaultValue={tag.name}
+              maxLength={MAX_TAG_NAME_LENGTH}
+              required
+            />
           </label>
           <label>
             Color

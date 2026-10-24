@@ -7,6 +7,7 @@ import {
   MAX_COMMUTE_MINUTES,
   MAX_GATHERING_LABEL_LENGTH,
   SECONDS_PER_MINUTE,
+  TEXT_LIMITS,
   inputDateTime,
 } from "../../lib/calendar";
 import { cx } from "../../lib/classNames";
@@ -210,6 +211,7 @@ export const EventFields = ({
         <input
           name="location"
           {...fields.inputProps("location")}
+          maxLength={TEXT_LIMITS.location}
           defaultValue={initial?.location}
           placeholder="Home, online, or somewhere else"
         />

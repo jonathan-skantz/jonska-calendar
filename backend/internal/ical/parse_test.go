@@ -451,3 +451,12 @@ EXDATE:`+strings.Join(excluded, ","))), stockholm)
 		t.Fatalf("expected a warning about the cap, got %v", result.Warnings)
 	}
 }
+
+func TestParseCutsTextToTheAppsLimits(t *testing.T) {
+	event := parseOne(t, "DTSTART:20261024T160000Z\nSUMMARY:"+strings.Repeat("t", db.MaxTitleLength+5)+
+		"\nDESCRIPTION:"+strings.Repeat("d", db.MaxDescriptionLength+5)+
+		"\nURL:https://example.com/"+strings.Repeat("u", db.MaxURLLength))
+	if len(event.Title) != db.MaxTitleLength || len(*event.Description) != db.MaxDescriptionLength || event.URL != nil {
+		t.Fatalf("expected cut title and description and no URL, got %d, %d, %v", len(event.Title), len(*event.Description), event.URL)
+	}
+}
