@@ -1,58 +1,60 @@
 .auth-screen {
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: 1fr minmax(360px, 520px) 1fr;
-    padding: 42px 5vw;
-    background: linear-gradient(120deg, #e8eee3 0%, #f5f0e5 55%, #eadfd4 100%);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr minmax(360px, 520px) 1fr;
+  padding: 42px 5vw;
+  background: linear-gradient(120deg, #e8eee3 0%, #f5f0e5 55%, #eadfd4 100%);
 }
 
 .auth-mark,
 .auth-note {
-    font: 12px 'DM Mono', monospace;
-    letter-spacing: .08em;
-    color: var(--moss-dark);
-    text-transform: uppercase;
+  font:
+    12px "DM Mono",
+    monospace;
+  letter-spacing: 0.08em;
+  color: var(--moss-dark);
+  text-transform: uppercase;
 }
 
 .auth-note {
-    align-self: end;
-    justify-self: end;
-    text-align: right;
-    line-height: 1.7;
+  align-self: end;
+  justify-self: end;
+  text-align: right;
+  line-height: 1.7;
 }
 
 .auth-panel {
-    align-self: center;
-    padding: 45px 48px;
-    background: rgba(251, 250, 246, .8);
-    border: 1px solid rgba(84, 121, 104, .18);
-    box-shadow: 0 22px 60px rgba(49, 72, 59, .12);
+  align-self: center;
+  padding: 45px 48px;
+  background: rgba(251, 250, 246, 0.8);
+  border: 1px solid rgba(84, 121, 104, 0.18);
+  box-shadow: 0 22px 60px rgba(49, 72, 59, 0.12);
 }
 
 .auth-copy {
-    max-width: 300px;
-    color: var(--muted);
-    line-height: 1.6;
-    margin-bottom: 34px;
+  max-width: 300px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 34px;
 }
 
-.auth-panel>.text-button {
-    margin-top: 25px;
+.auth-panel > .text-button {
+  margin-top: 25px;
 }
 
-@media (max-width:800px) {
-    .auth-screen {
-        display: block;
-        padding: 25px 20px;
-    }
+@media (max-width: 800px) {
+  .auth-screen {
+    display: block;
+    padding: 25px 20px;
+  }
 
-    .auth-panel {
-        margin: 17vh auto 30px;
-        padding: 30px 25px;
-        max-width: 500px;
-    }
+  .auth-panel {
+    margin: 17vh auto 30px;
+    padding: 30px 25px;
+    max-width: 500px;
+  }
 
-    .auth-note {
-        display: none;
-    }
+  .auth-note {
+    display: none;
+  }
 }
