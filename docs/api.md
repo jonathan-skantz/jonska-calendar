@@ -11,6 +11,7 @@
 | ----- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `400` | Invalid input. The body says why.                                                                                                 |
 | `401` | No valid session.                                                                                                                 |
+| `403` | Registration is invite-only and the email is not on the list.                                                                     |
 | `404` | Not found **or** not yours. The server does not say which, on purpose.                                                            |
 | `409` | Conflict: duplicate name, already shared, already a member, last or main tag removal, a subscribed event without a UID.           |
 | `413` | The body is over 64 KB, or over 6 MB for an `.ics` import.                                                                        |

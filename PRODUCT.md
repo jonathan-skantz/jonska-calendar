@@ -62,6 +62,11 @@ testable product over polish.
 
 ---
 
+### Accounts (Demo)
+
+- [x] People sign in with an email and a password.
+- [x] Sign-up is invite-only: only emails the host lists can register.
+
 ### Timeline Item Type 1: Events
 
 Events have a start date/time and end date/time.

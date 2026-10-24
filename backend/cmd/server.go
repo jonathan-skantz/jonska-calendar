@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 	// Embeds the time zone database, so the assistant can read the browser's
 	// time zone on hosts without one.
@@ -49,8 +50,15 @@ func main() {
 	log.Println("Connected to the database")
 
 	store := db.NewStore(dbPool)
-	// Behind HTTPS, the session cookie must never travel over plain HTTP.
-	authHandler := auth.New(store, os.Getenv("SESSION_COOKIE_SECURE") == "true")
+	authConfig := auth.Config{
+		// Behind HTTPS, the session cookie must never travel over plain HTTP.
+		SecureCookies: os.Getenv("SESSION_COOKIE_SECURE") == "true",
+		AllowedEmails: strings.Split(os.Getenv("REGISTRATION_ALLOWED_EMAILS"), ","),
+	}
+	authHandler := auth.New(store, authConfig)
+	if !authHandler.RegistrationRestricted() {
+		log.Println("REGISTRATION_ALLOWED_EMAILS is not set: anyone can register")
+	}
 	timelineHandler := timeline.New(store, authHandler.CurrentUserID)
 	weatherHandler := weather.New(store, authHandler.CurrentUserID, weather.NewClient())
 	icalHandler := ical.New(store, authHandler.CurrentUserID)

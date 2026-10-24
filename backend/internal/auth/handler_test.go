@@ -19,7 +19,7 @@ import (
 
 func TestRegister(t *testing.T) {
 	store := testutil.NewStore(t)
-	handler := New(store, false)
+	handler := New(store, Config{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":" TEST@example.com ","password":"password123"}`))
 	response := httptest.NewRecorder()
@@ -58,7 +58,7 @@ func TestRegister(t *testing.T) {
 
 func TestRegisterRejectsDuplicateEmail(t *testing.T) {
 	store := testutil.NewStore(t)
-	handler := New(store, false)
+	handler := New(store, Config{})
 
 	register := func() *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`))
@@ -77,7 +77,7 @@ func TestRegisterRejectsDuplicateEmail(t *testing.T) {
 
 func TestLoginCreatesSession(t *testing.T) {
 	store := testutil.NewStore(t)
-	handler := New(store, false)
+	handler := New(store, Config{})
 
 	registerRequest := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`))
 	registerResponse := httptest.NewRecorder()
@@ -114,7 +114,7 @@ func TestLoginCreatesSession(t *testing.T) {
 
 func TestLoginRejectsInvalidCredentials(t *testing.T) {
 	store := testutil.NewStore(t)
-	handler := New(store, false)
+	handler := New(store, Config{})
 
 	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"missing@example.com","password":"password123"}`))
 	response := httptest.NewRecorder()
@@ -127,7 +127,7 @@ func TestLoginRejectsInvalidCredentials(t *testing.T) {
 
 func TestLogoutRevokesSession(t *testing.T) {
 	store := testutil.NewStore(t)
-	handler := New(store, false)
+	handler := New(store, Config{})
 
 	registerRequest := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`))
 	registerResponse := httptest.NewRecorder()
@@ -168,7 +168,7 @@ func TestLogoutRevokesSession(t *testing.T) {
 
 func TestSessionCookieIsSecureWhenConfigured(t *testing.T) {
 	store := testutil.NewStore(t)
-	handler := New(store, true)
+	handler := New(store, Config{SecureCookies: true})
 
 	registerRequest := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`))
 	registerResponse := httptest.NewRecorder()
@@ -196,7 +196,7 @@ func TestSessionCookieIsSecureWhenConfigured(t *testing.T) {
 }
 
 func TestLoginIsRateLimited(t *testing.T) {
-	handler := New(testutil.NewStore(t), false)
+	handler := New(testutil.NewStore(t), Config{})
 	login := func(email, clientIP string) int {
 		request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"`+email+`","password":"password123"}`))
 		request.Header.Set("X-Forwarded-For", clientIP)
@@ -219,7 +219,7 @@ func TestLoginIsRateLimited(t *testing.T) {
 }
 
 func TestRegisterIsRateLimited(t *testing.T) {
-	handler := New(testutil.NewStore(t), false)
+	handler := New(testutil.NewStore(t), Config{})
 	for i := range registrationsPerClient + 1 {
 		request := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"user`+strconv.Itoa(i)+`@example.com","password":"password123"}`))
 		response := httptest.NewRecorder()
@@ -234,9 +234,24 @@ func TestRegisterIsRateLimited(t *testing.T) {
 	}
 }
 
+func TestRegisterOnlyAllowedEmails(t *testing.T) {
+	handler := New(testutil.NewStore(t), Config{AllowedEmails: []string{" Invited@Example.com ", ""}})
+	register := func(email string) int {
+		response := httptest.NewRecorder()
+		handler.Register(response, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"`+email+`","password":"password123"}`)))
+		return response.Code
+	}
+	if code := register("stranger@example.com"); code != http.StatusForbidden {
+		t.Fatalf("stranger: expected status %d, got %d", http.StatusForbidden, code)
+	}
+	if code := register("INVITED@example.com"); code != http.StatusCreated {
+		t.Fatalf("invited: expected status %d, got %d", http.StatusCreated, code)
+	}
+}
+
 func TestCurrentUser(t *testing.T) {
 	store := testutil.NewStore(t)
-	handler := New(store, false)
+	handler := New(store, Config{})
 
 	registerRequest := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`))
 	registerResponse := httptest.NewRecorder()
@@ -323,7 +338,7 @@ func TestValidateNewAccount(t *testing.T) {
 }
 
 func TestRegisterRejectsShortPassword(t *testing.T) {
-	handler := New(testutil.NewStore(t), false)
+	handler := New(testutil.NewStore(t), Config{})
 	response := httptest.NewRecorder()
 	handler.Register(response, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"short"}`)))
 	if response.Code != http.StatusBadRequest {
@@ -333,7 +348,7 @@ func TestRegisterRejectsShortPassword(t *testing.T) {
 
 func TestUpdateCurrentUserDisplayName(t *testing.T) {
 	store := testutil.NewStore(t)
-	handler := New(store, false)
+	handler := New(store, Config{})
 
 	registerResponse := httptest.NewRecorder()
 	handler.Register(registerResponse, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"password123"}`)))

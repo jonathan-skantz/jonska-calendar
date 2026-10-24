@@ -83,6 +83,12 @@ Behind HTTPS, send the session cookie only over HTTPS. Leave it off on plain HTT
 SESSION_COOKIE_SECURE=true
 ```
 
+To let only some people register, list their emails. Without it, anyone can register, and the API logs a warning at startup:
+
+```dotenv
+REGISTRATION_ALLOWED_EMAILS=me@example.com,partner@example.com
+```
+
 `.claude/settings.json` stops Claude Code from reading `.env.local`.
 
 ## First run

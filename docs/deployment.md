@@ -37,10 +37,12 @@ POSTGRES_USER=calendar
 POSTGRES_PASSWORD=$(openssl rand -hex 32)
 SITE_ADDRESS=cal.example.com
 SESSION_COOKIE_SECURE=true
+REGISTRATION_ALLOWED_EMAILS=me@example.com,partner@example.com
 EOF
 chmod 600 .env.prod
 ```
 
+- `REGISTRATION_ALLOWED_EMAILS` lists who may create an account. Leaving it empty lets anyone on the internet register. To invite someone later, add their email and run the start command again.
 - The password goes into a database URL, so keep it URL-safe. Hex is.
 - PostgreSQL sets the password only when it creates the volume. Changing it later needs `ALTER USER` as well.
 - For quick add and the assistant, put `ANTHROPIC_API_KEY` in `backend/.env.local`. Without it, both report that they are not configured.
@@ -80,8 +82,3 @@ docker compose --env-file .env.prod exec -T db \
 ```
 
 EBS snapshots of the instance's volume are a second option.
-
-## Before inviting people
-
-- Anyone who finds the URL can register. Sign-up is not invite-only.
-- Login and registration have no rate limiting.

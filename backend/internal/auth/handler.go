@@ -34,6 +34,7 @@ var (
 	ErrInvalidCredentials    = errors.New("invalid credentials")
 	ErrSessionTokenMissing   = errors.New("session token missing")
 	ErrTooManyAttempts       = errors.New("too many attempts, try again later")
+	ErrRegistrationClosed    = errors.New("registration is invite-only")
 )
 
 const (
@@ -50,19 +51,39 @@ const (
 	registrationWindow     = time.Hour
 )
 
+// Config holds the deployment settings for accounts and sessions.
+type Config struct {
+	// SecureCookies sends the session cookie over HTTPS only.
+	SecureCookies bool
+	// AllowedEmails are the only emails that may register. Empty leaves
+	// registration open to anyone.
+	AllowedEmails []string
+}
+
 type Handler struct {
-	Store *db.Store
-	// secureCookies sends the session cookie over HTTPS only.
+	Store         *db.Store
 	secureCookies bool
+	// allowedEmails is nil when registration is open.
+	allowedEmails map[string]bool
 
 	loginsByClient        *ratelimit.Limiter[string]
 	registrationsByClient *ratelimit.Limiter[string]
 }
 
-func New(store *db.Store, secureCookies bool) *Handler {
+func New(store *db.Store, config Config) *Handler {
+	var allowedEmails map[string]bool
+	for _, email := range config.AllowedEmails {
+		if email = normalizeEmail(email); email != "" {
+			if allowedEmails == nil {
+				allowedEmails = map[string]bool{}
+			}
+			allowedEmails[email] = true
+		}
+	}
 	return &Handler{
 		Store:                 store,
-		secureCookies:         secureCookies,
+		secureCookies:         config.SecureCookies,
+		allowedEmails:         allowedEmails,
 		loginsByClient:        ratelimit.New[string](loginsPerClient, loginWindow),
 		registrationsByClient: ratelimit.New[string](registrationsPerClient, registrationWindow),
 	}
@@ -95,6 +116,11 @@ const (
 	maxPasswordBytes = 256
 )
 
+// RegistrationRestricted reports whether only allowed emails may register.
+func (h *Handler) RegistrationRestricted() bool {
+	return h.allowedEmails != nil
+}
+
 // ParseRegisterRequest reads the credentials of a register or login request.
 // Register checks them further with validateNewAccount.
 func ParseRegisterRequest(body io.Reader) (*registerRequest, error) {
@@ -103,7 +129,7 @@ func ParseRegisterRequest(body io.Reader) (*registerRequest, error) {
 		return nil, ErrInvalidRequestBody
 	}
 
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Email = normalizeEmail(req.Email)
 	if req.Email == "" {
 		return nil, ErrEmailCannotBeEmpty
 	}
@@ -117,6 +143,10 @@ func ParseRegisterRequest(body io.Reader) (*registerRequest, error) {
 		return nil, ErrPasswordTooLong
 	}
 	return &req, nil
+}
+
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 // validateNewAccount applies the rules for new accounts only, so accounts
@@ -171,6 +201,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if h.allowedEmails != nil && !h.allowedEmails[req.Email] {
+		http.Error(w, ErrRegistrationClosed.Error(), http.StatusForbidden)
 		return
 	}
 
