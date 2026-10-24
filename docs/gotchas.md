@@ -124,6 +124,10 @@ A feed's token is its only credential. Anyone with the address sees the events. 
 
 ## Setup and tooling
 
+### The full stack sends a Content-Security-Policy
+
+`frontend/Caddyfile` allows scripts, styles, and images only from the site itself, plus Google Fonts and `data:` images. A new external resource, such as another font or an image host, works under `npm run dev` but is blocked in Docker and production until the policy allows it. Hashed files under `/assets/` are cached for a year; everything else is revalidated on each load.
+
 ### Rate limits trust `X-Forwarded-For`
 
 Login and registration are limited per client IP, taken from the last `X-Forwarded-For` entry (`backend/internal/middleware/clientip.go`). Caddy overwrites that header, so this is safe only while the API is reachable through Caddy alone. Never publish port 8080 in production. Limits live in memory and reset when the API restarts.
