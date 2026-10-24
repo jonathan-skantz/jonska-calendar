@@ -143,9 +143,8 @@ func main() {
 	mux.HandleFunc("POST /api/assistant/conversations/{conversationID}/actions/{actionID}", assistantHandler.Decide)
 
 	server := &http.Server{
-		Addr: ":8080",
-		// The import handler sets its own, larger body limit.
-		Handler: middleware.LimitBodies(mux, middleware.MaxBodyBytes, "/api/import/ics"),
+		Addr:    ":8080",
+		Handler: middleware.API(mux),
 		// Bound how long a client may take to send a request and how long an
 		// idle connection stays open, so slow clients cannot hold the server.
 		ReadHeaderTimeout: 10 * time.Second,

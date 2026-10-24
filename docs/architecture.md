@@ -55,24 +55,24 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 
 ## Packages
 
-| Path                             | Contents                                                                                                      |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `backend/cmd/server.go`          | Starts the server, loads env files, builds handlers, registers all routes.                                    |
-| `backend/internal/auth/`         | Register, login, logout, `me`. Argon2id passwords, session cookie.                                            |
-| `backend/internal/timeline/`     | Handlers for events, tasks, tags, sharing, reminders, households, transit card. Validation and error mapping. |
-| `backend/internal/quickadd/`     | `POST /api/events/parse`. Sends text to Anthropic, returns a draft. Never writes.                             |
-| `backend/internal/assistant/`    | Agent loop over calendar tools. Creates events at once; other changes wait for the user's decision.           |
-| `backend/internal/ratelimit/`    | Fixed-window rate limit in memory, keyed by user or client IP. Used by auth, quick add, and the assistant.    |
-| `backend/internal/weather/`      | `GET /api/weather`. Fetches from Open-Meteo and caches in the database.                                       |
-| `backend/internal/recurrence/`   | Repeat rules: validation, RRULE text, and expanding a series into occurrences. No database or HTTP.           |
-| `backend/internal/ical/`         | `.ics` import, export, and published feeds. Parses and writes iCalendar with `arran4/golang-ical`.            |
-| `backend/internal/subscription/` | Subscribed calendars: fetching with the private-address guard, refreshing, and their routes.                  |
-| `backend/internal/cleanup/`      | Hourly job that deletes expired sessions and week-old weather forecasts.                                      |
-| `backend/internal/middleware/`   | HTTP wrappers for every route: the body size limit, and the client IP used by rate limits.                    |
-| `backend/internal/testutil/`     | Starts a PostgreSQL container for tests, and one database per test.                                           |
-| `backend/db/`                    | `Store` and its SQL, split by feature. `models.go` has row types, `errors.go` the sentinel errors.            |
-| `backend/db/migrations/`         | Goose files `N_name.sql`, numbered 1 to 28 so far.                                                            |
-| `frontend/src/`                  | See [frontend](frontend.md).                                                                                  |
+| Path                             | Contents                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `backend/cmd/server.go`          | Starts the server, loads env files, builds handlers, registers all routes.                                            |
+| `backend/internal/auth/`         | Register, login, logout, `me`. Argon2id passwords, session cookie.                                                    |
+| `backend/internal/timeline/`     | Handlers for events, tasks, tags, sharing, reminders, households, transit card. Validation and error mapping.         |
+| `backend/internal/quickadd/`     | `POST /api/events/parse`. Sends text to Anthropic, returns a draft. Never writes.                                     |
+| `backend/internal/assistant/`    | Agent loop over calendar tools. Creates events at once; other changes wait for the user's decision.                   |
+| `backend/internal/ratelimit/`    | Fixed-window rate limit in memory, keyed by user or client IP. Used by auth, quick add, and the assistant.            |
+| `backend/internal/weather/`      | `GET /api/weather`. Fetches from Open-Meteo and caches in the database.                                               |
+| `backend/internal/recurrence/`   | Repeat rules: validation, RRULE text, and expanding a series into occurrences. No database or HTTP.                   |
+| `backend/internal/ical/`         | `.ics` import, export, and published feeds. Parses and writes iCalendar with `arran4/golang-ical`.                    |
+| `backend/internal/subscription/` | Subscribed calendars: fetching with the private-address guard, refreshing, and their routes.                          |
+| `backend/internal/cleanup/`      | Hourly job that deletes expired sessions and week-old weather forecasts.                                              |
+| `backend/internal/middleware/`   | HTTP wrappers for every route: cross-site request protection, the body size limit, and the client IP for rate limits. |
+| `backend/internal/testutil/`     | Starts a PostgreSQL container for tests, and one database per test.                                                   |
+| `backend/db/`                    | `Store` and its SQL, split by feature. `models.go` has row types, `errors.go` the sentinel errors.                    |
+| `backend/db/migrations/`         | Goose files `N_name.sql`, numbered 1 to 28 so far.                                                                    |
+| `frontend/src/`                  | See [frontend](frontend.md).                                                                                          |
 
 ## Where to change things
 

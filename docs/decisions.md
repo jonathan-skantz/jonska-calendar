@@ -78,7 +78,7 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 - **Chosen:** a random token in an `HttpOnly`, `SameSite=Lax` cookie. Only its SHA-256 is stored.
 - **Why:** deleting a row revokes a session. JavaScript cannot read the token.
 - **Secure flag:** set when `SESSION_COOKIE_SECURE=true`. A public deployment serves HTTPS and sets it. Local development runs on plain HTTP and leaves it off.
-- **Trade-off:** no CSRF token. Cross-site protection relies on `SameSite=Lax`.
+- **Cross-site requests:** `SameSite=Lax` keeps the cookie off cross-site requests, and `http.CrossOriginProtection` refuses cross-site requests that change data. Together they cover login CSRF and same-site subdomains, without a CSRF token.
 
 ## Weather cache rounded to 0.1 degrees
 

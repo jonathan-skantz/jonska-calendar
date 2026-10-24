@@ -2,6 +2,7 @@
 
 - All routes are under `/api`. Bodies are JSON, except error responses, which are plain text.
 - Authenticated routes need the `calendar_session` cookie. Login sets it.
+- Cross-site requests that change data (anything but `GET`, `HEAD`, `OPTIONS`) get `403`, using Go's `http.CrossOriginProtection` (`backend/internal/middleware/api.go`). Clients without a browser, such as curl, send neither `Sec-Fetch-Site` nor `Origin` and are allowed.
 - Request bodies are capped at 64 KB (`backend/internal/middleware`), except the `.ics` import, which allows 6 MB. A body that is too large without a declared length gets `400`.
 - The routes are registered in `backend/cmd/server.go`. The code is the final word.
 
