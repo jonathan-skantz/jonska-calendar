@@ -1,0 +1,4 @@
+# Env files hold dev settings and secrets; containers get theirs from compose.
+.env*
+Dockerfile
+.dockerignore
