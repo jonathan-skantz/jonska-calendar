@@ -122,6 +122,12 @@ A feed's token is its only credential. Anyone with the address sees the events. 
 
 ## Setup and tooling
 
+### Rate limits trust `X-Forwarded-For`
+
+Login and registration are limited per client IP, taken from the last `X-Forwarded-For` entry (`backend/internal/middleware/clientip.go`). Caddy overwrites that header, so this is safe only while the API is reachable through Caddy alone. Never publish port 8080 in production. Limits live in memory and reset when the API restarts.
+
+Docker keeps the real client address for IPv4. If the domain gets an IPv6 (`AAAA`) record, enable IPv6 in Docker too; otherwise Docker's proxy hides IPv6 clients behind one address, and they share one limit.
+
 ### `goose` does not read `DATABASE_URL`
 
 Goose reads only `GOOSE_*` keys from `.env`. Export `backend/.env` first ([getting started](getting-started.md#environment-files)).

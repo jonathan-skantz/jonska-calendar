@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -191,6 +192,45 @@ func TestSessionCookieIsSecureWhenConfigured(t *testing.T) {
 	logoutCookies := logoutResponse.Result().Cookies()
 	if len(logoutCookies) != 1 || !logoutCookies[0].Secure {
 		t.Fatal("expected a secure expired session cookie")
+	}
+}
+
+func TestLoginIsRateLimited(t *testing.T) {
+	handler := New(testutil.NewStore(t), false)
+	login := func(email, clientIP string) int {
+		request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"`+email+`","password":"password123"}`))
+		request.Header.Set("X-Forwarded-For", clientIP)
+		response := httptest.NewRecorder()
+		handler.Login(response, request)
+		return response.Code
+	}
+
+	for range loginsPerClient {
+		if code := login("someone@example.com", "203.0.113.1"); code != http.StatusUnauthorized {
+			t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, code)
+		}
+	}
+	if code := login("third@example.com", "203.0.113.1"); code != http.StatusTooManyRequests {
+		t.Fatalf("same client: expected status %d, got %d", http.StatusTooManyRequests, code)
+	}
+	if code := login("third@example.com", "203.0.113.3"); code != http.StatusUnauthorized {
+		t.Fatalf("another client: expected status %d, got %d", http.StatusUnauthorized, code)
+	}
+}
+
+func TestRegisterIsRateLimited(t *testing.T) {
+	handler := New(testutil.NewStore(t), false)
+	for i := range registrationsPerClient + 1 {
+		request := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"user`+strconv.Itoa(i)+`@example.com","password":"password123"}`))
+		response := httptest.NewRecorder()
+		handler.Register(response, request)
+		want := http.StatusCreated
+		if i == registrationsPerClient {
+			want = http.StatusTooManyRequests
+		}
+		if response.Code != want {
+			t.Fatalf("registration %d: expected status %d, got %d", i+1, want, response.Code)
+		}
 	}
 }
 

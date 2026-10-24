@@ -35,13 +35,13 @@ type Handler struct {
 	CurrentUser auth.CurrentUser
 	// Client is nil when no API key is configured.
 	Client  parser
-	limiter *ratelimit.Limiter
+	limiter *ratelimit.Limiter[uuid.UUID]
 }
 
 // New takes a nil client when quick add is not configured; requests then get
 // 503 instead of failing at startup.
 func New(tags TagLister, currentUser auth.CurrentUser, client *Client) *Handler {
-	handler := &Handler{Tags: tags, CurrentUser: currentUser, limiter: ratelimit.New(parsesPerWindow, rateWindow)}
+	handler := &Handler{Tags: tags, CurrentUser: currentUser, limiter: ratelimit.New[uuid.UUID](parsesPerWindow, rateWindow)}
 	if client != nil {
 		handler.Client = client
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 func TestAllowLimitsEachUserPerWindow(t *testing.T) {
-	limiter := New(2, time.Hour)
+	limiter := New[uuid.UUID](2, time.Hour)
 	now := time.Date(2026, 10, 17, 8, 0, 0, 0, time.UTC)
 	limiter.Now = func() time.Time { return now }
 	userID := uuid.New()
@@ -29,7 +29,7 @@ func TestAllowLimitsEachUserPerWindow(t *testing.T) {
 }
 
 func TestWindowsOfIdleUsersAreForgotten(t *testing.T) {
-	limiter := New(5, time.Hour)
+	limiter := New[uuid.UUID](5, time.Hour)
 	now := time.Date(2026, 10, 17, 8, 0, 0, 0, time.UTC)
 	limiter.Now = func() time.Time { return now }
 	for range 3 {

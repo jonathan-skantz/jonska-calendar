@@ -34,7 +34,7 @@ type Handler struct {
 	Client *Client
 
 	now           func() time.Time
-	limiter       *ratelimit.Limiter
+	limiter       *ratelimit.Limiter[uuid.UUID]
 	conversations *conversations
 }
 
@@ -44,7 +44,7 @@ func New(store Store, currentUser auth.CurrentUser, client *Client) *Handler {
 	return &Handler{
 		Store: store, CurrentUser: currentUser, Client: client,
 		now:           time.Now,
-		limiter:       ratelimit.New(messagesPerWindow, rateWindow),
+		limiter:       ratelimit.New[uuid.UUID](messagesPerWindow, rateWindow),
 		conversations: newConversations(time.Now),
 	}
 }

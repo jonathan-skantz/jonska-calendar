@@ -19,6 +19,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jonathan-skantz/calendar/backend/db"
+	"github.com/jonathan-skantz/calendar/backend/internal/middleware"
+	"github.com/jonathan-skantz/calendar/backend/internal/ratelimit"
 )
 
 var (
@@ -31,6 +33,7 @@ var (
 	ErrPasswordTooLong       = errors.New("password must be at most 256 bytes")
 	ErrInvalidCredentials    = errors.New("invalid credentials")
 	ErrSessionTokenMissing   = errors.New("session token missing")
+	ErrTooManyAttempts       = errors.New("too many attempts, try again later")
 )
 
 const (
@@ -38,14 +41,31 @@ const (
 	sessionDuration   = 30 * 24 * time.Hour
 )
 
+// Login is limited per client, not per email, so a stranger cannot lock
+// someone out by failing logins with their email.
+const (
+	loginsPerClient        = 20
+	loginWindow            = 15 * time.Minute
+	registrationsPerClient = 5
+	registrationWindow     = time.Hour
+)
+
 type Handler struct {
 	Store *db.Store
 	// secureCookies sends the session cookie over HTTPS only.
 	secureCookies bool
+
+	loginsByClient        *ratelimit.Limiter[string]
+	registrationsByClient *ratelimit.Limiter[string]
 }
 
 func New(store *db.Store, secureCookies bool) *Handler {
-	return &Handler{Store: store, secureCookies: secureCookies}
+	return &Handler{
+		Store:                 store,
+		secureCookies:         secureCookies,
+		loginsByClient:        ratelimit.New[string](loginsPerClient, loginWindow),
+		registrationsByClient: ratelimit.New[string](registrationsPerClient, registrationWindow),
+	}
 }
 
 type registerRequest struct {
@@ -139,6 +159,10 @@ var dummyHash = sync.OnceValue(func() string {
 })
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	if !h.registrationsByClient.Allow(middleware.ClientIP(r)) {
+		http.Error(w, ErrTooManyAttempts.Error(), http.StatusTooManyRequests)
+		return
+	}
 
 	req, err := ParseRegisterRequest(r.Body)
 
@@ -184,6 +208,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	if !h.loginsByClient.Allow(middleware.ClientIP(r)) {
+		http.Error(w, ErrTooManyAttempts.Error(), http.StatusTooManyRequests)
+		return
+	}
 	req, err := ParseRegisterRequest(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

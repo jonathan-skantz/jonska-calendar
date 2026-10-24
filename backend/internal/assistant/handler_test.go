@@ -497,7 +497,7 @@ func TestUpstreamFailureKeepsTheConversation(t *testing.T) {
 
 func TestMessagesAreRateLimitedPerUser(t *testing.T) {
 	_, _, upstream, handler := setup(t)
-	handler.limiter = ratelimit.New(1, time.Hour)
+	handler.limiter = ratelimit.New[uuid.UUID](1, time.Hour)
 	upstream.script(answer("Hi!"))
 	decodeOK[messageResponse](t, send(handler, message(uuid.Nil, "hello")))
 	if code := send(handler, message(uuid.Nil, "hello")).Code; code != http.StatusTooManyRequests {

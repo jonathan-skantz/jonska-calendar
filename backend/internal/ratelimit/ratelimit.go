@@ -3,20 +3,19 @@ package ratelimit
 import (
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
-// Limiter counts requests per user in fixed windows. It is in memory, which
-// is enough for the single server this app runs on.
-type Limiter struct {
+// Limiter counts requests per key, such as a user ID or a client IP, in fixed
+// windows. It is in memory, which is enough for the single server this app
+// runs on.
+type Limiter[K comparable] struct {
 	limit  int
 	window time.Duration
 	// Now is replaceable so tests can move time.
 	Now func() time.Time
 
 	mu        sync.Mutex
-	windows   map[uuid.UUID]count
+	windows   map[K]count
 	lastSweep time.Time
 }
 
@@ -25,17 +24,17 @@ type count struct {
 	count int
 }
 
-func New(limit int, window time.Duration) *Limiter {
-	return &Limiter{limit: limit, window: window, Now: time.Now, windows: map[uuid.UUID]count{}}
+func New[K comparable](limit int, window time.Duration) *Limiter[K] {
+	return &Limiter[K]{limit: limit, window: window, Now: time.Now, windows: map[K]count{}}
 }
 
-// Allow reports whether userID may make another request, and counts it if so.
-func (l *Limiter) Allow(userID uuid.UUID) bool {
+// Allow reports whether key may make another request, and counts it if so.
+func (l *Limiter[K]) Allow(key K) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.Now()
 	// Expired windows are forgotten at most once per window, so the map holds
-	// only users who made requests recently.
+	// only keys that made requests recently.
 	if now.Sub(l.lastSweep) >= l.window {
 		for id, window := range l.windows {
 			if now.Sub(window.start) >= l.window {
@@ -44,7 +43,7 @@ func (l *Limiter) Allow(userID uuid.UUID) bool {
 		}
 		l.lastSweep = now
 	}
-	window := l.windows[userID]
+	window := l.windows[key]
 	if now.Sub(window.start) >= l.window {
 		window = count{start: now}
 	}
@@ -52,12 +51,12 @@ func (l *Limiter) Allow(userID uuid.UUID) bool {
 		return false
 	}
 	window.count++
-	l.windows[userID] = window
+	l.windows[key] = window
 	return true
 }
 
-// tracked is the number of users with a live window, for tests.
-func (l *Limiter) tracked() int {
+// tracked is the number of keys with a live window, for tests.
+func (l *Limiter[K]) tracked() int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return len(l.windows)
