@@ -52,6 +52,33 @@ describe("useAuth", () => {
     queryClient.clear();
   });
 
+  it("starts a demo in the browser's time zone", async () => {
+    mockedApi.mockImplementation(async (path) => {
+      if (path === "/api/auth/me") throw new Error("Not signed in");
+      return undefined;
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.authenticate.mutateAsync({ mode: "demo" });
+    });
+
+    expect(mockedApi).toHaveBeenCalledWith("/api/auth/demo", {
+      method: "POST",
+      body: JSON.stringify({
+        time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
+    });
+    queryClient.clear();
+  });
+
   it("returns login failures for the authentication screen", async () => {
     mockedApi.mockImplementation(async (path) => {
       if (path === "/api/auth/me") throw new Error("Not signed in");

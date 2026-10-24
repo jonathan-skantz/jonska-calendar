@@ -35,6 +35,14 @@ describe("AuthScreen", () => {
     });
   });
 
+  it("starts a demo without credentials", () => {
+    const onSubmit = vi.fn();
+    render(<AuthScreen error="" pending={false} onSubmit={onSubmit} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /try a demo/i }));
+    expect(onSubmit).toHaveBeenLastCalledWith({ mode: "demo" });
+  });
+
   it("disables submitting while signing in and shows errors", () => {
     render(
       <AuthScreen

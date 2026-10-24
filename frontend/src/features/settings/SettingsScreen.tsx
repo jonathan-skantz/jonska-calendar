@@ -32,6 +32,7 @@ export const SettingsScreen = ({ user, onBack }: SettingsScreenProps) => {
   const subscriptionMutations = useSubscriptionMutations();
   const feeds = useFeeds().data ?? [];
   const feedMutations = useFeedMutations();
+  const isDemo = user.demo_expires_at !== undefined;
 
   return (
     <SettingsPage
@@ -40,26 +41,31 @@ export const SettingsScreen = ({ user, onBack }: SettingsScreenProps) => {
       onDisplayNameSave={updateDisplayName}
       onBack={onBack}
     >
-      <HouseholdSettings
-        household={household}
-        currentUserId={user.id}
-        onCreate={householdMutations.create}
-        onUpdate={householdMutations.update}
-        onAddMember={householdMutations.addMember}
-        onLeave={householdMutations.leave}
-      />
+      {/* A demo account cannot reach other users or fetch calendars. */}
+      {!isDemo && (
+        <HouseholdSettings
+          household={household}
+          currentUserId={user.id}
+          onCreate={householdMutations.create}
+          onUpdate={householdMutations.update}
+          onAddMember={householdMutations.addMember}
+          onLeave={householdMutations.leave}
+        />
+      )}
       <IcsSettings
         tags={tags}
         exportUrl={icsExportUrl()}
         onImport={icsImport.mutateAsync}
       />
-      <SubscriptionSettings
-        subscriptions={subscriptions}
-        onAdd={subscriptionMutations.add}
-        onUpdate={subscriptionMutations.update}
-        onRefresh={subscriptionMutations.refresh}
-        onRemove={subscriptionMutations.remove}
-      />
+      {!isDemo && (
+        <SubscriptionSettings
+          subscriptions={subscriptions}
+          onAdd={subscriptionMutations.add}
+          onUpdate={subscriptionMutations.update}
+          onRefresh={subscriptionMutations.refresh}
+          onRemove={subscriptionMutations.remove}
+        />
+      )}
       <FeedSettings
         feeds={feeds}
         tags={tags}

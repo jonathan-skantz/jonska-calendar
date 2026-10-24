@@ -1,8 +1,11 @@
+import { format } from "date-fns";
 import { useRef } from "react";
 
 type TopBarProps = {
   email: string;
   displayName?: string;
+  // Set for a demo account: when it and its data are deleted.
+  demoExpiresAt?: string;
   upcomingReminderCount: number;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
@@ -15,6 +18,7 @@ type TopBarProps = {
 export function TopBar({
   email,
   displayName,
+  demoExpiresAt,
   upcomingReminderCount,
   sidebarOpen,
   onToggleSidebar,
@@ -46,6 +50,7 @@ export function TopBar({
           <span className="brand-symbol">✳</span>
           <span className="brand-name">calendar / home</span>
         </div>
+        {demoExpiresAt && <span className="demo-badge">Demo</span>}
       </div>
       <div className="topbar-actions">
         <button className="text-button" onClick={onOpenAssistant}>
@@ -79,6 +84,12 @@ export function TopBar({
             ref={accountMenu}
           >
             <span className="user-email">{email}</span>
+            {demoExpiresAt && (
+              <span className="user-email">
+                Demo account, deleted with its data on{" "}
+                {format(new Date(demoExpiresAt), "EEE d MMM 'at' HH:mm")}
+              </span>
+            )}
             <button
               className="text-button"
               onClick={chooseFromMenu(onOpenSettings)}

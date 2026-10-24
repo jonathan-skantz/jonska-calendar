@@ -216,6 +216,7 @@ export function CalendarApp({ user }: { user: User }) {
       <TopBar
         email={user.email}
         displayName={user.display_name}
+        demoExpiresAt={user.demo_expires_at}
         sidebarOpen={sidebar.open}
         onToggleSidebar={sidebar.toggle}
         upcomingReminderCount={

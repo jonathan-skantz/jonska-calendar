@@ -2,6 +2,8 @@ export type User = {
   id: string;
   email: string;
   display_name?: string;
+  // Set for a demo account, which is deleted at this time.
+  demo_expires_at?: string;
 };
 
 export type Tag = {

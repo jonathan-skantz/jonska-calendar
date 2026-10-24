@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TopBar } from "./TopBar";
 
-const renderTopBar = () => {
+const renderTopBar = (demoExpiresAt?: string) => {
   const handlers = {
     onToggleSidebar: vi.fn(),
     onOpenAssistant: vi.fn(),
@@ -14,6 +14,7 @@ const renderTopBar = () => {
     <TopBar
       email="ana@example.com"
       displayName="Ana"
+      demoExpiresAt={demoExpiresAt}
       upcomingReminderCount={0}
       sidebarOpen
       {...handlers}
@@ -42,5 +43,18 @@ describe("TopBar", () => {
       screen.getByRole("button", { name: "Sign out", hidden: true }),
     );
     expect(handlers.onLogout).toHaveBeenCalledOnce();
+  });
+
+  it("marks a demo account and says when it is deleted", () => {
+    renderTopBar("2026-10-25T17:00:00Z");
+    expect(screen.getByText("Demo")).toBeTruthy();
+    expect(
+      screen.getByText(/Demo account, deleted with its data on/),
+    ).toBeTruthy();
+  });
+
+  it("shows no demo badge for a regular account", () => {
+    renderTopBar();
+    expect(screen.queryByText("Demo")).toBeNull();
   });
 });

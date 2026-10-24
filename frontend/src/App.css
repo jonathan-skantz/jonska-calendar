@@ -106,6 +106,18 @@
   color: var(--moss-dark);
 }
 
+.demo-badge {
+  border: 1px solid var(--coral);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: var(--coral);
+  font:
+    10px "DM Mono",
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .brand-symbol {
   color: var(--coral);
   font-size: 20px;

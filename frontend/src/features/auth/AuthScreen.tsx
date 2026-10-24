@@ -65,6 +65,16 @@ export function AuthScreen({ error, pending, onSubmit }: AuthScreenProps) {
             ? "New here? Create an account"
             : "Already have an account? Sign in"}
         </button>
+        <button
+          className="text-button"
+          disabled={pending}
+          onClick={() => onSubmit({ mode: "demo" })}
+        >
+          Just looking? Try a demo account
+        </button>
+        <p className="auth-demo-note">
+          No sign-up. You get a sample week, deleted after 24 hours.
+        </p>
       </section>
       <div className="auth-note">
         Built for close circles

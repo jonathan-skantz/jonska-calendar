@@ -9,9 +9,22 @@ import {
 import { queryKeys } from "../../lib/queryKeys";
 import type { AuthMode, User } from "../../types";
 
-export type Credentials = { mode: AuthMode; email: string; password: string };
+export type Credentials =
+  | { mode: AuthMode; email: string; password: string }
+  // A demo needs no credentials: the server makes a throwaway account.
+  | { mode: "demo" };
 
-const signIn = async ({ mode, email, password }: Credentials) => {
+const signIn = async (credentials: Credentials) => {
+  if (credentials.mode === "demo") {
+    // The sample week is placed in the browser's time zone.
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    await api("/api/auth/demo", {
+      method: "POST",
+      body: JSON.stringify({ time_zone: timeZone }),
+    });
+    return;
+  }
+  const { mode, email, password } = credentials;
   const body = JSON.stringify({ email, password });
   await api<User>(`/api/auth/${mode === "login" ? "login" : "register"}`, {
     method: "POST",

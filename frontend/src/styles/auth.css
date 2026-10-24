@@ -39,7 +39,18 @@
 }
 
 .auth-panel > .text-button {
+  display: block;
   margin-top: 25px;
+}
+
+.auth-panel > .text-button + .text-button {
+  margin-top: 12px;
+}
+
+.auth-demo-note {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 @media (max-width: 800px) {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getErrorText } from "../../lib/requestErrors";
 import type { TimelineEntry } from "../../types";
 import { useReminderActions } from "../reminders/useReminderActions";
+import { useCurrentUser } from "../auth/useAuth";
 import { ShareEventDrawer } from "../sharing/ShareEventDrawer";
 import {
   useEventShareMutations,
@@ -31,6 +32,8 @@ export const ComposerPanel = ({
   selectedDate,
 }: ComposerPanelProps) => {
   const { editingItem } = composer;
+  // A demo account cannot share.
+  const isDemo = useCurrentUser().user?.demo_expires_at !== undefined;
   const tags = useTags().data ?? [];
   const { saveItem, deleteItem } = useTimelineMutations();
   const reminders = useReminderActions();
@@ -110,7 +113,7 @@ export const ComposerPanel = ({
         onClose={close}
         onTypeChange={composer.setType}
         onShare={
-          editingItem?.type === "event"
+          editingItem?.type === "event" && !isDemo
             ? () => setSharingEvent(editingItem)
             : undefined
         }
