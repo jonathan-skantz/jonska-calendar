@@ -1,0 +1,16 @@
+# SITE_ADDRESS is a domain in production, which turns on automatic HTTPS.
+# The default serves plain HTTP on port 80 for a local check.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:api:8080}
+	}
+
+	# The app routes on the client, so unknown paths get index.html.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
