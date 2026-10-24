@@ -91,6 +91,13 @@ func (s *Store) RevokeSession(ctx context.Context, tokenHash []byte) error {
 	return err
 }
 
+// DeleteExpiredSessions removes sessions past their expiry, which lookups
+// already ignore, and returns how many it removed.
+func (s *Store) DeleteExpiredSessions(ctx context.Context) (int64, error) {
+	tag, err := s.db.Exec(ctx, `DELETE FROM sessions WHERE expires_at <= now()`)
+	return tag.RowsAffected(), err
+}
+
 // SetDisplayName stores a trimmed display name. A nil name clears it so that
 // readers fall back to the email local-part.
 func (s *Store) SetDisplayName(ctx context.Context, userID uuid.UUID, displayName *string) error {

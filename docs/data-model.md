@@ -101,7 +101,7 @@ calendar_subscriptions (user_id, name, url, color, time_zone, last_fetched_at, l
 - The URL is unique per user.
 - `uid` (migration 29) is the feed's UID, NULL when it gave none. It is not unique, since a feed may repeat one. It is what recognizes an event across refreshes, which recreate the rows. See [customizations](#customizations).
 - `listSubscribedTimeline` adds the events to `ListTimeline`, with the subscription as `{id, name, color}`. They expand like other series.
-- `Refresher.Run` (`backend/internal/subscription/refresh.go`) checks every 15 minutes for subscriptions last fetched more than 6 hours ago and refreshes them one at a time. It is the only background job and runs in the API process.
+- `Refresher.Run` (`backend/internal/subscription/refresh.go`) checks every 15 minutes for subscriptions last fetched more than 6 hours ago and refreshes them one at a time. It runs in the API process, beside the hourly cleanup job.
 
 ## Feeds
 

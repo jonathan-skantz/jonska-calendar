@@ -108,7 +108,7 @@ The server rejects a `from` earlier than yesterday in UTC, because it does not k
 
 ### Subscriptions refresh in the background
 
-- `go Refresher.Run(ctx)` in `backend/cmd/server.go` is the only background job. Each API process runs one, so two processes refresh the same subscriptions twice; the row lock keeps the results consistent.
+- `go Refresher.Run(ctx)` in `backend/cmd/server.go` runs beside the hourly cleanup job (`backend/internal/cleanup`). Each API process runs one, so two processes refresh the same subscriptions twice; the row lock keeps the results consistent.
 - A subscription is refreshed when its last fetch is 6 hours old, checked every 15 minutes. A failed fetch counts as a fetch, so a broken feed is retried after 6 hours, not every 15 minutes.
 - Subscribed events are replaced on each refresh and get new IDs. Anything keyed by their ID, such as an open drawer, goes stale after a refresh.
 

@@ -37,3 +37,10 @@ func (s *Store) UpsertWeatherForecast(ctx context.Context, latitude, longitude f
 	`, latitude, longitude, forecast.FetchedAt, forecast.Hourly, forecast.Daily)
 	return err
 }
+
+// DeleteWeatherFetchedBefore removes forecasts fetched before the given time,
+// which are too old to show, and returns how many it removed.
+func (s *Store) DeleteWeatherFetchedBefore(ctx context.Context, before time.Time) (int64, error) {
+	tag, err := s.db.Exec(ctx, `DELETE FROM weather_forecasts WHERE fetched_at < $1`, before)
+	return tag.RowsAffected(), err
+}

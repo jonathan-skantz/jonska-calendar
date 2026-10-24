@@ -68,7 +68,7 @@ Each entry gives what was chosen, why, and when to reconsider. **TODO(maintainer
 
 ## Subscriptions refresh in the API process
 
-- **Chosen:** a goroutine started in `server.go` refreshes stale subscriptions, plus a "Refresh now" route. It is the only background job.
+- **Chosen:** a goroutine started in `server.go` refreshes stale subscriptions, plus a "Refresh now" route. The only other background job is the hourly cleanup of expired rows (`backend/internal/cleanup`).
 - **Why:** the app runs as one process for a family. A separate worker or a queue would add deployment for no gain.
 - **Considered:** refreshing on demand when the timeline is loaded. That needs no job, but the week shows old events until the next load, and a slow feed delays the request.
 - **Reconsider if:** the API runs as several processes, which would each refresh the same subscriptions.

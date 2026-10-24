@@ -62,11 +62,13 @@ There is **no service layer**, on purpose. See [decisions](decisions.md#no-servi
 | `backend/internal/timeline/`     | Handlers for events, tasks, tags, sharing, reminders, households, transit card. Validation and error mapping. |
 | `backend/internal/quickadd/`     | `POST /api/events/parse`. Sends text to Anthropic, returns a draft. Never writes.                             |
 | `backend/internal/assistant/`    | Agent loop over calendar tools. Creates events at once; other changes wait for the user's decision.           |
-| `backend/internal/ratelimit/`    | Per-user fixed-window rate limit, in memory. Used by quick add and the assistant.                             |
+| `backend/internal/ratelimit/`    | Fixed-window rate limit in memory, keyed by user or client IP. Used by auth, quick add, and the assistant.    |
 | `backend/internal/weather/`      | `GET /api/weather`. Fetches from Open-Meteo and caches in the database.                                       |
 | `backend/internal/recurrence/`   | Repeat rules: validation, RRULE text, and expanding a series into occurrences. No database or HTTP.           |
 | `backend/internal/ical/`         | `.ics` import, export, and published feeds. Parses and writes iCalendar with `arran4/golang-ical`.            |
 | `backend/internal/subscription/` | Subscribed calendars: fetching with the private-address guard, refreshing, and their routes.                  |
+| `backend/internal/cleanup/`      | Hourly job that deletes expired sessions and week-old weather forecasts.                                      |
+| `backend/internal/middleware/`   | HTTP wrappers for every route: the body size limit, and the client IP used by rate limits.                    |
 | `backend/internal/testutil/`     | Starts a PostgreSQL container for tests, and one database per test.                                           |
 | `backend/db/`                    | `Store` and its SQL, split by feature. `models.go` has row types, `errors.go` the sentinel errors.            |
 | `backend/db/migrations/`         | Goose files `N_name.sql`, numbered 1 to 28 so far.                                                            |

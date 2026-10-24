@@ -17,6 +17,7 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/db"
 	"github.com/jonathan-skantz/calendar/backend/internal/assistant"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
+	"github.com/jonathan-skantz/calendar/backend/internal/cleanup"
 	"github.com/jonathan-skantz/calendar/backend/internal/ical"
 	"github.com/jonathan-skantz/calendar/backend/internal/middleware"
 	"github.com/jonathan-skantz/calendar/backend/internal/quickadd"
@@ -67,6 +68,7 @@ func main() {
 	subscriptionClient := subscription.NewClient(os.Getenv("SUBSCRIPTIONS_ALLOW_PRIVATE") == "true")
 	subscriptionHandler := subscription.New(store, authHandler.CurrentUserID, subscriptionClient)
 	go subscriptionHandler.Refresher.Run(ctx)
+	go cleanup.Run(ctx, store)
 
 	// Quick add and the assistant stay off (503) without a key, so the rest
 	// of the app runs without one.
