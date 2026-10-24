@@ -144,7 +144,7 @@ The API loads `.env` and `.env.local` from its working directory. From anywhere 
 
 ### Migrations sort by number, not by name
 
-Files are `1_` to `23_`, not zero-padded. Sorting by name puts `10_` before `2_`. Tools and tests use the number. The next file is `24_`.
+Files are `1_` to `32_`, not zero-padded. Sorting by name puts `10_` before `2_`. Tools and tests use the number. The next file is `33_`.
 
 ### Tests and dev use different PostgreSQL versions
 
