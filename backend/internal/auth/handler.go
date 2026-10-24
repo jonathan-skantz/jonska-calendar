@@ -9,7 +9,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/mail"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -23,6 +25,10 @@ var (
 	ErrInvalidRequestBody    = errors.New("invalid request body")
 	ErrEmailCannotBeEmpty    = errors.New("email cannot be empty")
 	ErrPasswordCannotBeEmpty = errors.New("password cannot be empty")
+	ErrEmailTooLong          = errors.New("email is too long")
+	ErrInvalidEmail          = errors.New("email is not a valid address")
+	ErrPasswordTooShort      = errors.New("password must be at least 8 characters")
+	ErrPasswordTooLong       = errors.New("password must be at most 256 bytes")
 	ErrInvalidCredentials    = errors.New("invalid credentials")
 	ErrSessionTokenMissing   = errors.New("session token missing")
 )
@@ -61,8 +67,16 @@ type updateCurrentUserRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
-const maxDisplayNameLength = 60
+const (
+	maxDisplayNameLength = 60
+	maxEmailLength       = 254
+	minPasswordLength    = 8
+	// Hashing cost grows with the password, so its length is capped.
+	maxPasswordBytes = 256
+)
 
+// ParseRegisterRequest reads the credentials of a register or login request.
+// Register checks them further with validateNewAccount.
 func ParseRegisterRequest(body io.Reader) (*registerRequest, error) {
 	var req registerRequest
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
@@ -73,22 +87,72 @@ func ParseRegisterRequest(body io.Reader) (*registerRequest, error) {
 	if req.Email == "" {
 		return nil, ErrEmailCannotBeEmpty
 	}
+	if len(req.Email) > maxEmailLength {
+		return nil, ErrEmailTooLong
+	}
 	if req.Password == "" {
 		return nil, ErrPasswordCannotBeEmpty
 	}
+	if len(req.Password) > maxPasswordBytes {
+		return nil, ErrPasswordTooLong
+	}
 	return &req, nil
 }
+
+// validateNewAccount applies the rules for new accounts only, so accounts
+// created before them can still log in.
+func validateNewAccount(req *registerRequest) error {
+	address, err := mail.ParseAddress(req.Email)
+	if err != nil || address.Address != req.Email {
+		return ErrInvalidEmail
+	}
+	if utf8.RuneCountInString(req.Password) < minPasswordLength {
+		return ErrPasswordTooShort
+	}
+	return nil
+}
+
+// Each Argon2 hash takes 64 MiB of memory, so only a few run at once. This
+// keeps a burst of logins from exhausting the server's memory.
+var hashSlots = make(chan struct{}, 4)
+
+func withHashSlot[T any](r *http.Request, hash func() (T, error)) (T, error) {
+	select {
+	case hashSlots <- struct{}{}:
+		defer func() { <-hashSlots }()
+		return hash()
+	case <-r.Context().Done():
+		var zero T
+		return zero, r.Context().Err()
+	}
+}
+
+// dummyHash is compared against when a login names an unknown email, so the
+// response takes as long as for a real account and does not reveal which
+// emails are registered.
+var dummyHash = sync.OnceValue(func() string {
+	hash, err := argon2id.CreateHash("not-a-real-password", argon2id.DefaultParams)
+	if err != nil {
+		panic(err)
+	}
+	return hash
+})
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	req, err := ParseRegisterRequest(r.Body)
 
+	if err == nil {
+		err = validateNewAccount(req)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	hash, err := argon2id.CreateHash(req.Password, argon2id.DefaultParams)
+	hash, err := withHashSlot(r, func() (string, error) {
+		return argon2id.CreateHash(req.Password, argon2id.DefaultParams)
+	})
 	if err != nil {
 		log.Printf("Failed to create hash: %v", err)
 		http.Error(w, "Failed to create hash", http.StatusInternalServerError)
@@ -127,18 +191,19 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.Store.FindUserByEmail(r.Context(), req.Email)
+	known := err == nil
 	if errors.Is(err, db.ErrUserNotFound) {
-		http.Error(w, ErrInvalidCredentials.Error(), http.StatusUnauthorized)
-		return
-	}
-	if err != nil {
+		user.PasswordHash = dummyHash()
+	} else if err != nil {
 		log.Printf("Failed to find user: %v", err)
 		http.Error(w, "Failed to log in", http.StatusInternalServerError)
 		return
 	}
 
-	match, err := argon2id.ComparePasswordAndHash(req.Password, user.PasswordHash)
-	if err != nil || !match {
+	match, err := withHashSlot(r, func() (bool, error) {
+		return argon2id.ComparePasswordAndHash(req.Password, user.PasswordHash)
+	})
+	if err != nil || !match || !known {
 		http.Error(w, ErrInvalidCredentials.Error(), http.StatusUnauthorized)
 		return
 	}

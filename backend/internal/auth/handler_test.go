@@ -244,6 +244,9 @@ func TestParseRegisterRequestValidation(t *testing.T) {
 		{name: "invalid json", body: "{", want: ErrInvalidRequestBody},
 		{name: "empty email", body: `{"email":"","password":"password123"}`, want: ErrEmailCannotBeEmpty},
 		{name: "empty password", body: `{"email":"test@example.com","password":""}`, want: ErrPasswordCannotBeEmpty},
+		{name: "email too long", body: `{"email":"` + strings.Repeat("a", 250) + `@b.se","password":"password123"}`, want: ErrEmailTooLong},
+		{name: "password too long", body: `{"email":"test@example.com","password":"` + strings.Repeat("a", 257) + `"}`, want: ErrPasswordTooLong},
+		{name: "short password still parses for login", body: `{"email":"test@example.com","password":"short"}`, want: nil},
 	}
 
 	for _, test := range tests {
@@ -253,6 +256,38 @@ func TestParseRegisterRequestValidation(t *testing.T) {
 				t.Fatalf("expected %v, got %v", test.want, err)
 			}
 		})
+	}
+}
+
+func TestValidateNewAccount(t *testing.T) {
+	tests := []struct {
+		name     string
+		email    string
+		password string
+		want     error
+	}{
+		{name: "valid", email: "test@example.com", password: "password123", want: nil},
+		{name: "no at sign", email: "test.example.com", password: "password123", want: ErrInvalidEmail},
+		{name: "display name form", email: "test <test@example.com>", password: "password123", want: ErrInvalidEmail},
+		{name: "short password", email: "test@example.com", password: "1234567", want: ErrPasswordTooShort},
+		{name: "eight characters", email: "test@example.com", password: "åäö12345", want: nil},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateNewAccount(&registerRequest{Email: test.email, Password: test.password})
+			if !errors.Is(err, test.want) {
+				t.Fatalf("expected %v, got %v", test.want, err)
+			}
+		})
+	}
+}
+
+func TestRegisterRejectsShortPassword(t *testing.T) {
+	handler := New(testutil.NewStore(t), false)
+	response := httptest.NewRecorder()
+	handler.Register(response, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"test@example.com","password":"short"}`)))
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, response.Code)
 	}
 }
 

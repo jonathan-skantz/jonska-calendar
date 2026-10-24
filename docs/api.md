@@ -22,7 +22,7 @@
 
 | Method and path                                                         | Request JSON                                          | Success response                                                                     |
 | ----------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `POST /api/auth/register`                                               | `email`, `password`                                   | `201` with `{ "id": "<uuid>" }`                                                      |
+| `POST /api/auth/register`                                               | `email` (a valid address), `password` (8+ characters) | `201` with `{ "id": "<uuid>" }`                                                      |
 | `POST /api/auth/login`                                                  | `email`, `password`                                   | `200` with `{ "id": "<uuid>" }` and a session cookie                                 |
 | `POST /api/auth/logout`                                                 | None                                                  | `204`; clears the cookie                                                             |
 | `GET /api/auth/me`                                                      | None                                                  | `{ "id", "email" }`, plus `display_name` when set                                    |

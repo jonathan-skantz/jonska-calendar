@@ -47,6 +47,7 @@ export function AuthScreen({ error, pending, onSubmit }: AuthScreenProps) {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              minLength={mode === "register" ? 8 : undefined}
               required
             />
           </label>
