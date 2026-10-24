@@ -2,6 +2,7 @@
 
 - All routes are under `/api`. Bodies are JSON, except error responses, which are plain text.
 - Authenticated routes need the `calendar_session` cookie. Login sets it.
+- Request bodies are capped at 64 KB (`backend/internal/middleware`), except the `.ics` import, which allows 6 MB. A body that is too large without a declared length gets `400`.
 - The routes are registered in `backend/cmd/server.go`. The code is the final word.
 
 ## Status codes
@@ -12,7 +13,7 @@
 | `401` | No valid session.                                                                                                       |
 | `404` | Not found **or** not yours. The server does not say which, on purpose.                                                  |
 | `409` | Conflict: duplicate name, already shared, already a member, last or main tag removal, a subscribed event without a UID. |
-| `413` | The `.ics` import body is over 6 MB.                                                                                    |
+| `413` | The body is over 64 KB, or over 6 MB for an `.ics` import.                                                              |
 | `429` | Quick add rate limit reached (30 per user per hour).                                                                    |
 | `502` | Quick add: Anthropic failed. Subscription refresh: the calendar could not be fetched.                                   |
 | `503` | Not configured or unavailable: quick add without a key, weather with no cache or upstream.                              |

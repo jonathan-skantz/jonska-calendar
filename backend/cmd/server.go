@@ -17,6 +17,7 @@ import (
 	"github.com/jonathan-skantz/calendar/backend/internal/assistant"
 	"github.com/jonathan-skantz/calendar/backend/internal/auth"
 	"github.com/jonathan-skantz/calendar/backend/internal/ical"
+	"github.com/jonathan-skantz/calendar/backend/internal/middleware"
 	"github.com/jonathan-skantz/calendar/backend/internal/quickadd"
 	"github.com/jonathan-skantz/calendar/backend/internal/subscription"
 	"github.com/jonathan-skantz/calendar/backend/internal/timeline"
@@ -129,11 +130,16 @@ func main() {
 	mux.HandleFunc("POST /api/assistant/conversations/{conversationID}/actions/{actionID}", assistantHandler.Decide)
 
 	server := &http.Server{
-		Addr:    ":8080",
-		Handler: mux,
-		// Bounds how long a client may take to send its request headers, so
-		// slow connections cannot hold the server open indefinitely.
+		Addr: ":8080",
+		// The import handler sets its own, larger body limit.
+		Handler: middleware.LimitBodies(mux, middleware.MaxBodyBytes, "/api/import/ics"),
+		// Bound how long a client may take to send a request and how long an
+		// idle connection stays open, so slow clients cannot hold the server.
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		// Longer than an assistant turn, which may take two minutes.
+		WriteTimeout: 150 * time.Second,
 	}
 
 	if err := server.ListenAndServe(); err != nil {
