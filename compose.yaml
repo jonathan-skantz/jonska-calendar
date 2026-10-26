@@ -1,6 +1,7 @@
 # `docker compose up -d db` starts only PostgreSQL, for local development.
 # `docker compose up -d --build` starts the whole app on http://localhost
 # (or https://$SITE_ADDRESS when that is a domain).
+# The server pulls released images instead of building: see deploy.sh.
 services:
   db:
     image: postgres:18
@@ -21,6 +22,7 @@ services:
     restart: unless-stopped
 
   migrate:
+    image: ghcr.io/jonathan-skantz/jonska-calendar-migrate:${APP_VERSION:-local}
     build:
       context: ./backend
       target: migrate
@@ -31,6 +33,7 @@ services:
         condition: service_healthy
 
   api:
+    image: ghcr.io/jonathan-skantz/jonska-calendar-api:${APP_VERSION:-local}
     build: ./backend
     # Secrets such as ANTHROPIC_API_KEY; the app runs without them.
     env_file:
@@ -47,6 +50,7 @@ services:
     restart: unless-stopped
 
   web:
+    image: ghcr.io/jonathan-skantz/jonska-calendar-web:${APP_VERSION:-local}
     build: ./frontend
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
