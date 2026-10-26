@@ -183,6 +183,20 @@ func seedEvent(t *testing.T, store *db.Store, userID uuid.UUID, event db.Event) 
 	return id
 }
 
+// reminderRecorder records the reminders the agent creates, by event, and
+// still saves them. Tests check this instead of ListReminders, which only
+// returns reminders ahead of the real clock: with the fixed dates here, it
+// would stop seeing them once those dates have passed.
+type reminderRecorder struct {
+	*db.Store
+	offsets map[uuid.UUID][]int
+}
+
+func (r *reminderRecorder) CreateReminder(ctx context.Context, userID, eventID uuid.UUID, offsetSeconds int) (uuid.UUID, error) {
+	r.offsets[eventID] = append(r.offsets[eventID], offsetSeconds)
+	return r.Store.CreateReminder(ctx, userID, eventID, offsetSeconds)
+}
+
 // storedEvent returns the user's own event id, and false once it is gone.
 func storedEvent(t *testing.T, store *db.Store, userID, id uuid.UUID) (db.TimelineEntry, bool) {
 	t.Helper()
@@ -272,6 +286,8 @@ func TestMessageValidatesRequest(t *testing.T) {
 // about that with the next message.
 func TestLunchIsCreatedOnMondayWhenFridayIsBusy(t *testing.T) {
 	store, userID, upstream, handler := setup(t)
+	reminders := &reminderRecorder{Store: store, offsets: map[uuid.UUID][]int{}}
+	handler.Store = reminders
 	ctx := context.Background()
 	friends, err := store.CreateTag(ctx, userID, "Friends")
 	if err != nil {
@@ -327,9 +343,8 @@ func TestLunchIsCreatedOnMondayWhenFridayIsBusy(t *testing.T) {
 	if !ok || *entry.MainTagID != friends.ID || !entry.EndsAt.Equal(at(26, 13, 0)) {
 		t.Fatalf("expected the lunch saved with the Friends tag, got %+v", entry)
 	}
-	reminders, err := store.ListReminders(ctx, userID)
-	if err != nil || len(reminders) != 1 || reminders[0].OffsetSeconds != 1800 {
-		t.Fatalf("expected one reminder 30 minutes before, got %+v, %v", reminders, err)
+	if offsets := reminders.offsets[created.EventID]; len(offsets) != 1 || offsets[0] != 1800 {
+		t.Fatalf("expected one reminder 30 minutes before, got %v", offsets)
 	}
 
 	// Only the owner of the conversation can decide, and only once.
