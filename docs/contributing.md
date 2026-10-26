@@ -59,6 +59,12 @@ git config core.hooksPath .githooks
 
 The hook formats staged files and runs every check. Fix the failure. Do not skip the hook with `--no-verify`.
 
+## Branches and releases
+
+Work on a branch and open a pull request to `main`. CI ([`ci.yml`](../.github/workflows/ci.yml)) runs the same checks on every push and builds the Docker images. PRs are squash-merged, so the PR title must be a Conventional Commit: it becomes the commit on `main` and picks the version. A merge does not deploy: the **Release** workflow tags the tip of `main` as `vX.Y.Z` and deploys it when you run it. See [deployment](deployment.md#4-release).
+
+The workflow steps live in [`.github/scripts`](../.github/scripts), each with usage notes at the top. After changing the version rules, run `.github/scripts/release-version.test.sh`; CI runs it too, with `shellcheck`.
+
 ## Agent instructions
 
 - [CLAUDE.md](../CLAUDE.md) links to this reading order.
