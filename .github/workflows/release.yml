@@ -1,0 +1,77 @@
+# Releases and deploys to the EC2 instance. Nothing is built or tested here:
+# it ships the images CI already built and tested for the commit.
+#
+# Run it from Actions → Release → Run workflow, on main:
+# - `tag` empty: release the tip of main. It gets the next vX.Y.Z (picked from
+#   the PR titles since the last release) and is deployed.
+# - `tag` set, e.g. v1.2.0: deploy that existing release again, e.g. to roll
+#   back. Nothing is tagged.
+#
+# The steps are scripts in .github/scripts, each with usage notes.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to redeploy or roll back to. Leave empty to release the tip of main.
+        required: false
+
+# Releases queue instead of racing for the same version number.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the git tag
+  packages: write # tag the images in GHCR
+  id-token: write # assume the AWS role through OIDC
+
+jobs:
+  release:
+    # Only main is released. The production environment allows only main too.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # All history and tags, to find the last release.
+          fetch-depth: 0
+
+      - name: Pick the version
+        id: version
+        run: .github/scripts/release-version.sh "$TAG" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ inputs.tag }}
+
+      - if: steps.version.outputs.new == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - if: steps.version.outputs.new == 'true'
+        name: Tag the images and the commit
+        run: .github/scripts/tag-release.sh "$TAG" "$GITHUB_SHA"
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Pull and restart on the instance
+        run: .github/scripts/ssm-deploy.sh "$TAG"
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+
+      - name: Smoke check
+        run: .github/scripts/smoke-check.sh "$SITE_URL"
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
