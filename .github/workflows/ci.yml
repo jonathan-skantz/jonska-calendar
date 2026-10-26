@@ -1,0 +1,111 @@
+# Checks every branch push. Images are built on every push to catch Dockerfile
+# breakage, but pushed to GHCR only from main, and only after every check
+# passes. A release (release.yml) reuses those images, so it ships exactly
+# what CI tested.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  # A new push to a branch cancels that branch's older run, e.g. group
+  # "ci-refs/heads/my-feature". Each main commit gets its own group instead
+  # ("ci-<sha>"): a cancelled main run would leave that commit without images
+  # to release.
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ hashFiles('backend/go.sum') }}
+          restore-keys: go-
+      - run: go vet ./...
+      # Testcontainers uses the runner's Docker daemon.
+      - run: go test ./... -count=1
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: npm-
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+
+  # The release and deploy scripts in .github/scripts.
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # shellcheck is preinstalled on GitHub's Ubuntu runners.
+      - run: shellcheck .github/scripts/*.sh deploy.sh
+      - run: .github/scripts/release-version.test.sh
+
+  # One job per image, shown as "images (api)" and so on. On main this pushes,
+  # for example, ghcr.io/jonathan-skantz/jonska-calendar-api:sha-<full commit SHA>.
+  images:
+    name: images (${{ matrix.name }})
+    needs: [backend, frontend, scripts]
+    # The EC2 instance is arm64; a native runner avoids emulation.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: api
+            context: backend
+            target: ""
+          # The goose migration runner: a stage of the backend Dockerfile.
+          - name: migrate
+            context: backend
+            target: migrate
+          # Caddy serving the built frontend.
+          - name: web
+            context: frontend
+            target: ""
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ghcr.io/${{ github.repository }}-${{ matrix.name }}:sha-${{ github.sha }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          # Layer cache in GitHub's Actions cache, one scope per image.
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
