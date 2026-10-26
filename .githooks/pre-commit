@@ -7,6 +7,10 @@ cd "$repo_root"
 echo "Formatting staged files..."
 mise exec -- frontend/node_modules/.bin/lint-staged --config .lintstagedrc.json
 
+# Every tracked shell script, on every commit. CI runs the same command.
+echo "Running shellcheck..."
+git ls-files -z '*.sh' .githooks/pre-commit | xargs -0 mise exec -- shellcheck
+
 echo "Running Go vet..."
 (cd backend && mise exec -- go vet ./...)
 

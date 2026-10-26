@@ -57,13 +57,15 @@ jobs:
       - run: npm run test
       - run: npm run build
 
-  # The release and deploy scripts in .github/scripts.
+  # All tracked shell scripts, and the tests of the release scripts.
   scripts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # shellcheck is preinstalled on GitHub's Ubuntu runners.
-      - run: shellcheck .github/scripts/*.sh deploy.sh
+      # The shellcheck version pinned in mise.toml, as in the pre-commit hook.
+      # The runner's preinstalled one is older and reports different warnings.
+      - uses: jdx/mise-action@v5
+      - run: git ls-files -z '*.sh' .githooks/pre-commit | xargs -0 shellcheck
       - run: .github/scripts/release-version.test.sh
 
   # One job per image, shown as "images (api)" and so on. On main this pushes,

@@ -29,11 +29,13 @@ cd frontend && mise exec -- npm run test                                  # vite
 cd frontend && mise exec -- npx vitest run src/lib/timeline.test.ts       # single frontend test file
 cd frontend && mise exec -- npm run lint                                  # oxlint
 cd frontend && mise exec -- npm run build                                 # tsc -b + vite build
+git ls-files -z '*.sh' .githooks/pre-commit | xargs -0 mise exec -- shellcheck   # shell scripts
+.github/scripts/release-version.test.sh                                  # release version rules
 ```
 
 The Go tests that use PostgreSQL start one container per test package with Testcontainers, so Docker must be running. Each test gets a fresh copy of a migrated template database (`backend/internal/testutil`); a package that uses it calls `testutil.Run` from `TestMain`.
 
-The pre-commit hook (`.githooks/pre-commit`, enabled with `git config core.hooksPath .githooks`) runs prettier/gofmt on staged files through lint-staged, then all the checks above.
+The pre-commit hook (`.githooks/pre-commit`, enabled with `git config core.hooksPath .githooks`) runs prettier/gofmt on staged files through lint-staged, then the checks above except the release version test. CI (`.github/workflows/ci.yml`) runs all of them on every push.
 
 ## Architecture
 

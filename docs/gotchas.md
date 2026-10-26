@@ -151,10 +151,10 @@ Files are `1_` to `32_`, not zero-padded. Sorting by name puts `10_` before `2_`
 - `go test` uses `postgres:15.3-alpine`. Dev uses `postgres:18`.
 - A query that depends on behavior that changed between those versions can pass in one and fail in the other.
 
-### There is no CI
+### The hook is optional; CI is not
 
-- The only automatic check is the pre-commit hook, which runs only after `git config core.hooksPath .githooks`.
-- `git commit --no-verify` skips it. Run the checks yourself before you push.
+- The pre-commit hook runs only after `git config core.hooksPath .githooks`, and `git commit --no-verify` skips it.
+- CI runs the same checks on every push, and `main` requires them to pass. A skipped hook only means you find out later.
 
 ## Not built yet
 

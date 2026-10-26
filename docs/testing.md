@@ -4,9 +4,9 @@ Three kinds of checks:
 
 - **Go tests** against a real PostgreSQL.
 - **Frontend tests** with Vitest and jsdom.
-- **Static checks:** `go vet`, frontend lint, and the TypeScript build.
+- **Static checks:** `go vet`, frontend lint, the TypeScript build, and `shellcheck` on every tracked shell script.
 
-The pre-commit hook runs all of them. There is no CI.
+The pre-commit hook runs all of them. CI ([`ci.yml`](../.github/workflows/ci.yml)) runs them again on every push, plus the test of the release version rules.
 
 ## Commands
 
@@ -20,6 +20,8 @@ cd frontend && mise exec -- npm run test                                  # all 
 cd frontend && mise exec -- npx vitest run src/lib/timeline.test.ts       # one frontend file
 cd frontend && mise exec -- npm run lint                                  # oxlint
 cd frontend && mise exec -- npm run build                                 # tsc -b, then vite build
+git ls-files -z '*.sh' .githooks/pre-commit | xargs -0 mise exec -- shellcheck   # shell scripts
+.github/scripts/release-version.test.sh                                  # release version rules
 ```
 
 Before calling a change done, run the full set once. It is what the hook runs.
@@ -93,11 +95,12 @@ Replace browser APIs such as `Notification` with `vi.stubGlobal`.
 `.githooks/pre-commit`, in order:
 
 1. lint-staged (Prettier and gofmt on staged files);
-2. `go vet`;
-3. `go test`;
-4. frontend lint;
-5. frontend tests;
-6. frontend build.
+2. `shellcheck` on every tracked shell script;
+3. `go vet`;
+4. `go test`;
+5. frontend lint;
+6. frontend tests;
+7. frontend build.
 
 Enable it once per clone:
 
