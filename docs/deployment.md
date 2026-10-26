@@ -42,7 +42,7 @@ Terms:
 
 _Once per server._
 
-1. **Launch** an EC2 instance with Ubuntu 24.04 or Amazon Linux 2023. A `t4g.small` (2 GB) is enough. It must be arm64 (Graviton), since CI builds arm64 images only.
+1. **Launch** an EC2 instance with Ubuntu 24.04 or Amazon Linux 2023. A `t3.small` (2 GB) is enough. It must be x86 (amd64), since CI builds amd64 images only: arm64 types such as `t4g` cannot run them.
 2. **Attach an Elastic IP**, so the address survives restarts.
 3. **Add a security group** (firewall) with these inbound rules:
 
@@ -62,7 +62,11 @@ _Once per server._
    sudo usermod -aG docker ubuntu   # the user is ec2-user on Amazon Linux
    ```
 
-6. **Enable SSM**: attach an IAM instance profile with the AWS policy `AmazonSSMManagedInstanceCore`. The agent is preinstalled. Within minutes the instance should appear in Systems Manager → Fleet Manager; if not, deploys cannot reach it.
+6. **Enable SSM**, so deploys can reach the instance. The SSM agent is preinstalled; it needs a role for the instance (separate from the deploy role in 3.3, which GitHub uses):
+   1. IAM → **Roles** → **Create role** → trusted entity **AWS service**, use case **EC2** → policy `AmazonSSMManagedInstanceCore` → name it, e.g. `calendar-ec2-ssm`.
+   2. EC2 → the instance → **Actions** → **Security** → **Modify IAM role** → select it. (The list only shows roles with the EC2 use case; refresh it after creating one.)
+   3. Restart the agent: `sudo snap restart amazon-ssm-agent` (Amazon Linux: `sudo systemctl restart amazon-ssm-agent`).
+   4. Within minutes the instance should be **Online** in Systems Manager → Fleet Manager.
 
 ## 2. Configure
 
@@ -109,7 +113,7 @@ IAM → Identity providers → add an OpenID Connect provider with URL `https://
 
 IAM → Roles → create a role with the two policies below. Replace `<account>` (12-digit ID), `<region>` and `<instance-id>`.
 
-**Trust policy**: only jobs in this repository's `production` environment may assume the role.
+**Trust policy**: only jobs in this repository's `production` environment may assume the role. GitHub identifies the repository in the token's `sub` (subject) with the owner's and the repository's numeric IDs (`<owner>@<owner-id>/<repo>@<repo-id>`), so a deleted and recreated repository with the same name does not match. The IDs below are this repository's; for a fork, get them from `https://api.github.com/repos/<owner>/<repo>` (`owner.id` and `id`).
 
 ```json
 {
@@ -124,7 +128,7 @@ IAM → Roles → create a role with the two policies below. Replace `<account>`
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:jonathan-skantz/jonska-calendar:environment:production"
+          "token.actions.githubusercontent.com:sub": "repo:jonathan-skantz@57753056/jonska-calendar@1432527943:environment:production"
         }
       }
     }
@@ -248,13 +252,14 @@ git fetch --tags && git checkout --detach v1.3.0
 
 ### When a release fails
 
-| Message in the Release log                                | Fix                                                             |
-| --------------------------------------------------------- | --------------------------------------------------------------- |
-| `No api image for <commit>`                               | CI on `main` is still running or failed. Rerun after it passes. |
-| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Check the trust policy's `sub`, and that the run was on `main`. |
-| `pull access denied` or `unauthorized`                    | A GHCR package is still private (3.1).                          |
-| `Deploy on the instance ended with status Failed`         | Read the server output just above it.                           |
-| `… is not healthy after the deploy`                       | Read `logs api` and `logs web` on the server.                   |
+| Message in the Release log                                | Fix                                                                                                                                                        |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No api image for <commit>`                               | CI on `main` is still running or failed. Rerun after it passes.                                                                                            |
+| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The token's `sub` differs from the trust policy's. CloudTrail → Event history → `AssumeRoleWithWebIdentity` shows the `sub` GitHub sent.                   |
+| `InvalidInstanceId … not in a valid state`                | SSM does not see the instance as online. Check Fleet Manager, the region and instance ID, and the instance's IAM role (part 1, step 6); restart the agent. |
+| `pull access denied` or `unauthorized`                    | A GHCR package is still private (3.1).                                                                                                                     |
+| `Deploy on the instance ended with status Failed`         | Read the server output just above it.                                                                                                                      |
+| `… is not healthy after the deploy`                       | Read `logs api` and `logs web` on the server.                                                                                                              |
 
 ## Backups
 
